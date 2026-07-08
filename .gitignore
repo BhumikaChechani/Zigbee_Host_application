@@ -1,0 +1,9 @@
+# Build directories
+build/
+bin/
+
+# Persistence
+devices.txt
+
+# OS generated files
+.DS_Store

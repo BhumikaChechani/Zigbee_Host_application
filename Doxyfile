@@ -1,0 +1,21 @@
+# Minimal Doxygen configuration for the ZNP host controller.
+# Generate docs with:  doxygen Doxyfile   (output in docs/html/index.html)
+
+PROJECT_NAME           = "ZNP MT Host Controller"
+PROJECT_BRIEF          = "Linux host for a CC1352P7 ZNP: siren & button integration"
+OUTPUT_DIRECTORY       = docs
+INPUT                  = include src README.md
+FILE_PATTERNS          = *.c *.h *.md
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = README.md
+
+# We use C, and want undocumented items surfaced during review.
+OPTIMIZE_OUTPUT_FOR_C  = YES
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+WARN_IF_UNDOCUMENTED   = YES
+JAVADOC_AUTOBRIEF      = YES
+
+GENERATE_LATEX         = NO
+GENERATE_HTML          = YES
+QUIET                  = YES

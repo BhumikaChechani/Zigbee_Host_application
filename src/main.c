@@ -1096,6 +1096,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #if ENABLE_CONTACT_SENSOR
         if ( ContactSensor_IsKnown( af.srcAddr ) ) { isKnown = true; ContactSensor_UpdateSeen( af.srcAddr ); }
 #endif
+#if ENABLE_VIBRATION_SENSOR
+        if ( VibrationSensor_IsKnown( af.srcAddr ) ) { isKnown = true; VibrationSensor_UpdateSeen( af.srcAddr ); }
+#endif
 
         if ( !isKnown && Device_ShouldQuery( af.srcAddr ) )
         {

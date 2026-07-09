@@ -168,11 +168,13 @@ void AqaraOccupancy_PollAll( void )
     int validNum = 0;
     uint16_t addrs[MAX_AQARA_OCCUPANCY];
     uint8_t eps[MAX_AQARA_OCCUPANCY];
+    bool rawOcc[MAX_AQARA_OCCUPANCY];
     for ( int i = 0; i < num; i++ )
     {
         if ( !g_aqaraOccupancies[i].configured ) continue;
         addrs[validNum] = g_aqaraOccupancies[i].shortAddr;
         eps[validNum] = g_aqaraOccupancies[i].endpoint;
+        rawOcc[validNum] = g_aqaraOccupancies[i].rawOccupied;
         validNum++;
     }
     pthread_mutex_unlock( &g_deviceMutex );
@@ -184,6 +186,14 @@ void AqaraOccupancy_PollAll( void )
     
     for ( int i = 0; i < num; i++ )
     {
+        if ( rawOcc[i] )
+        {
+            // Trigger distance tracking BEFORE polling so the read returns fresh data
+            uint8_t writeZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x02, 0x98, 0x01, 0x20, 0x01 };
+            ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, writeZcl, 9 );
+            usleep( 50000 );
+        }
+
         uint8_t readZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x00, 0x42, 0x01, 0x5F, 0x01 };
         // Poll Presence & Distance
         ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, readZcl, 9 );
@@ -691,11 +701,8 @@ static void EvaluatePresenceLogic( uint16_t shortAddr_ )
         }
         else if ( dist == 0 )
         {
-            // dist=0 means the sensor has not yet streamed a valid distance (distance
-            // tracking not yet active or target not locked). Fall back to raw presence
-            // so the zone fires immediately; once a real distance arrives the next call
-            // to EvaluatePresenceLogic will apply the zone filter correctly.
-            logicalOccupied = true;
+            // Fall back to raw presence only if zone starts at 0.
+            logicalOccupied = ( g_aqaraOccupancies[idx].zones[z].minCm == 0 );
         }
         else
         {

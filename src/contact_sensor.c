@@ -112,6 +112,7 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_contactSensors[g_numContactSensors].endpoint = endpoint_;
       g_contactSensors[g_numContactSensors].lastSeen = ZNP_GetCurrentTime();
       g_contactSensors[g_numContactSensors].zoneId = -1;
+      g_contactSensors[g_numContactSensors].zoneType = 0xFFFF;
       g_contactSensors[g_numContactSensors].hasIeee = Device_GetDiscoveredIeee(
           shortAddr_, g_contactSensors[g_numContactSensors].ieee);
       g_contactSensors[g_numContactSensors].configured = false;
@@ -229,6 +230,7 @@ void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
   for (int i = 0; i < g_numContactSensors; i++) {
     if (g_contactSensors[i].shortAddr == shortAddr_) {
       g_contactSensors[i].zoneId = zoneId;
+      g_contactSensors[i].zoneType = zoneType_;
       break;
     }
   }
@@ -240,15 +242,38 @@ void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
 
 void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
                                 uint8_t zoneId_) {
-  printf("   -> Zone Status Change from Contact Sensor 0x%04X: "
+  printf("   -> Zone Status Change from IAS Zone Sensor 0x%04X: "
          "zone_status=0x%04X, zone_id=%d\n",
          shortAddr_, zoneStatus_, zoneId_);
 
-  bool open = (zoneStatus_ & 0x0001) != 0;
-  if (open) {
-    UseCase_Post(UC_CONTACT_OPEN, shortAddr_, zoneStatus_);
+  uint16_t zType = 0x0015; // default to contact switch
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numContactSensors; i++) {
+    if (g_contactSensors[i].shortAddr == shortAddr_) {
+      if (g_contactSensors[i].zoneType != 0xFFFF) {
+          zType = g_contactSensors[i].zoneType;
+      }
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+
+  bool active = (zoneStatus_ & 0x0001) != 0; // Alarm 1
+  
+  if (zType == 0x002D) {
+    // Vibration Sensor
+    if (active) {
+      UseCase_Post(UC_VIBRATION_DETECTED, shortAddr_, zoneStatus_);
+    } else {
+      UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, zoneStatus_);
+    }
   } else {
-    UseCase_Post(UC_CONTACT_CLOSED, shortAddr_, zoneStatus_);
+    // Standard Contact Sensor (0x0015) or unknown
+    if (active) {
+      UseCase_Post(UC_CONTACT_OPEN, shortAddr_, zoneStatus_);
+    } else {
+      UseCase_Post(UC_CONTACT_CLOSED, shortAddr_, zoneStatus_);
+    }
   }
 }
 

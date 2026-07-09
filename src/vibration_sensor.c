@@ -112,6 +112,8 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_vibrationSensors[g_numVibrationSensors].zoneId = -1;
       g_vibrationSensors[g_numVibrationSensors].hasIeee = Device_GetDiscoveredIeee(shortAddr_, g_vibrationSensors[g_numVibrationSensors].ieee);
       g_vibrationSensors[g_numVibrationSensors].configured = false;
+      g_vibrationSensors[g_numVibrationSensors].isVibrating = false;
+      g_vibrationSensors[g_numVibrationSensors].lastVibrationTime = 0;
       g_numVibrationSensors++;
       changed = true;
     }
@@ -221,11 +223,30 @@ void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_
 void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uint8_t zoneId_) {
   printf("   -> Zone Status Change from Vibration Sensor 0x%04X: zone_status=0x%04X, zone_id=%d\n", shortAddr_, zoneStatus_, zoneId_);
   bool active = (zoneStatus_ & 0x0001) != 0;
-  if (active) {
-    UseCase_Post(UC_VIBRATION_DETECTED, shortAddr_, zoneStatus_);
-  } else {
-    UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, zoneStatus_);
+
+  pthread_mutex_lock(&g_deviceMutex);
+  int idx = -1;
+  for (int i = 0; i < g_numVibrationSensors; i++) {
+    if (g_vibrationSensors[i].shortAddr == shortAddr_) {
+      idx = i;
+      break;
+    }
   }
+  if (idx != -1) {
+    if (active) {
+      if (!g_vibrationSensors[idx].isVibrating) {
+        g_vibrationSensors[idx].isVibrating = true;
+        UseCase_Post(UC_VIBRATION_DETECTED, shortAddr_, zoneStatus_);
+      }
+      g_vibrationSensors[idx].lastVibrationTime = ZNP_GetCurrentTime();
+    } else {
+      if (g_vibrationSensors[idx].isVibrating) {
+        g_vibrationSensors[idx].isVibrating = false;
+        UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, zoneStatus_);
+      }
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
 }
 
 void VibrationSensor_PrintStatus(void) {
@@ -283,5 +304,17 @@ void VibrationSensor_DiscoverAllActiveEp(void) {
     ZNP_ZdoActiveEpReq(tempAddrs[i]);
     ZNP_QuerySimpleDesc(tempAddrs[i], 1);
   }
+}
+
+void VibrationSensor_PollAll(void) {
+  pthread_mutex_lock(&g_deviceMutex);
+  double now = ZNP_GetCurrentTime();
+  for (int i = 0; i < g_numVibrationSensors; i++) {
+    if (g_vibrationSensors[i].isVibrating && (now - g_vibrationSensors[i].lastVibrationTime > 5.0)) {
+      g_vibrationSensors[i].isVibrating = false;
+      UseCase_Post(UC_VIBRATION_CLEARED, g_vibrationSensors[i].shortAddr, 0);
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
 }
 #endif

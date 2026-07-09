@@ -16,7 +16,6 @@ typedef struct
     bool hasIeee;
     double lastSeen;
     int zoneId;
-    uint16_t zoneType;
     bool configured;
 } CONTACT_SENSOR_T;
 

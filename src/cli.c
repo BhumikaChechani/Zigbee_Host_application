@@ -17,6 +17,9 @@
 #if ENABLE_CONTACT_SENSOR
 #include "contact_sensor.h"
 #endif
+#if ENABLE_VIBRATION_SENSOR
+#include "vibration_sensor.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,6 +60,9 @@ static void Cli_HandleCommand( const char *cmd_ )
 #endif
 #if ENABLE_CONTACT_SENSOR
         ContactSensor_PrintStatus();
+#endif
+#if ENABLE_VIBRATION_SENSOR
+        VibrationSensor_PrintStatus();
 #endif
 #if ENABLE_AQARA_OCCUPANCY
         AqaraOccupancy_PrintStatus();

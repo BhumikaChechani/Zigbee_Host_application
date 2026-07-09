@@ -405,6 +405,9 @@ int main( int argc, char *argv[] )
 #if ENABLE_CONTACT_SENSOR
     ContactSensor_Init();
 #endif
+#if ENABLE_VIBRATION_SENSOR
+    VibrationSensor_Init();
+#endif
 
     // Load persisted devices
     Device_Load();
@@ -581,6 +584,9 @@ int main( int argc, char *argv[] )
 #endif
 #if ENABLE_CONTACT_SENSOR
     ContactSensor_Start();
+#endif
+#if ENABLE_VIBRATION_SENSOR
+    VibrationSensor_Start();
 #endif
 
     // Start CLI thread
@@ -933,9 +939,21 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                     else
                     {
                         bool isContact = false;
+                        bool isVibration = false;
                         if ( deviceId == 0x0402 )
                         {
-                            isContact = true;
+                            for ( int i = 0; i < numInCls; i++ )
+                            {
+                                if ( inCls[i] == 0xFC04 )
+                                {
+                                    isVibration = true;
+                                    break;
+                                }
+                            }
+                            if ( !isVibration )
+                            {
+                                isContact = true;
+                            }
                         }
 
                         bool isOnics = false;
@@ -993,6 +1011,12 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                         {
 #if ENABLE_CONTACT_SENSOR
                             ContactSensor_Discover( shortAddr, ep );
+#endif
+                        }
+                        else if ( isVibration )
+                        {
+#if ENABLE_VIBRATION_SENSOR
+                            VibrationSensor_Discover( shortAddr, ep );
 #endif
                         }
                         else if ( isOnics )
@@ -1106,6 +1130,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #endif
 #if ENABLE_CONTACT_SENSOR
         else if ( ContactSensor_IsKnown( af.srcAddr ) ) { ContactSensor_PostAf( af.srcAddr, &af ); }
+#endif
+#if ENABLE_VIBRATION_SENSOR
+        else if ( VibrationSensor_IsKnown( af.srcAddr ) ) { VibrationSensor_PostAf( af.srcAddr, &af ); }
 #endif
 #if ENABLE_ONICS_BUTTON
         else if ( OnicsButton_IsKnown( af.srcAddr ) ) { OnicsButton_PostAf( af.srcAddr, &af ); }

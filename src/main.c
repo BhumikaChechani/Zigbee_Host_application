@@ -26,6 +26,9 @@
 #if ENABLE_CONTACT_SENSOR
 #include "contact_sensor.h"
 #endif
+#if ENABLE_VIBRATION_SENSOR
+#include "vibration_sensor.h"
+#endif
 
 #include "usecase.h"
 #include "sensor_common.h"

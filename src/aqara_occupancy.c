@@ -687,14 +687,19 @@ static void EvaluatePresenceLogic( uint16_t shortAddr_ )
         if ( !sensorSaysOccupied )
         {
             // Sensor explicitly says NO presence -> always clear all zones immediately.
-            // Distance can be stale/frozen; never let it block a sensor-reported absence.
             logicalOccupied = false;
+        }
+        else if ( dist == 0 )
+        {
+            // dist=0 means the sensor has not yet streamed a valid distance (distance
+            // tracking not yet active or target not locked). Fall back to raw presence
+            // so the zone fires immediately; once a real distance arrives the next call
+            // to EvaluatePresenceLogic will apply the zone filter correctly.
+            logicalOccupied = true;
         }
         else
         {
-            // Sensor says presence -> apply zone range filter using the reported distance.
-            // dist=0 is treated as literal 0 cm (sensor's default when target is at minimum
-            // range or distance is not yet available). Zone must include 0 to fire.
+            // Valid distance -> apply software zone filter.
             logicalOccupied = ( dist >= g_aqaraOccupancies[idx].zones[z].minCm &&
                                 dist <= g_aqaraOccupancies[idx].zones[z].maxCm );
         }
@@ -731,16 +736,33 @@ static void EvaluatePresenceLogic( uint16_t shortAddr_ )
 void AqaraOccupancy_HandleState( uint16_t shortAddr_, uint8_t occupied_ )
 {
     pthread_mutex_lock( &g_deviceMutex );
+    uint8_t endpoint = 0x01;
     for ( int i = 0; i < g_numAqaraOccupancies; i++ )
     {
         if ( g_aqaraOccupancies[i].shortAddr == shortAddr_ )
         {
             g_aqaraOccupancies[i].rawOccupied = ( occupied_ != 0 );
             g_aqaraOccupancies[i].lastSeen = ZNP_GetCurrentTime();
+            endpoint = g_aqaraOccupancies[i].endpoint;
             break;
         }
     }
     pthread_mutex_unlock( &g_deviceMutex );
+
+    if ( occupied_ != 0 )
+    {
+        // The sensor just sent us a presence report -> it is guaranteed awake RIGHT NOW.
+        // Trigger distance tracking (attr 0x0198 = 1) while the radio is still active.
+        // The sensor will respond with unsolicited 0x015F (distance) reports so that
+        // EvaluatePresenceLogic can apply zone filtering with a real distance value.
+        static uint8_t s_distSeq = 0xD0;
+        uint8_t f[9] = { 0x04, 0x5F, 0x11, ++s_distSeq, 0x02,
+                         0x98, 0x01,   // attr 0x0198
+                         0x20,         // uint8
+                         0x01 };       // value = 1 (start tracking)
+        ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0,
+                              s_distSeq, 0x00, 0x1E, f, sizeof(f) );
+    }
 
     EvaluatePresenceLogic( shortAddr_ );
 }
@@ -786,25 +808,9 @@ void AqaraOccupancy_SetZone( uint16_t shortAddr_, int zoneIdx_, uint32_t minCm_,
         g_aqaraOccupancies[idx].zones[zoneIdx_].maxCm = maxCm_;
         printf( "Aqara Occupancy 0x%04X zone %d set to %u - %u cm.\n", shortAddr_, zoneIdx_, minCm_, maxCm_ );
         Device_Save();
-        
-        uint32_t bitmask = 0;
-        for ( int z = 0; z < MAX_OCCUPANCY_ZONES; z++ )
-        {
-            if ( g_aqaraOccupancies[idx].zones[z].isActive )
-            {
-                uint32_t startSlice = g_aqaraOccupancies[idx].zones[z].minCm / 25;
-                uint32_t endSlice = g_aqaraOccupancies[idx].zones[z].maxCm / 25;
-                if (endSlice > 24) endSlice = 24;
-                for (uint32_t s = startSlice; s < endSlice; s++)
-                {
-                    bitmask |= (1 << s);
-                }
-            }
-        }
-        if (bitmask == 0) bitmask = 0xFFFFFF;
-        
+        // Zone boundaries enforced in software (EvaluatePresenceLogic + distance filter).
+        // Hardware stays at full range (0xFFFFFF) so the radar DSP tracking never breaks.
         pthread_mutex_unlock( &g_deviceMutex );
-        AqaraOccupancy_SetHwDetectionRange( shortAddr_, bitmask );
         EvaluatePresenceLogic( shortAddr_ );
         return;
     }
@@ -841,25 +847,7 @@ void AqaraOccupancy_DeleteZone( uint16_t shortAddr_, int zoneIdx_ )
         g_aqaraOccupancies[idx].zones[zoneIdx_].occupied = false;
         printf( "Aqara Occupancy 0x%04X zone %d deleted.\n", shortAddr_, zoneIdx_ );
         Device_Save();
-        
-        uint32_t bitmask = 0;
-        for ( int z = 0; z < MAX_OCCUPANCY_ZONES; z++ )
-        {
-            if ( g_aqaraOccupancies[idx].zones[z].isActive )
-            {
-                uint32_t startSlice = g_aqaraOccupancies[idx].zones[z].minCm / 25;
-                uint32_t endSlice = g_aqaraOccupancies[idx].zones[z].maxCm / 25;
-                if (endSlice > 24) endSlice = 24;
-                for (uint32_t s = startSlice; s < endSlice; s++)
-                {
-                    bitmask |= (1 << s);
-                }
-            }
-        }
-        if (bitmask == 0) bitmask = 0xFFFFFF;
-        
         pthread_mutex_unlock( &g_deviceMutex );
-        AqaraOccupancy_SetHwDetectionRange( shortAddr_, bitmask );
         return;
     }
     pthread_mutex_unlock( &g_deviceMutex );

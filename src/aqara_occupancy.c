@@ -727,7 +727,7 @@ static void EvaluatePresenceLogic( uint16_t shortAddr_ )
             else
             {
                 if ( sensorSaysOccupied && dist > 0 )
-                    printf( "   ❌ PRESENCE IGNORED on sensor 0x%04X (distance %u cm outside zone %d [%u-%u])\n", 
+                    printf( "   🚫 PRESENCE IGNORED on sensor 0x%04X (distance %u cm outside zone %d [%u-%u])\n", 
                             shortAddr_, dist, z, g_aqaraOccupancies[idx].zones[z].minCm, g_aqaraOccupancies[idx].zones[z].maxCm );
                 else
                     printf( "   ❌ PRESENCE CLEARED on sensor 0x%04X (zone %d)\n", shortAddr_, z );

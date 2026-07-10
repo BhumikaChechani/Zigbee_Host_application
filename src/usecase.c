@@ -26,6 +26,10 @@
 static MSG_QUEUE_T s_useCaseInbox; ///< Inbox of pending use-case events.
 static pthread_t s_useCaseThread;  ///< The use-case worker thread handle.
 
+// Maximum allowed gap between consecutive presses in a 3-press sequence.
+// If the time since the last recorded press exceeds this, the history is reset.
+#define MAX_PRESS_INTERVAL_S 5.0
+
 // Struct to keep track of the last 3 button press timestamps for each Aqara
 // switch
 typedef struct {
@@ -92,13 +96,22 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
         history->count = 0;
       } else {
+        // If the gap from the last recorded press is too long, this is the
+        // start of a fresh sequence — discard stale history.
+        if (history->count > 0) {
+          double gapSinceLastPress = now - history->pressTimes[history->count - 1];
+          if (gapSinceLastPress > MAX_PRESS_INTERVAL_S) {
+            printf("[USECASE] Aqara 0x%04X: gap since last press = %.3fs > %.1fs -> "
+                   "clearing press history\n",
+                   event_->srcAddr, gapSinceLastPress, MAX_PRESS_INTERVAL_S);
+            history->count = 0;
+          }
+        }
+
+        // Record this press (max 3 slots; do NOT slide — reset after evaluation)
         if (history->count < 3) {
           history->pressTimes[history->count] = now;
           history->count++;
-        } else {
-          history->pressTimes[0] = history->pressTimes[1];
-          history->pressTimes[1] = history->pressTimes[2];
-          history->pressTimes[2] = now;
         }
 
         printf("[USECASE] Aqara 0x%04X pressed (count=%d)\n", event_->srcAddr,
@@ -111,12 +124,18 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
           double diff = history->pressTimes[2] - history->pressTimes[0];
           printf("[USECASE] Aqara 0x%04X: 3 presses in %.3fs\n",
                  event_->srcAddr, diff);
+          // Always reset after a complete 3-press window so the next
+          // sequence starts fresh — regardless of whether the window
+          // was fast enough to trigger.
+          history->count = 0;
           if (diff <= 3.0) {
             printf("[USECASE] 3 presses in <= 3.0s -> turning sirens ON\n");
 #if ENABLE_SIREN
             Siren_ControlAll(1);
 #endif
-            history->count = 0;
+          } else {
+            printf("[USECASE] 3 presses but window too wide (%.3fs > 3.0s) -> "
+                   "ignoring\n", diff);
           }
         }
       }

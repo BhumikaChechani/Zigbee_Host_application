@@ -45,6 +45,11 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
       }
     }
   }
+
+  if ((fc & 0x10) == 0 && cmdId != 0x0B) {
+    uint8_t transSeq = af_->data[1];
+    ZNP_SendDefaultResponse(af_->srcAddr, af_->srcEp, 8, af_->clusterId, transSeq, cmdId, 0x00, fc);
+  }
 }
 
 static void *ContactSensor_Thread(void *arg_) {

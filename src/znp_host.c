@@ -1177,4 +1177,20 @@ bool ZNP_SendSirenWarning( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uin
                                  transId_, 0, 30, zclFrame, 8 );
 }
 
+bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t dstEndpoint_, uint8_t srcEndpoint_,
+                             uint16_t clusterId_, uint8_t transSeq_, uint8_t cmdId_,
+                             uint8_t status_, uint8_t fc_)
+{
+    uint8_t payload[5];
+    uint8_t direction = (fc_ & 0x08) ? 0x00 : 0x08; // Reverse direction of received message
+    payload[0] = 0x10 | direction; // Profile wide, Disable Default Response
+    payload[1] = transSeq_;
+    payload[2] = 0x0B; // Default Response Command ID
+    payload[3] = cmdId_;
+    payload[4] = status_;
+
+    return ZNP_AfDataRequestExt(2, shortAddr_, dstEndpoint_, 0x0000, srcEndpoint_,
+                                clusterId_, transSeq_, 0x00, 30, payload, 5);
+}
+
 

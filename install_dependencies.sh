@@ -34,12 +34,24 @@ else
     exit 1
 fi
 
-# Add current non-root user to the serial communication group
+# Configure system-wide udev rules for all ttyACM and ttyUSB serial devices
+echo "[+] Configuring udev rules for all serial ports (/dev/ttyACM* and /dev/ttyUSB*)..."
+cat << 'EOF' > /etc/udev/rules.d/99-serial.rules
+KERNEL=="ttyACM[0-9]*", MODE="0666"
+KERNEL=="ttyUSB[0-9]*", MODE="0666"
+EOF
+
+# Reload udev rules to apply changes immediately
+echo "[+] Reloading udev rules..."
+udevadm control --reload-rules
+udevadm trigger
+
+# Add current non-root user to the serial communication group as backup
 # (SUDO_USER holds the username of the user who invoked sudo)
 REAL_USER=${SUDO_USER:-$USER}
 
 if [ "$REAL_USER" != "root" ]; then
-    echo "[+] Configuring serial port permissions for user: $REAL_USER"
+    echo "[+] Configuring group permissions for user: $REAL_USER"
     if getent group dialout > /dev/null; then
         usermod -aG dialout "$REAL_USER"
         echo "[+] Added $REAL_USER to the 'dialout' group."
@@ -47,15 +59,11 @@ if [ "$REAL_USER" != "root" ]; then
         usermod -aG uucp "$REAL_USER"
         echo "[+] Added $REAL_USER to the 'uucp' group."
     fi
-    echo "=========================================================="
-    echo " SUCCESS: Installation complete!"
-    echo " ⚠️  IMPORTANT: Please LOG OUT and LOG BACK IN (or reboot) for"
-    echo " group permissions to take effect so you can access the serial port without sudo."
-    echo "=========================================================="
-else
-    echo "=========================================================="
-    echo " SUCCESS: Installation complete!"
-    echo " Note: Since you ran this script directly as root, make sure your"
-    echo " standard user account belongs to the 'dialout' or 'uucp' group."
-    echo "=========================================================="
 fi
+
+echo "=========================================================="
+echo " SUCCESS: Installation & Configuration complete!"
+echo " 🔌 IMPORTANT: If the Zigbee Coordinator is plugged in,"
+echo "    please UNPLUG and PLUG it back in to apply the rules."
+echo "    This allows running the app without sudo immediately!"
+echo "=========================================================="

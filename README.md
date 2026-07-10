@@ -15,7 +15,16 @@ This application acts as the "brain" of your Zigbee network. It communicates wit
 
 ## 🚀 Quick Start Guide
 
-### 1. Build the Application
+### 1. Install Dependencies
+Before compiling, you need to install the C compiler, make utility, and serial diagnostic tools. Run the automated setup script included in this repository (supports Debian/Ubuntu, Fedora, CentOS, and Red Hat systems):
+
+```sh
+sudo ./install_dependencies.sh
+```
+
+*Note: After the script completes, please log out and log back in (or reboot) so the serial port group permissions take effect.*
+
+### 2. Build the Application
 The project is written in standard C11 and uses a simple Makefile. To compile the code into an executable:
 
 ```sh
@@ -27,7 +36,7 @@ make clean
 ```
 *This will generate the final executable at `bin/znp_host_c`.*
 
-### 2. Run the Controller
+### 3. Run the Controller
 You **must** run the application from the root `host_c/` folder. This ensures the `devices.txt` registry file is saved and loaded correctly from the current directory.
 
 ```sh

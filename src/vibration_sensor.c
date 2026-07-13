@@ -430,14 +430,14 @@ void VibrationSensor_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
 void VibrationSensor_ReadEnvironment(uint16_t shortAddr_) {
   printf("Requesting Environment Data (Battery & Temp) from Vibration Sensor 0x%04X...\n", shortAddr_);
   
-  // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 0x2D
+  // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 0x26
   uint8_t zclFrameBat[5];
   zclFrameBat[0] = 0x00; 
   zclFrameBat[1] = 0xCD;
   zclFrameBat[2] = 0x00; // Read Attributes
   zclFrameBat[3] = 0x20; // Attr 0x0020
   zclFrameBat[4] = 0x00; 
-  ZNP_AfDataRequestExt(2, shortAddr_, 0x2D, 0, 8, 0x0001, 0xCD, 0, 30, zclFrameBat, 5);
+  ZNP_AfDataRequestExt(2, shortAddr_, 0x26, 0, 8, 0x0001, 0xCD, 0, 30, zclFrameBat, 5);
   
   usleep(200000); // Wait 200ms
   

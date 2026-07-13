@@ -160,10 +160,14 @@ static void Cli_HandleCommand( const char *cmd_ )
             uint16_t addr = strtoul( parts[1], NULL, 16 );
             uint8_t level = (uint8_t)strtoul( parts[2], NULL, 10 );
 #if ENABLE_AQARA_OCCUPANCY
-            AqaraOccupancy_SetSensitivity( addr, level );
+            if (AqaraOccupancy_IsKnown(addr)) {
+                AqaraOccupancy_SetSensitivity( addr, level );
+            }
 #endif
 #if ENABLE_VIBRATION_SENSOR
-            VibrationSensor_SetSensitivity( addr, level );
+            if (VibrationSensor_IsKnown(addr)) {
+                VibrationSensor_SetSensitivity( addr, level );
+            }
 #endif
         }
         else
@@ -241,10 +245,14 @@ static void Cli_HandleCommand( const char *cmd_ )
         {
             uint16_t addr = (uint16_t)strtol( parts[1], NULL, 16 );
 #if ENABLE_AQARA_OCCUPANCY
-            AqaraOccupancy_ReadEnvironment( addr );
+            if (AqaraOccupancy_IsKnown(addr)) {
+                AqaraOccupancy_ReadEnvironment( addr );
+            }
 #endif
 #if ENABLE_VIBRATION_SENSOR
-            VibrationSensor_ReadEnvironment( addr );
+            if (VibrationSensor_IsKnown(addr)) {
+                VibrationSensor_ReadEnvironment( addr );
+            }
 #endif
         }
         else

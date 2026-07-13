@@ -155,6 +155,7 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_vibrationSensors[g_numVibrationSensors].lastVibrationTime = 0.0;
       g_vibrationSensors[g_numVibrationSensors].isMoving = false;
       g_vibrationSensors[g_numVibrationSensors].lastMovementTime = 0.0;
+      g_vibrationSensors[g_numVibrationSensors].sensitivity = 10;
       g_numVibrationSensors++;
       changed = true;
     }
@@ -243,6 +244,19 @@ void VibrationSensor_Setup(uint16_t shortAddr_) {
   ZNP_SendZoneEnrollResponse(shortAddr_, endpoint, 0x21, 0x01);
   usleep(200000);
   printf("Configuration sent to Vibration Sensor 0x%04X!\n", shortAddr_);
+  
+  pthread_mutex_lock(&g_deviceMutex);
+  uint8_t sens = 10;
+  for (int i = 0; i < g_numVibrationSensors; i++) {
+    if (g_vibrationSensors[i].shortAddr == shortAddr_) {
+      sens = g_vibrationSensors[i].sensitivity;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+  if (sens != 10) {
+    VibrationSensor_SetSensitivity(shortAddr_, sens);
+  }
 }
 
 void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSeq_, uint16_t zoneType_) {
@@ -388,6 +402,16 @@ void VibrationSensor_PollAll(void) {
 
 void VibrationSensor_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
   printf("Configuring Vibration Sensor 0x%04X sensitivity to level %d...\n", shortAddr_, level_);
+  
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numVibrationSensors; i++) {
+    if (g_vibrationSensors[i].shortAddr == shortAddr_) {
+      g_vibrationSensors[i].sensitivity = level_;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+  Device_Save();
   
   uint8_t zclFrame[8];
   zclFrame[0] = 0x00; // Global, Client->Server, Default Resp Enabled

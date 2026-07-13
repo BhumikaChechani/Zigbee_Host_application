@@ -26,6 +26,9 @@
 #if ENABLE_CONTACT_SENSOR
 #include "contact_sensor.h"
 #endif
+#if ENABLE_VIBRATION_SENSOR
+#include "vibration_sensor.h"
+#endif
 
 #include "usecase.h"
 #include "sensor_common.h"
@@ -215,6 +218,18 @@ void Device_Save( void )
     }
 #endif
 
+#if ENABLE_VIBRATION_SENSOR
+    for ( int i = 0; i < g_numVibrationSensors; i++ )
+    {
+        fprintf( file, "vibration %04X %02X ", g_vibrationSensors[i].shortAddr, g_vibrationSensors[i].endpoint );
+        for ( int j = 0; j < 8; j++ )
+        {
+            fprintf( file, "%02X", g_vibrationSensors[i].ieee[j] );
+        }
+        fprintf( file, " %d %d %d\n", g_vibrationSensors[i].hasIeee ? 1 : 0, g_vibrationSensors[i].zoneId, g_vibrationSensors[i].sensitivity );
+    }
+#endif
+
     fclose( file );
     pthread_mutex_unlock( &g_deviceMutex );
 }
@@ -353,6 +368,30 @@ void Device_Load( void )
                 g_contactSensors[g_numContactSensors].zoneId = zoneId;
                 g_contactSensors[g_numContactSensors].configured = true;
                 g_numContactSensors++;
+                Device_AddDiscoveredIeee( shortAddr, ieee );
+            }
+        }
+#endif
+#if ENABLE_VIBRATION_SENSOR
+        else if ( strcmp( type, "vibration" ) == 0 )
+        {
+            unsigned int sens = 10;
+            int scanned = fscanf( file, "%u %u %u", &hasIeee, &zoneId, &sens );
+            if ( scanned >= 2 && g_numVibrationSensors < MAX_VIBRATION_SENSORS )
+            {
+                g_vibrationSensors[g_numVibrationSensors].shortAddr = shortAddr;
+                g_vibrationSensors[g_numVibrationSensors].endpoint = endpoint;
+                g_vibrationSensors[g_numVibrationSensors].lastSeen = ZNP_GetCurrentTime();
+                g_vibrationSensors[g_numVibrationSensors].hasIeee = ( hasIeee != 0 );
+                memcpy( g_vibrationSensors[g_numVibrationSensors].ieee, ieee, 8 );
+                g_vibrationSensors[g_numVibrationSensors].zoneId = zoneId;
+                g_vibrationSensors[g_numVibrationSensors].sensitivity = sens;
+                g_vibrationSensors[g_numVibrationSensors].configured = true;
+                g_vibrationSensors[g_numVibrationSensors].isVibrating = false;
+                g_vibrationSensors[g_numVibrationSensors].lastVibrationTime = 0.0;
+                g_vibrationSensors[g_numVibrationSensors].isMoving = false;
+                g_vibrationSensors[g_numVibrationSensors].lastMovementTime = 0.0;
+                g_numVibrationSensors++;
                 Device_AddDiscoveredIeee( shortAddr, ieee );
             }
         }
@@ -614,6 +653,10 @@ int main( int argc, char *argv[] )
             ZNP_PermitJoin( PERMIT_JOIN_DURATION );
             lastRefresh = now;
         }
+
+#if ENABLE_VIBRATION_SENSOR
+        VibrationSensor_PollAll();
+#endif
 
         usleep( 5000 ); // Small yield
     }
@@ -940,11 +983,17 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                     {
                         bool isContact = false;
                         bool isVibration = false;
-                        if ( deviceId == 0x0402 )
+
+                        // Check if it's explicitly a Vibration/Glass Break Sensor by DevID
+                        if ( deviceId == 0x0228 || deviceId == 0x022D || deviceId == 0x0101 )
+                        {
+                            isVibration = true;
+                        }
+                        else if ( deviceId == 0x0402 )
                         {
                             for ( int i = 0; i < numInCls; i++ )
                             {
-                                if ( inCls[i] == 0xFC04 )
+                                if ( inCls[i] == 0xFC04 || inCls[i] == 0x0101 )
                                 {
                                     isVibration = true;
                                     break;
@@ -957,11 +1006,11 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                         }
 
                         bool isOnics = false;
-                        if ( !isContact )
+                        if ( !isContact && !isVibration )
                         {
                             for ( int i = 0; i < numInCls; i++ )
                             {
-                                if ( inCls[i] == 0x0500 || inCls[i] == 0x000F )
+                                if ( inCls[i] == 0x000F || inCls[i] == 0x0012 )
                                 {
                                     isOnics = true;
                                     break;
@@ -1093,6 +1142,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #if ENABLE_CONTACT_SENSOR
         if ( ContactSensor_IsKnown( af.srcAddr ) ) { isKnown = true; ContactSensor_UpdateSeen( af.srcAddr ); }
 #endif
+#if ENABLE_VIBRATION_SENSOR
+        if ( VibrationSensor_IsKnown( af.srcAddr ) ) { isKnown = true; VibrationSensor_UpdateSeen( af.srcAddr ); }
+#endif
 
         if ( !isKnown && Device_ShouldQuery( af.srcAddr ) )
         {
@@ -1102,23 +1154,10 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                 Siren_Discover( af.srcAddr, af.srcEp );
 #endif
             }
-            else if ( af.clusterId == 0x0500 )
+            else
             {
-#if ENABLE_ONICS_BUTTON
-                OnicsButton_Discover( af.srcAddr, af.srcEp );
-#endif
-            }
-            else if ( af.clusterId == 0x0006 || af.clusterId == 0x0003 )
-            {
-#if ENABLE_AQARA_BUTTON
-                AqaraButton_Discover( af.srcAddr, af.srcEp );
-#endif
-            }
-            else if ( af.clusterId == 0x0406 )
-            {
-#if ENABLE_AQARA_OCCUPANCY
-                AqaraOccupancy_Discover( af.srcAddr, af.srcEp );
-#endif
+                printf(" ❓ Unknown device 0x%04X sent AF message on cluster 0x%04X. Requesting Active EPs...\n", af.srcAddr, af.clusterId);
+                ZNP_ZdoActiveEpReq( af.srcAddr );
             }
         }
 

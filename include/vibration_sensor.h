@@ -22,6 +22,7 @@ typedef struct
     bool isMoving;
     double lastMovementTime;
     uint16_t lastZoneStatus;
+    uint8_t sensitivity;
 } VIBRATION_SENSOR_T;
 
 extern VIBRATION_SENSOR_T g_vibrationSensors[MAX_VIBRATION_SENSORS];

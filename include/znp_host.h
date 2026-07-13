@@ -307,16 +307,7 @@ bool ZNP_AfDataRequestExt(uint8_t dstAddrMode_, uint64_t dstAddr_,
 /// @param  shortAddr_    Destination short address.
 /// @param  dstEndpoint_  Destination endpoint.
 /// @param  srcEndpoint_  Source endpoint on the coordinator (e.g. 1 or 8).
-/// @param  clusterId_    The cluster ID of the original message.
-/// @param  transSeq_     Transaction sequence number of the original message.
-/// @param  cmdId_        The ZCL command ID being responded to.
-/// @param  status_       The ZCL status code (0x00 = SUCCESS).
-/// @param  fc_           The frame control of the received message (used to reverse direction).
-/// @return true if successful.
-///
-bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t dstEndpoint_, uint8_t srcEndpoint_,
-                             uint16_t clusterId_, uint8_t transSeq_, uint8_t cmdId_,
-                             uint8_t status_, uint8_t fc_);
+
 
 ///
 /// @brief  ZDO_MATCH_DESC_REQ - find devices matching a cluster profile.

@@ -99,16 +99,19 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
         // If the gap from the last recorded press is too long, this is the
         // start of a fresh sequence — discard stale history.
         if (history->count > 0) {
-          double gapSinceLastPress = now - history->pressTimes[history->count - 1];
+          double gapSinceLastPress =
+              now - history->pressTimes[history->count - 1];
           if (gapSinceLastPress > MAX_PRESS_INTERVAL_S) {
-            printf("[USECASE] Aqara 0x%04X: gap since last press = %.3fs > %.1fs -> "
+            printf("[USECASE] Aqara 0x%04X: gap since last press = %.3fs > "
+                   "%.1fs -> "
                    "clearing press history\n",
                    event_->srcAddr, gapSinceLastPress, MAX_PRESS_INTERVAL_S);
             history->count = 0;
           }
         }
 
-        // Record this press (max 3 slots; do NOT slide — reset after evaluation)
+        // Record this press (max 3 slots; do NOT slide — reset after
+        // evaluation)
         if (history->count < 3) {
           history->pressTimes[history->count] = now;
           history->count++;
@@ -135,7 +138,8 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
           } else {
             printf("[USECASE] 3 presses but window too wide (%.3fs > 3.0s) -> "
-                   "ignoring\n", diff);
+                   "ignoring\n",
+                   diff);
           }
         }
       }
@@ -183,36 +187,29 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     // registered occupancy zone reports presence.
     int occupied = AqaraOccupancy_OccupiedCount();
     int total = g_numAqaraOccupancies;
-    printf(
-        "🚶 [USECASE] Person detected in zone 0x%04X (index %u) (%d/%d physical sensors occupied)\n",
-        event_->srcAddr, event_->raw, occupied, total);
+    printf("🚶 [USECASE] Person detected in zone 0x%04X (index %u) (%d/%d "
+           "physical sensors occupied)\n",
+           event_->srcAddr, event_->raw, occupied, total);
     if (AqaraOccupancy_AllOccupied()) {
-      printf("[USECASE] OCCUPANCY in ALL physical sensors -> sirens ON\n");
-      // #if ENABLE_SIREN
-      // Siren_ControlAll( 1 );
-      // #endif
+      printf("[USECASE] OCCUPANCY in ALL physical sensors\n");
     } else {
       printf("[USECASE] Not all physical sensors occupied -> holding\n");
     }
 #else
-    printf(
-        "🚶 [USECASE] Person detected in zone 0x%04X (index %u)\n",
-        event_->srcAddr, event_->raw);
+    printf("🚶 [USECASE] Person detected in zone 0x%04X (index %u)\n",
+           event_->srcAddr, event_->raw);
 #endif
     break;
   }
   case UC_OCCUPANCY_CLEARED:
-    printf("💨 [USECASE] Occupancy cleared in zone 0x%04X (index %u) -> sirens OFF\n",
+    printf("💨 [USECASE] Occupancy cleared in zone 0x%04X (index %u)\n",
            event_->srcAddr, event_->raw);
-    // Siren_ControlAll( 0 );
     break;
   case UC_LIGHT_ON:
-    printf("☀️ [USECASE] Light turned ON -> sirens OFF\n");
-    // Siren_ControlAll( 0 );
+    printf("☀️ [USECASE] Light turned ON\n");
     break;
   case UC_LIGHT_OFF:
-    printf("🌙 [USECASE] Light turned OFF -> sirens ON\n");
-    // Siren_ControlAll( 1 );
+    printf("🌙 [USECASE] Light turned OFF\n");
     break;
   case UC_CONTACT_OPEN:
     printf("🚪 [USECASE] Contact Sensor OPENED -> sirens ON\n");

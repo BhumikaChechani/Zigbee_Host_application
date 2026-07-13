@@ -227,25 +227,25 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
     break;
   case UC_VIBRATION_DETECTED:
-    printf("🔴 📳 [USECASE] Vibration Sensor ALARM -> sirens ON\n");
+    printf("🔴 📳 [USECASE] Vibration Sensor (Alarm 2) ALARM -> sirens ON\n");
 #if ENABLE_SIREN
     Siren_ControlAll(1);
 #endif
     break;
   case UC_VIBRATION_CLEARED:
-    printf("🟢 📴 [USECASE] Vibration Sensor CLEARED -> sirens OFF\n");
+    printf("🟢 📴 [USECASE] Vibration Sensor (Alarm 2) CLEARED -> sirens OFF\n");
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
     break;
   case UC_MOVEMENT_DETECTED:
-    printf("🔴 🫨 [USECASE] Movement/Tilt Sensor ALARM -> sirens ON\n");
+    printf("🔴 🫨 [USECASE] Movement/Tilt Sensor (Alarm 1) ALARM -> sirens ON\n");
 #if ENABLE_SIREN
     Siren_ControlAll(1);
 #endif
     break;
   case UC_MOVEMENT_CLEARED:
-    printf("🟢 🧍 [USECASE] Movement/Tilt Sensor CLEARED -> sirens OFF\n");
+    printf("🟢 🧍 [USECASE] Movement/Tilt Sensor (Alarm 1) CLEARED -> sirens OFF\n");
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif

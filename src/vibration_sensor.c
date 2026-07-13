@@ -385,7 +385,7 @@ void VibrationSensor_PollAll(void) {
       // Clear the Alarm 2 bit in lastZoneStatus
       g_vibrationSensors[i].lastZoneStatus &= ~0x0002;
       UseCase_Post(UC_VIBRATION_CLEARED, g_vibrationSensors[i].shortAddr, 0);
-      printf("   -> Auto-cleared Vibration for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
+      printf("   -> Auto-cleared Vibration (Alarm 2) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
     }
 
     // Check Movement timeout
@@ -394,7 +394,7 @@ void VibrationSensor_PollAll(void) {
       // Clear the Alarm 1 bit in lastZoneStatus
       g_vibrationSensors[i].lastZoneStatus &= ~0x0001;
       UseCase_Post(UC_MOVEMENT_CLEARED, g_vibrationSensors[i].shortAddr, 0);
-      printf("   -> Auto-cleared Movement for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
+      printf("   -> Auto-cleared Movement (Alarm 1) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);

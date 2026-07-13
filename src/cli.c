@@ -42,7 +42,23 @@ static void Cli_HandleCommand( const char *cmd_ )
     const char *base = parts[0];
     if ( strcmp( base, "help" ) == 0 )
     {
-        printf( "\nAvailable commands: status, siren, discover, env, zone, permit, exit\n" );
+        printf( "\n--- Available Commands ---\n" );
+        printf( "  status                         - Print system and device status\n" );
+        printf( "  permit [seconds]               - Open network for joining (default 60s)\n" );
+        printf( "  discover [addr]                - Trigger endpoint/cluster discovery\n" );
+        printf( "  siren <addr> <0|1>             - Turn a specific siren off(0) or on(1)\n" );
+        printf( "\n--- Sensor Configuration ---\n" );
+        printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
+        printf( "                                   * Works for: Aqara Occupancy, Frient Vibration\n" );
+        printf( "  sensitivity <addr> <level>     - Set physical sensitivity level\n" );
+        printf( "                                   * Aqara Occupancy: 1=Low, 2=Medium, 3=High\n" );
+        printf( "                                   * Frient Vibration: 1=Most sensitive ... 15=Least sensitive (Default 10)\n" );
+        printf( "  zone <addr> <id> <min> <max>   - Set detection zone distances (cm)\n" );
+        printf( "                                   * Works for: Aqara Occupancy\n" );
+        printf( "  zonedel <addr> <id>            - Delete a detection zone (Aqara Occupancy)\n" );
+        printf( "  spatiallearn <addr>            - Trigger AI Spatial Learning (Aqara Occupancy)\n" );
+        printf( "  forcesetup <addr>              - Force re-bind and config payload to sensor\n" );
+        printf( "  exit                           - Quit application\n\n" );
     }
     else if ( strcmp( base, "status" ) == 0 )
     {

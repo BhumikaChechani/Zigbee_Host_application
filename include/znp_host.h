@@ -392,7 +392,16 @@ bool ZNP_SendSirenWarning(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
                           uint8_t transId_, uint8_t warnMode_, uint8_t volume_,
                           uint16_t duration_);
 
-
+/// @brief  Send a ZCL Default Response.
+/// @param  shortAddr_   Target network address.
+/// @param  endpoint_    Target endpoint.
+/// @param  clusterId_   ZCL cluster id.
+/// @param  transId_     ZCL transaction sequence number.
+/// @param  cmdId_       ZCL command ID being responded to.
+/// @param  status_      Status code.
+/// @return true if accepted.
+bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t endpoint_, uint16_t clusterId_,
+                             uint8_t transId_, uint8_t cmdId_, uint8_t status_);
 
 /// @brief  Monotonic-ish wall-clock time in seconds (for timeouts/last-seen).
 /// @return Current time in seconds as a double.

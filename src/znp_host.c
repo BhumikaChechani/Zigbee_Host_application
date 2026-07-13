@@ -1178,3 +1178,20 @@ bool ZNP_SendSirenWarning( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uin
 }
 
 
+
+bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t endpoint_, uint16_t clusterId_,
+                             uint8_t transId_, uint8_t cmdId_, uint8_t status_)
+{
+    printf("Sending Default Response to 0x%04X ep=0x%02X cluster=0x%04X cmd=0x%02X status=0x%02X...\n",
+           shortAddr_, endpoint_, clusterId_, cmdId_, status_);
+
+    uint8_t zclFrame[5];
+    zclFrame[0] = 0x10;
+    zclFrame[1] = transId_;
+    zclFrame[2] = 0x0B;
+    zclFrame[3] = cmdId_;
+    zclFrame[4] = status_;
+
+    return ZNP_AfDataRequestExt(2, shortAddr_, endpoint_, 0, 8, clusterId_,
+                                transId_, 0, 30, zclFrame, 5);
+}

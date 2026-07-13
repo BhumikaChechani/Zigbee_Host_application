@@ -40,7 +40,10 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
       if (zclLen >= 4) {
         uint16_t zoneStatus = zcl[0] | (zcl[1] << 8);
         uint8_t zoneId = zcl[3];
+        uint8_t transSeq = af_->data[hdrLen - 2];
         VibrationSensor_HandleStatus(af_->srcAddr, zoneStatus, zoneId);
+        // The WISZB-13x sensor requires a Default Response, otherwise it never clears its alarm bits
+        ZNP_SendDefaultResponse(af_->srcAddr, af_->srcEp, 0x0500, transSeq, cmdId, 0x00);
       }
     }
   } else if (af_->clusterId == 0x0012) { // Multistate Input (Aqara specific actions)
@@ -271,10 +274,7 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
     }
     // If all alarm bits are cleared, the sensor explicitly cleared the state
     else {
-      if (g_vibrationSensors[idx].isVibrating) {
-        g_vibrationSensors[idx].isVibrating = false;
-        UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, zoneStatus_);
-      }
+      // Do nothing! Let the 5-second polling loop clear the vibration state to enforce a minimum hold time.
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);

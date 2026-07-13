@@ -631,7 +631,7 @@ void AqaraOccupancy_SetSensitivity( uint16_t shortAddr_, uint8_t level_ )
     const char *labels[] = { "", "low", "medium", "high" };
     uint8_t f[9] = { 0x04, 0x5F, 0x11, 0x32, 0x02, 0x0C, 0x01, 0x20, level_ };
     ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, 0x33, 0x00, 0x1E, f, 9 );
-    printf( "[OCC] Sensitivity set to %s (%u) on 0x%04X\n", labels[level_], level_, shortAddr_ );
+    printf( "Configuring Aqara Occupancy Sensor 0x%04X sensitivity to level %d (%s)...\n", shortAddr_, level_, labels[level_] );
 }
 
 void AqaraOccupancy_ReadEnvironment( uint16_t shortAddr_ )

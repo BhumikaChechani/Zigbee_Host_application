@@ -61,6 +61,27 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
     printf("   -> [Aqara Vibration Basic] from 0x%04X, cluster 0x0000: ", af_->srcAddr);
     for (int i = 0; i < zclLen; i++) printf("%02X ", zcl[i]);
     printf("\n");
+  } else if (af_->clusterId == 0x0001) { // Power Configuration
+    if (cmdId == 0x01) { // Read Attributes Response
+      const uint8_t *zcl = &af_->data[hdrLen];
+      int zclLen = af_->dataLen - hdrLen;
+      if (zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Success
+        uint8_t bat = zcl[4]; // Unit is 100 mV
+        printf("🔋 Vibration Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
+      }
+    }
+  } else if (af_->clusterId == 0x0402) { // Temperature Measurement
+    if (cmdId == 0x01 || cmdId == 0x0A) { // Read Attributes Response or Report Attributes
+      const uint8_t *zcl = &af_->data[hdrLen];
+      int zclLen = af_->dataLen - hdrLen;
+      if (cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Read Resp Success
+        int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
+        printf("🌡️ Vibration Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+      } else if (cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00) { // Report
+        int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
+        printf("🌡️ Vibration Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+      }
+    }
   }
 }
 
@@ -363,5 +384,46 @@ void VibrationSensor_PollAll(void) {
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);
+}
+
+void VibrationSensor_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
+  printf("Configuring Vibration Sensor 0x%04X sensitivity to level %d...\n", shortAddr_, level_);
+  
+  uint8_t zclFrame[8];
+  zclFrame[0] = 0x00; // Global, Client->Server, Default Resp Enabled
+  zclFrame[1] = 0xCC; // Trans seq
+  zclFrame[2] = 0x02; // Write Attributes
+  zclFrame[3] = 0x13; // Attr 0x0013 (Current Zone Sensitivity Level)
+  zclFrame[4] = 0x00; 
+  zclFrame[5] = 0x21; // Uint16
+  zclFrame[6] = level_; // LSB
+  zclFrame[7] = 0x00;   // MSB
+
+  // IAS Zone is on EP 0x2D
+  ZNP_AfDataRequestExt(2, shortAddr_, 0x2D, 0, 8, 0x0500, 0xCC, 0, 30, zclFrame, 8);
+}
+
+void VibrationSensor_ReadEnvironment(uint16_t shortAddr_) {
+  printf("Requesting Environment Data (Battery & Temp) from Vibration Sensor 0x%04X...\n", shortAddr_);
+  
+  // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 0x2D
+  uint8_t zclFrameBat[5];
+  zclFrameBat[0] = 0x00; 
+  zclFrameBat[1] = 0xCD;
+  zclFrameBat[2] = 0x00; // Read Attributes
+  zclFrameBat[3] = 0x20; // Attr 0x0020
+  zclFrameBat[4] = 0x00; 
+  ZNP_AfDataRequestExt(2, shortAddr_, 0x2D, 0, 8, 0x0001, 0xCD, 0, 30, zclFrameBat, 5);
+  
+  usleep(200000); // Wait 200ms
+  
+  // Read Temperature (Cluster 0x0402, Attr 0x0000) on EP 0x26
+  uint8_t zclFrameTemp[5];
+  zclFrameTemp[0] = 0x00; 
+  zclFrameTemp[1] = 0xCE;
+  zclFrameTemp[2] = 0x00; // Read Attributes
+  zclFrameTemp[3] = 0x00; // Attr 0x0000
+  zclFrameTemp[4] = 0x00; 
+  ZNP_AfDataRequestExt(2, shortAddr_, 0x26, 0, 8, 0x0402, 0xCE, 0, 30, zclFrameTemp, 5);
 }
 #endif

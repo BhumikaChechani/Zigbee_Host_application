@@ -162,6 +162,9 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_AQARA_OCCUPANCY
             AqaraOccupancy_SetSensitivity( addr, level );
 #endif
+#if ENABLE_VIBRATION_SENSOR
+            VibrationSensor_SetSensitivity( addr, level );
+#endif
         }
         else
         {
@@ -239,6 +242,9 @@ static void Cli_HandleCommand( const char *cmd_ )
             uint16_t addr = (uint16_t)strtol( parts[1], NULL, 16 );
 #if ENABLE_AQARA_OCCUPANCY
             AqaraOccupancy_ReadEnvironment( addr );
+#endif
+#if ENABLE_VIBRATION_SENSOR
+            VibrationSensor_ReadEnvironment( addr );
 #endif
         }
         else

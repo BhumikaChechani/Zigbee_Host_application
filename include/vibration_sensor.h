@@ -41,4 +41,7 @@ void VibrationSensor_DiscoverAllActiveEp( void );
 void VibrationSensor_PollAll( void );
 void VibrationSensor_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ );
 
+void VibrationSensor_SetSensitivity( uint16_t shortAddr_, uint8_t level_ );
+void VibrationSensor_ReadEnvironment( uint16_t shortAddr_ );
+
 #endif // VIBRATION_SENSOR_H

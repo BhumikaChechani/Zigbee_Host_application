@@ -132,6 +132,8 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_vibrationSensors[g_numVibrationSensors].configured = false;
       g_vibrationSensors[g_numVibrationSensors].isVibrating = false;
       g_vibrationSensors[g_numVibrationSensors].lastVibrationTime = 0.0;
+      g_vibrationSensors[g_numVibrationSensors].isMoving = false;
+      g_vibrationSensors[g_numVibrationSensors].lastMovementTime = 0.0;
       g_numVibrationSensors++;
       changed = true;
     }
@@ -251,26 +253,27 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
   }
   
   if (idx != -1) {
-    uint16_t prevStatus = g_vibrationSensors[idx].lastZoneStatus;
     g_vibrationSensors[idx].lastZoneStatus = zoneStatus_;
 
-    bool alarm1_just_on = ((zoneStatus_ & 0x0001) != 0) && ((prevStatus & 0x0001) == 0);
-    bool alarm2_just_on = ((zoneStatus_ & 0x0002) != 0) && ((prevStatus & 0x0002) == 0);
+    bool movement_active = ((zoneStatus_ & 0x0001) != 0); // Alarm 1
+    bool vibration_active = ((zoneStatus_ & 0x0002) != 0); // Alarm 2
 
-    // If any alarm bit just transitioned to 1, trigger the vibration event
-    if (alarm1_just_on || alarm2_just_on) {
+    // Handle Movement (Alarm 1)
+    if (movement_active) {
+      if (!g_vibrationSensors[idx].isMoving) {
+        g_vibrationSensors[idx].isMoving = true;
+        UseCase_Post(UC_MOVEMENT_DETECTED, shortAddr_, zoneStatus_);
+      }
+      g_vibrationSensors[idx].lastMovementTime = ZNP_GetCurrentTime();
+    }
+
+    // Handle Vibration (Alarm 2)
+    if (vibration_active) {
       if (!g_vibrationSensors[idx].isVibrating) {
         g_vibrationSensors[idx].isVibrating = true;
         UseCase_Post(UC_VIBRATION_DETECTED, shortAddr_, zoneStatus_);
       }
       g_vibrationSensors[idx].lastVibrationTime = ZNP_GetCurrentTime();
-    }
-    // If alarm bits are still active but didn't just turn on (e.g. heartbeat or rapid events)
-    else if ((zoneStatus_ & 0x0003) != 0) {
-      // Extend the timeout only if we are currently in a vibrating state
-      if (g_vibrationSensors[idx].isVibrating) {
-        g_vibrationSensors[idx].lastVibrationTime = ZNP_GetCurrentTime();
-      }
     }
     // If all alarm bits are cleared, the sensor explicitly cleared the state
     else {
@@ -341,12 +344,22 @@ void VibrationSensor_PollAll(void) {
   double now = ZNP_GetCurrentTime();
   pthread_mutex_lock(&g_deviceMutex);
   for (int i = 0; i < g_numVibrationSensors; i++) {
+    // Check Vibration timeout
     if (g_vibrationSensors[i].isVibrating && (now - g_vibrationSensors[i].lastVibrationTime > 5.0)) {
       g_vibrationSensors[i].isVibrating = false;
-      // Clear the alarm bits in lastZoneStatus so the next vibration can trigger an edge
-      g_vibrationSensors[i].lastZoneStatus &= ~0x0003;
+      // Clear the Alarm 2 bit in lastZoneStatus
+      g_vibrationSensors[i].lastZoneStatus &= ~0x0002;
       UseCase_Post(UC_VIBRATION_CLEARED, g_vibrationSensors[i].shortAddr, 0);
       printf("   -> Auto-cleared Vibration for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
+    }
+
+    // Check Movement timeout
+    if (g_vibrationSensors[i].isMoving && (now - g_vibrationSensors[i].lastMovementTime > 5.0)) {
+      g_vibrationSensors[i].isMoving = false;
+      // Clear the Alarm 1 bit in lastZoneStatus
+      g_vibrationSensors[i].lastZoneStatus &= ~0x0001;
+      UseCase_Post(UC_MOVEMENT_CLEARED, g_vibrationSensors[i].shortAddr, 0);
+      printf("   -> Auto-cleared Movement for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);

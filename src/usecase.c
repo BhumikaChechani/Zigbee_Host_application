@@ -219,6 +219,18 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     Siren_ControlAll(0);
 #endif
     break;
+  case UC_MOVEMENT_DETECTED:
+    printf("🫨 [USECASE] Movement/Tilt Sensor ALARM -> sirens ON\n");
+#if ENABLE_SIREN
+    Siren_ControlAll(1);
+#endif
+    break;
+  case UC_MOVEMENT_CLEARED:
+    printf("🫨 [USECASE] Movement/Tilt Sensor CLEARED -> sirens OFF\n");
+#if ENABLE_SIREN
+    Siren_ControlAll(0);
+#endif
+    break;
   default:
     break;
   }

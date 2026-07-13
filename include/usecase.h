@@ -28,7 +28,9 @@ typedef enum
     UC_CONTACT_OPEN,      ///< Contact sensor opened         -> sirens on.
     UC_CONTACT_CLOSED,    ///< Contact sensor closed         -> sirens off.
     UC_VIBRATION_DETECTED,///< Vibration detected            -> sirens on.
-    UC_VIBRATION_CLEARED  ///< Vibration cleared             -> sirens off.
+    UC_VIBRATION_CLEARED, ///< Vibration cleared             -> sirens off.
+    UC_MOVEMENT_DETECTED, ///< Movement/Tilt detected        -> sirens on.
+    UC_MOVEMENT_CLEARED   ///< Movement/Tilt cleared         -> sirens off.
 } UC_EVT_TYPE_T;
 
 /// @brief One event enqueued to the use-case thread.

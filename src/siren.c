@@ -67,11 +67,40 @@ static void *Siren_Thread( void *arg_ )
     return NULL;
 }
 
+static uint8_t s_sirenVolume = 2; // high by default
+
+static const char SIREN_CONFIG_FILE[] = "siren_config.txt";
+
+static void Siren_LoadConfig(void)
+{
+    FILE *f = fopen(SIREN_CONFIG_FILE, "r");
+    if (f)
+    {
+        int v;
+        if (fscanf(f, "%d", &v) == 1)
+        {
+            if (v >= 0 && v <= 3) s_sirenVolume = (uint8_t)v;
+        }
+        fclose(f);
+    }
+}
+
+static void Siren_SaveConfig(void)
+{
+    FILE *f = fopen(SIREN_CONFIG_FILE, "w");
+    if (f)
+    {
+        fprintf(f, "%d\n", s_sirenVolume);
+        fclose(f);
+    }
+}
+
 void Siren_Init( void )
 {
     memset( g_sirens, 0, sizeof( g_sirens ) );
     g_numSirens = 0;
     MsgQueue_Init( &s_sirenInbox );
+    Siren_LoadConfig();
 }
 
 void Siren_Start( void )
@@ -273,13 +302,12 @@ void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSe
     ZNP_SendZoneEnrollResponse( shortAddr_, endpoint_, transSeq_, zoneId );
 }
 
-static uint8_t s_sirenVolume = 2; // high by default
-
 void Siren_SetVolume( uint8_t volume_ )
 {
     if (volume_ > 3) volume_ = 3;
     s_sirenVolume = volume_;
     printf( "Siren global volume set to %d (0=low, 1=medium, 2=high, 3=very high)\n", volume_ );
+    Siren_SaveConfig();
 }
 
 uint8_t Siren_GetVolume( void )

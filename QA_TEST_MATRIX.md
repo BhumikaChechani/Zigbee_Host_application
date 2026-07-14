@@ -26,7 +26,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚪 3. Contact Sensor (Door/Window)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Move magnet away (Open Door) | 🔔 **1-SECOND GENTLE CHIME** on sirens. | Simulates a simple door opening. |
+| Move magnet away (Open Door) | 🔔 **1-SECOND CHIME** on sirens. | HARDWARE LIMITATION: Siren ignores low-volume setting and always plays loud. |
 | Bring magnet close (Close Door) | Console logs door closed. **No chime.** | |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | Tests generic sensor health data. |
 
@@ -35,7 +35,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 📳 4. Frient Vibration Sensor (Glass Break)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Tap glass gently (Vibration / Alarm 2) | 🔔 **1-SECOND LOUD BEEP** on sirens. | Warning chime for light impacts. |
+| Tap glass gently (Vibration / Alarm 2) | 🔔 **1-SECOND LOUD BEEP** on sirens. | HARDWARE LIMITATION: Siren ignores low-volume setting and always plays loud. |
 | Shake or tilt heavily (Movement / Alarm 1) | 🚨 **FULL SIREN ALARM** on all sirens. | Critical breach / window broken. |
 | Remove battery cover (Tamper switch) | 🚨 **FULL SIREN ALARM** on all sirens. | Protects device from being dismantled. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | Tests vibration sensor health data. |
@@ -51,7 +51,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Type `siren on` and hit Enter | 🚨 **FULL SIREN ALARM** on all sirens. | Tests global siren activation. |
 | Type `siren off` and hit Enter | 🔇 **ALL SIRENS STOP** immediately. | Stops the global test. |
 | Type `siren mode <1-6>` | 🎶 Sets global siren sound mode. | **Modes:** 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic. |
-| Type `siren vol <0-3>` | 🔊 Sets global siren volume level. | **Levels:** 0=Low, 1=Medium, 2=High, 3=Very High. |
+| Type `siren vol <0-3>` | 🔊 Sets global siren volume level. | **Levels:** 0=Low, 1=Medium, 2=High, 3=Very High. Note: Some firmwares ignore volume. |
 | Type `siren test <addr> [mode]` | 🚨 Sounds ONLY the specific siren address. | Provide mode 1-6 to test a specific sound (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
 | Type `siren stop <addr>` | 🔇 **ONLY THAT SPECIFIC SIREN** stops. | Stops a siren test. |
 

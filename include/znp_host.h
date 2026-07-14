@@ -409,6 +409,16 @@ bool ZNP_SendSirenWarning(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
 bool ZNP_SendSirenStrobe(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
                          uint8_t transId_, bool on_, uint16_t duration_);
 
+/// @brief  IAS WD Squawk - send a short chime/beep.
+/// @param  sirenShortAddr_  Target siren network address.
+/// @param  sirenEndpoint_   Endpoint hosting the IAS WD cluster.
+/// @param  transId_         ZCL transaction sequence number.
+/// @param  squawkMode_      Squawk mode (e.g. 0=armed).
+/// @param  volume_          Squawk volume (0=low, 1=medium, 2=high, 3=very high).
+/// @return true if the command was accepted by the ZNP.
+bool ZNP_SendSirenSquawk(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
+                         uint8_t transId_, uint8_t squawkMode_, uint8_t volume_);
+
 /// @brief  Send a ZCL Default Response.
 /// @param  shortAddr_   Target network address.
 /// @param  endpoint_    Target endpoint.

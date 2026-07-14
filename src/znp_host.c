@@ -1193,10 +1193,28 @@ bool ZNP_SendSirenStrobe( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint
     zclFrame[4] = duration_ & 0xFF;
     zclFrame[5] = ( duration_ >> 8 ) & 0xFF;
     zclFrame[6] = 0x00; // Duty cycle
-    zclFrame[7] = 0x00; // Strobe level
-
     return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 0, 8, 0x0502,
                                  transId_, 0, 30, zclFrame, 8 );
+}
+
+bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint8_t transId_,
+                          uint8_t squawkMode_, uint8_t volume_ )
+{
+    printf( "Sending Siren SQUAWK to siren 0x%04X ep=0x%02X...\n", sirenShortAddr_, sirenEndpoint_ );
+
+    // Bits 4-7: Squawk Mode (0=System is armed)
+    // Bit 3: Strobe (0)
+    // Bits 0-1: Squawk Level
+    uint8_t squawkInfo = ( ( squawkMode_ & 0x0F ) << 4 ) | (volume_ & 0x03); 
+    
+    uint8_t zclFrame[4];
+    zclFrame[0] = 0x11;
+    zclFrame[1] = transId_;
+    zclFrame[2] = 0x01; // Command: Squawk
+    zclFrame[3] = squawkInfo;
+
+    return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 0, 4, 0x0502,
+                                 transId_, 0, 30, zclFrame, 4 );
 }
 
 

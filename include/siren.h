@@ -97,6 +97,10 @@ void Siren_ControlAll( uint8_t warnMode_ );
 /// @param on_ true to flash strobe, false to stop all.
 void Siren_ControlStrobe( bool on_ );
 
+/// @brief Send a short Squawk/Chime to every registered siren.
+/// @param squawkMode_ e.g., 0=Armed, 1=Disarmed.
+void Siren_ControlSquawk( uint8_t squawkMode_ );
+
 /// @brief Set the global siren volume.
 /// @param volume_ 0=low, 1=medium, 2=high, 3=very high.
 void Siren_SetVolume( uint8_t volume_ );

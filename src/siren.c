@@ -380,6 +380,27 @@ void Siren_ControlStrobe( bool on_ )
     }
 }
 
+void Siren_ControlSquawk( uint8_t squawkMode_ )
+{
+    pthread_mutex_lock( &g_deviceMutex );
+    if ( g_numSirens == 0 )
+    {
+        printf( "⚠️ No sirens registered yet.\n" );
+        pthread_mutex_unlock( &g_deviceMutex );
+        return;
+    }
+
+    int tempNum = g_numSirens;
+    SIREN_T tempSirens[MAX_SIRENS];
+    memcpy( tempSirens, g_sirens, sizeof( SIREN_T ) * g_numSirens );
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    for ( int i = 0; i < tempNum; i++ )
+    {
+        ZNP_SendSirenSquawk( tempSirens[i].shortAddr, tempSirens[i].endpoint, 0xAA, squawkMode_, s_sirenVolume );
+    }
+}
+
 void Siren_PrintStatus( void )
 {
     pthread_mutex_lock( &g_deviceMutex );

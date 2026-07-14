@@ -101,22 +101,6 @@ static void *Siren_Thread( void *arg_ )
                             }
                         }
                     }
-                    else if ( af->clusterId == 0x0402 ) // Temperature Measurement
-                    {
-                        if ( cmdId == 0x01 || cmdId == 0x0A ) // Read Attributes Response or Report Attributes
-                        {
-                            if ( cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00 )
-                            {
-                                int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
-                                printf("🌡️ Siren 0x%04X Temperature: %.2f °C\n", af->srcAddr, (float)temp / 100.0);
-                            }
-                            else if ( cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00 )
-                            {
-                                int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
-                                printf("🌡️ Siren 0x%04X Temperature Report: %.2f °C\n", af->srcAddr, (float)temp / 100.0);
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -500,7 +484,7 @@ void Siren_ReadEnvironment( uint16_t shortAddr_ )
         return;
     }
 
-    printf("Requesting Environment Data (Battery & Temp) from Siren 0x%04X on EP 0x%02X...\n", shortAddr_, ep);
+    printf("Requesting Environment Data (Battery) from Siren 0x%04X on EP 0x%02X...\n", shortAddr_, ep);
   
     // Read Battery Voltage (Cluster 0x0001, Attr 0x0020)
     uint8_t zclFrameBat[5];
@@ -510,19 +494,6 @@ void Siren_ReadEnvironment( uint16_t shortAddr_ )
     zclFrameBat[3] = 0x20; // Attr 0x0020
     zclFrameBat[4] = 0x00; 
     ZNP_AfDataRequestExt(2, shortAddr_, ep, 0, 8, 0x0001, 0xD1, 0, 30, zclFrameBat, 5);
-    
-    usleep(200000); // Wait 200ms
-    
-    // Read Temperature (Cluster 0x0402, Attr 0x0000)
-    // NOTE: The Frient SIRZB-110 exclusively maps its Temperature cluster to EP 0x26 (38).
-    uint8_t tempEp = 0x26;
-    uint8_t zclFrameTemp[5];
-    zclFrameTemp[0] = 0x00; 
-    zclFrameTemp[1] = 0xD2; // Trans seq
-    zclFrameTemp[2] = 0x00; // Read Attributes
-    zclFrameTemp[3] = 0x00; // Attr 0x0000
-    zclFrameTemp[4] = 0x00; 
-    ZNP_AfDataRequestExt(2, shortAddr_, tempEp, 0, 8, 0x0402, 0xD2, 0, 30, zclFrameTemp, 5);
 }
 
 void Siren_UpdateSeen( uint16_t shortAddr_ )

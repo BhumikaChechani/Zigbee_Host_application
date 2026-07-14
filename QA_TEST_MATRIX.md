@@ -47,7 +47,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
 | Remove mounting backplate (Tamper switch) | 🚨 **FULL SIREN ALARM** on all sirens. | Siren hardware tamper detection. |
-| Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | Fetches diagnostics from the siren. |
+| Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Fetches diagnostics from the siren. |
 | Type `siren on` and hit Enter | 🚨 **FULL SIREN ALARM** on all sirens. | Tests global siren activation. |
 | Type `siren off` and hit Enter | 🔇 **ALL SIRENS STOP** immediately. | Stops the global test. |
 | Type `siren mode <1-6>` | 🎶 Sets global siren sound mode. | **Modes:** 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic. |

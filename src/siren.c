@@ -68,6 +68,7 @@ static void *Siren_Thread( void *arg_ )
 }
 
 static uint8_t s_sirenVolume = 2; // high by default
+static uint8_t s_sirenMode = 1;   // burglar by default
 
 static const char SIREN_CONFIG_FILE[] = "siren_config.txt";
 
@@ -76,10 +77,15 @@ static void Siren_LoadConfig(void)
     FILE *f = fopen(SIREN_CONFIG_FILE, "r");
     if (f)
     {
-        int v;
-        if (fscanf(f, "%d", &v) == 1)
+        int v, m;
+        int parsed = fscanf(f, "%d %d", &v, &m);
+        if (parsed >= 1)
         {
             if (v >= 0 && v <= 3) s_sirenVolume = (uint8_t)v;
+        }
+        if (parsed >= 2)
+        {
+            if (m >= 1 && m <= 6) s_sirenMode = (uint8_t)m;
         }
         fclose(f);
     }
@@ -90,7 +96,7 @@ static void Siren_SaveConfig(void)
     FILE *f = fopen(SIREN_CONFIG_FILE, "w");
     if (f)
     {
-        fprintf(f, "%d\n", s_sirenVolume);
+        fprintf(f, "%d %d\n", s_sirenVolume, s_sirenMode);
         fclose(f);
     }
 }
@@ -315,6 +321,19 @@ uint8_t Siren_GetVolume( void )
     return s_sirenVolume;
 }
 
+void Siren_SetMode( uint8_t mode_ )
+{
+    if (mode_ < 1 || mode_ > 6) mode_ = 1;
+    s_sirenMode = mode_;
+    printf( "Siren global mode set to %d\n", mode_ );
+    Siren_SaveConfig();
+}
+
+uint8_t Siren_GetMode( void )
+{
+    return s_sirenMode;
+}
+
 void Siren_ControlAll( uint8_t warnMode_ )
 {
     g_sirenActive = ( warnMode_ != 0 );
@@ -335,7 +354,8 @@ void Siren_ControlAll( uint8_t warnMode_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, 0xAA, warnMode_, s_sirenVolume, 240 );
+        uint8_t mode = (warnMode_ != 0) ? s_sirenMode : 0;
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, 0xAA, mode, s_sirenVolume, 240 );
     }
 }
 

@@ -47,6 +47,10 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  permit [seconds]               - Open network for joining (default 60s)\n" );
         printf( "  discover [addr]                - Trigger endpoint/cluster discovery\n" );
         printf( "  siren <addr> <0|1>             - Turn a specific siren off(0) or on(1)\n" );
+        printf( "  siren vol <0-3>                - Set siren volume globally (0=low, 3=very high)\n" );
+        printf( "  siren mode <1-6>               - Set siren sound mode globally\n" );
+        printf( "                                   * 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic\n" );
+        printf( "  siren test <addr> <ep> [mode]  - Test siren directly on an endpoint\n" );
         printf( "\n--- Sensor Configuration ---\n" );
         printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
         printf( "                                   * Works for: Aqara Occupancy, Frient Vibration\n" );
@@ -118,17 +122,30 @@ static void Cli_HandleCommand( const char *cmd_ )
             Siren_SetVolume( vol );
 #endif
         }
+        else if ( strcmp( parts[1], "mode" ) == 0 )
+        {
+            if ( numParts < 3 )
+            {
+                printf( "Usage: siren mode <1-6> (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic)\n" );
+                return;
+            }
+            uint8_t mode = (uint8_t)strtoul( parts[2], NULL, 10 );
+#if ENABLE_SIREN
+            Siren_SetMode( mode );
+#endif
+        }
         else if ( strcmp( parts[1], "test" ) == 0 )
         {
             if ( numParts < 4 )
             {
-                printf( "Usage: siren test <addr_hex> <ep_hex_or_dec>\n" );
+                printf( "Usage: siren test <addr_hex> <ep_hex_or_dec> [mode]\n" );
                 return;
             }
             uint16_t addr = (uint16_t)strtol( parts[2], NULL, 16 );
             uint8_t ep = (uint8_t)strtol( parts[3], NULL, 0 );
+            uint8_t testMode = (numParts >= 5) ? (uint8_t)strtol( parts[4], NULL, 10 ) : Siren_GetMode();
 #if ENABLE_SIREN
-            ZNP_SendSirenWarning( addr, ep, 0xBB, 1, Siren_GetVolume(), 240 );
+            ZNP_SendSirenWarning( addr, ep, 0xBB, testMode, Siren_GetVolume(), 240 );
 #endif
         }
     }

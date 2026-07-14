@@ -101,6 +101,14 @@ void Siren_SetVolume( uint8_t volume_ );
 /// @return Current volume level.
 uint8_t Siren_GetVolume( void );
 
+/// @brief Set the global siren mode.
+/// @param mode_ 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic
+void Siren_SetMode( uint8_t mode_ );
+
+/// @brief Get the global siren mode.
+/// @return Current mode level.
+uint8_t Siren_GetMode( void );
+
 /// @brief  Print the registered sirens (for the CLI 'status' command).
 /// @return None.
 void Siren_PrintStatus( void );

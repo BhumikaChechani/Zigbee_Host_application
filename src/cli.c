@@ -46,7 +46,8 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  status                         - Print system and device status\n" );
         printf( "  permit [seconds]               - Open network for joining (default 60s)\n" );
         printf( "  discover [addr]                - Trigger endpoint/cluster discovery\n" );
-        printf( "  siren <addr> <0|1>             - Turn a specific siren off(0) or on(1)\n" );
+        printf( "  siren on                       - Turn all sirens ON\n" );
+        printf( "  siren off                      - Turn all sirens OFF\n" );
         printf( "  siren vol <0-3>                - Set siren volume globally (0=low, 3=very high)\n" );
         printf( "  siren mode <1-6>               - Set siren sound mode globally\n" );
         printf( "                                   * 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic\n" );

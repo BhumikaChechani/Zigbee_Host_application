@@ -399,16 +399,6 @@ bool ZNP_SendSirenWarning(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
                           uint8_t transId_, uint8_t warnMode_, uint8_t volume_,
                           uint16_t duration_);
 
-/// @brief  IAS WD Start Warning - trigger strobe only (no siren sound).
-/// @param  sirenShortAddr_  Target siren network address.
-/// @param  sirenEndpoint_   Endpoint hosting the IAS WD cluster.
-/// @param  transId_         ZCL transaction sequence number.
-/// @param  on_              True to start strobe, False to stop all.
-/// @param  duration_        Warning duration in seconds.
-/// @return true if the command was accepted by the ZNP.
-bool ZNP_SendSirenStrobe(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
-                         uint8_t transId_, bool on_, uint16_t duration_);
-
 /// @brief  IAS WD Squawk - send a short chime/beep.
 /// @param  sirenShortAddr_  Target siren network address.
 /// @param  sirenEndpoint_   Endpoint hosting the IAS WD cluster.

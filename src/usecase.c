@@ -215,16 +215,13 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     // Siren_ControlAll( 1 );
     break;
   case UC_CONTACT_OPEN:
-    printf("🚪 [USECASE] Contact Sensor OPENED -> Strobe ON (Silent)\n");
+    printf("🚪 [USECASE] Contact Sensor OPENED -> Squawk (Door Chime)\n");
 #if ENABLE_SIREN
-    Siren_ControlStrobe(true);
+    Siren_ControlSquawk(0);
 #endif
     break;
   case UC_CONTACT_CLOSED:
-    printf("🚪 [USECASE] Contact Sensor CLOSED -> Strobe OFF\n");
-#if ENABLE_SIREN
-    Siren_ControlStrobe(false);
-#endif
+    printf("🚪 [USECASE] Contact Sensor CLOSED\n");
     break;
   case UC_VIBRATION_DETECTED:
     printf("🔴 📳 [USECASE] Vibration Sensor (Alarm 2) ALARM -> Squawk\n");

@@ -66,8 +66,8 @@ This section details exactly what happens in the system when different sensors a
 - **Vibration (Alarm 2) Cleared:** **Action:** (No action needed, Squawk is self-terminating).
 
 ### Contact Sensors (Door/Window)
-- **Sensor Opened:** Evaluated as a breach. **Action:** Turns the Siren Strobe **ON** (Silent Visual Alarm).
-- **Sensor Closed:** **Action:** Turns the Siren Strobe **OFF**.
+- **Sensor Opened:** Evaluated as a breach. **Action:** Turns the Siren Squawk **ON** (Door Chime).
+- **Sensor Closed:** **Action:** (No action needed, Squawk is self-terminating).
 
 ### Aqara FP300 Presence Sensor (Occupancy)
 - **Presence Detected in a Zone:** Logs `"🚶 [USECASE] Person detected in zone..."`. 
@@ -98,8 +98,9 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 5. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
 6. User runs the `siren on` CLI command.
 
-**When does the Siren Strobe (Silent Alarm) turn ON?**
-1. A Contact Sensor opens.
+**When does the Siren Squawk (Door Chime / Warning) turn ON?**
+1. Frient Vibration Sensor detects Vibration (Alarm 2).
+2. A Contact Sensor opens.
 
 **When does the Siren turn OFF?**
 1. 1-press on an Aqara Button *while* the siren is currently active.
@@ -109,5 +110,3 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 5. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
 6. User runs the `siren off` CLI command.
 
-**When does the Siren Strobe (Silent Alarm) turn OFF?**
-1. A Contact Sensor closes.

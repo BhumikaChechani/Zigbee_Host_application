@@ -1177,26 +1177,6 @@ bool ZNP_SendSirenWarning( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uin
                                  transId_, 0, 30, zclFrame, 8 );
 }
 
-bool ZNP_SendSirenStrobe( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint8_t transId_,
-                          bool on_, uint16_t duration_ )
-{
-    printf( "Sending Siren %s STROBE to siren 0x%04X ep=0x%02X...\n", on_ ? "START" : "STOP", sirenShortAddr_, sirenEndpoint_ );
-
-    // Warning Mode = 0 (Stop), Strobe = 1 (on), Siren Level = 0
-    uint8_t modeLevel = on_ ? (1 << 2) : 0; 
-    
-    uint8_t zclFrame[8];
-    zclFrame[0] = 0x11;
-    zclFrame[1] = transId_;
-    zclFrame[2] = 0x00;
-    zclFrame[3] = modeLevel;
-    zclFrame[4] = duration_ & 0xFF;
-    zclFrame[5] = ( duration_ >> 8 ) & 0xFF;
-    zclFrame[6] = 0x00; // Duty cycle
-    return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 0, 8, 0x0502,
-                                 transId_, 0, 30, zclFrame, 8 );
-}
-
 bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint8_t transId_,
                           uint8_t squawkMode_, uint8_t volume_ )
 {

@@ -56,10 +56,10 @@ This section details exactly what happens in the system when different sensors a
 - **Panic State Cleared:** **Action:** Turns the Siren **OFF**.
 
 ### Frient Vibration Sensor (WISZB-13x)
-- **Movement/Tilt (Alarm 1) Detected:** **Action:** Turns the Siren Squawk **ON** (short chime).
-- **Movement/Tilt (Alarm 1) Cleared:** **Action:** (No action needed, Squawk is self-terminating).
-- **Vibration (Alarm 2) Detected:** **Action:** Turns the Siren **ON** (full alarm).
-- **Vibration (Alarm 2) Cleared:** **Action:** Turns the Siren **OFF** (auto-cleared after 5s of no vibration).
+- **Movement/Tilt (Alarm 1) Detected:** **Action:** Turns the Siren **ON** (full alarm).
+- **Movement/Tilt (Alarm 1) Cleared:** **Action:** Turns the Siren **OFF** (auto-cleared after 5s of no movement).
+- **Vibration (Alarm 2) Detected:** **Action:** Turns the Siren Squawk **ON** (short chime).
+- **Vibration (Alarm 2) Cleared:** **Action:** (No action needed, Squawk is self-terminating).
 
 ### Contact Sensors (Door/Window)
 - **Sensor Opened:** Evaluated as a breach. **Action:** Turns the Siren Strobe **ON** (Silent Visual Alarm).
@@ -89,7 +89,7 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 **When does the Siren turn ON?**
 1. 3-presses within 3 seconds on an Aqara Button.
 2. An Onics Panic Button triggers a panic state.
-3. Frient Vibration Sensor detects Vibration (Alarm 2).
+3. Frient Vibration Sensor detects Movement/Tilt (Alarm 1).
 4. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
 5. User runs the `siren on` CLI command.
 
@@ -99,7 +99,7 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 **When does the Siren turn OFF?**
 1. 1-press on an Aqara Button *while* the siren is currently active.
 2. An Onics Panic Button clears its panic state.
-3. Frient Vibration Sensor clears its Vibration state (Alarm 2).
+3. Frient Vibration Sensor clears its Movement/Tilt state (Alarm 1).
 4. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
 5. User runs the `siren off` CLI command.
 

@@ -475,6 +475,37 @@ uint8_t Siren_GetEndpoint( uint16_t shortAddr_ )
     return ep;
 }
 
+void Siren_ReadEnvironment( uint16_t shortAddr_ )
+{
+    uint8_t ep = Siren_GetEndpoint(shortAddr_);
+    if (ep == 0) {
+        printf("Error: Siren 0x%04X is not registered. Cannot read environment.\n", shortAddr_);
+        return;
+    }
+
+    printf("Requesting Environment Data (Battery & Temp) from Siren 0x%04X on EP 0x%02X...\n", shortAddr_, ep);
+  
+    // Read Battery Voltage (Cluster 0x0001, Attr 0x0020)
+    uint8_t zclFrameBat[5];
+    zclFrameBat[0] = 0x00; 
+    zclFrameBat[1] = 0xD1; // Trans seq
+    zclFrameBat[2] = 0x00; // Read Attributes
+    zclFrameBat[3] = 0x20; // Attr 0x0020
+    zclFrameBat[4] = 0x00; 
+    ZNP_AfDataRequestExt(2, shortAddr_, ep, 0, 8, 0x0001, 0xD1, 0, 30, zclFrameBat, 5);
+    
+    usleep(200000); // Wait 200ms
+    
+    // Read Temperature (Cluster 0x0402, Attr 0x0000)
+    uint8_t zclFrameTemp[5];
+    zclFrameTemp[0] = 0x00; 
+    zclFrameTemp[1] = 0xD2; // Trans seq
+    zclFrameTemp[2] = 0x00; // Read Attributes
+    zclFrameTemp[3] = 0x00; // Attr 0x0000
+    zclFrameTemp[4] = 0x00; 
+    ZNP_AfDataRequestExt(2, shortAddr_, ep, 0, 8, 0x0402, 0xD2, 0, 30, zclFrameTemp, 5);
+}
+
 void Siren_UpdateSeen( uint16_t shortAddr_ )
 {
     pthread_mutex_lock( &g_deviceMutex );

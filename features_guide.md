@@ -20,7 +20,7 @@ Once the application is running, you can interact with the network via the termi
 ### Sensor Configuration
 | Command | Description |
 | :--- | :--- |
-| **`env <addr>`** | Fetches current environmental readings (e.g., Temp, Humidity, Battery) for supported sensors (Aqara Occupancy, Frient Vibration). Note: Battery-powered sensors must be awake. |
+| **`env <addr>`** | Fetches current environmental readings (e.g., Temp, Humidity, Battery) for supported sensors (Aqara Occupancy, Frient Vibration, Frient Siren). Note: Battery-powered sensors must be awake. |
 | **`sensitivity <addr> <level>`** | Sets the sensor's physical sensitivity. For Aqara Occupancy: 1=Low, 2=Med, 3=High. For Frient Vibration: 1=Most Sensitive to 15=Least Sensitive (Default 10). |
 | **`forcesetup <addr>`** | Forces a full re-initialization and Zigbee binding setup for the sensor. |
 

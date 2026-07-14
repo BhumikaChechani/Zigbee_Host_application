@@ -117,6 +117,10 @@ void Siren_SetMode( uint8_t mode_ );
 /// @return Current mode level.
 uint8_t Siren_GetMode( void );
 
+/// @brief Read environment data (battery, temp) from a specific siren.
+/// @param shortAddr_ Target network address.
+void Siren_ReadEnvironment( uint16_t shortAddr_ );
+
 /// @brief  Print the registered sirens (for the CLI 'status' command).
 /// @return None.
 void Siren_PrintStatus( void );

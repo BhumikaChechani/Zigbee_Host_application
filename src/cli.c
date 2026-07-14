@@ -53,7 +53,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  siren test <addr> [mode]       - Test siren warning directly\n" );
         printf( "\n--- Sensor Configuration ---\n" );
         printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
-        printf( "                                   * Works for: Aqara Occupancy, Frient Vibration\n" );
+        printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren\n" );
         printf( "  sensitivity <addr> <level>     - Set physical sensitivity level\n" );
         printf( "                                   * Aqara Occupancy: 1=Low, 2=Medium, 3=High\n" );
         printf( "                                   * Frient Vibration: 1=Most sensitive ... 15=Least sensitive (Default 10)\n" );
@@ -291,6 +291,11 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_VIBRATION_SENSOR
             if (VibrationSensor_IsKnown(addr)) {
                 VibrationSensor_ReadEnvironment( addr );
+            }
+#endif
+#if ENABLE_SIREN
+            if (Siren_GetEndpoint(addr) != 0) {
+                Siren_ReadEnvironment( addr );
             }
 #endif
         }

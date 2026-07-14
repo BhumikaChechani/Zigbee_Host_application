@@ -45,46 +45,75 @@ static void *Siren_Thread( void *arg_ )
             // (IAS Zone 0x0500, cmd 0x01) still needs a response. Everything
             // else is informational and drives no logic.
             const AF_MSG_T *af = &msg->af;
-            if ( af->clusterId == 0x0500 && af->dataLen >= 3 )
+            if ( af->dataLen >= 3 )
             {
                 uint8_t fc = af->data[0];
                 int hdrLen = ( fc & 0x04 ) ? 5 : 3;
                 if ( af->dataLen >= hdrLen )
                 {
                     uint8_t cmdId = af->data[hdrLen - 1];
-                    if ( cmdId == 0x01 ) // Zone Enroll Request
+                    const uint8_t *zcl = &af->data[hdrLen];
+                    int zclLen = af->dataLen - hdrLen;
+
+                    if ( af->clusterId == 0x0500 )
                     {
-                        const uint8_t *zcl = &af->data[hdrLen];
-                        int zclLen = af->dataLen - hdrLen;
-                        if ( zclLen >= 2 )
+                        if ( cmdId == 0x01 ) // Zone Enroll Request
                         {
-                            uint16_t zoneType = zcl[0] | ( zcl[1] << 8 );
-                            uint8_t transSeq = af->data[hdrLen - 2];
-                            Siren_HandleEnroll( af->srcAddr, af->srcEp, transSeq, zoneType );
+                            if ( zclLen >= 2 )
+                            {
+                                uint16_t zoneType = zcl[0] | ( zcl[1] << 8 );
+                                uint8_t transSeq = af->data[hdrLen - 2];
+                                Siren_HandleEnroll( af->srcAddr, af->srcEp, transSeq, zoneType );
+                            }
+                        }
+                        else if ( cmdId == 0x00 ) // Zone Status Change Notification
+                        {
+                            if ( zclLen >= 2 )
+                            {
+                                uint16_t zoneStatus = zcl[0] | ( zcl[1] << 8 );
+                                uint8_t zoneId = ( zclLen >= 4 ) ? zcl[3] : 0;
+                                printf( "   -> Zone Status Change from Siren 0x%04X: zone_status=0x%04X, zone_id=%u\n",
+                                        af->srcAddr, zoneStatus, zoneId );
+
+                                // Send Default Response
+                                ZNP_SendDefaultResponse( af->srcAddr, af->srcEp, 0x0500, af->data[hdrLen - 2], 0x00, 0x00 );
+
+                                // Bit 2 is Tamper
+                                if ( zoneStatus & 0x0004 )
+                                {
+                                    UseCase_Post( UC_TAMPER_DETECTED, af->srcAddr, zoneStatus );
+                                }
+                                else
+                                {
+                                    UseCase_Post( UC_TAMPER_CLEARED, af->srcAddr, zoneStatus );
+                                }
+                            }
                         }
                     }
-                    else if ( cmdId == 0x00 ) // Zone Status Change Notification
+                    else if ( af->clusterId == 0x0001 ) // Power Configuration
                     {
-                        const uint8_t *zcl = &af->data[hdrLen];
-                        int zclLen = af->dataLen - hdrLen;
-                        if ( zclLen >= 2 )
+                        if ( cmdId == 0x01 ) // Read Attributes Response
                         {
-                            uint16_t zoneStatus = zcl[0] | ( zcl[1] << 8 );
-                            uint8_t zoneId = ( zclLen >= 4 ) ? zcl[3] : 0;
-                            printf( "   -> Zone Status Change from Siren 0x%04X: zone_status=0x%04X, zone_id=%u\n",
-                                    af->srcAddr, zoneStatus, zoneId );
-
-                            // Send Default Response
-                            ZNP_SendDefaultResponse( af->srcAddr, af->srcEp, 0x0500, af->data[hdrLen - 2], 0x00, 0x00 );
-
-                            // Bit 2 is Tamper
-                            if ( zoneStatus & 0x0004 )
+                            if ( zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00 )
                             {
-                                UseCase_Post( UC_TAMPER_DETECTED, af->srcAddr, zoneStatus );
+                                uint8_t bat = zcl[4]; // Unit is 100 mV
+                                printf("🔋 Siren 0x%04X Battery Voltage: %.1f V\n", af->srcAddr, (float)bat / 10.0);
                             }
-                            else
+                        }
+                    }
+                    else if ( af->clusterId == 0x0402 ) // Temperature Measurement
+                    {
+                        if ( cmdId == 0x01 || cmdId == 0x0A ) // Read Attributes Response or Report Attributes
+                        {
+                            if ( cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00 )
                             {
-                                UseCase_Post( UC_TAMPER_CLEARED, af->srcAddr, zoneStatus );
+                                int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
+                                printf("🌡️ Siren 0x%04X Temperature: %.2f °C\n", af->srcAddr, (float)temp / 100.0);
+                            }
+                            else if ( cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00 )
+                            {
+                                int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
+                                printf("🌡️ Siren 0x%04X Temperature Report: %.2f °C\n", af->srcAddr, (float)temp / 100.0);
                             }
                         }
                     }

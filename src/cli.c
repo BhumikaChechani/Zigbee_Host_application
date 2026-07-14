@@ -51,6 +51,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  siren mode <1-6>               - Set siren sound mode globally\n" );
         printf( "                                   * 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic\n" );
         printf( "  siren test <addr> [mode]       - Test siren warning directly\n" );
+        printf( "  siren stop <addr>              - Stop a specific siren\n" );
         printf( "\n--- Sensor Configuration ---\n" );
         printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
         printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren\n" );
@@ -152,6 +153,25 @@ static void Cli_HandleCommand( const char *cmd_ )
             }
             uint8_t testMode = (numParts >= 4) ? (uint8_t)strtol( parts[3], NULL, 10 ) : Siren_GetMode();
             ZNP_SendSirenWarning( addr, ep, 0xBB, testMode, Siren_GetVolume(), 240 );
+#endif
+        }
+        else if ( strcmp( parts[1], "stop" ) == 0 )
+        {
+            if ( numParts < 3 )
+            {
+                printf( "Usage: siren stop <addr_hex>\n" );
+                return;
+            }
+            uint16_t addr = (uint16_t)strtol( parts[2], NULL, 16 );
+            
+#if ENABLE_SIREN
+            uint8_t ep = Siren_GetEndpoint(addr);
+            if (ep == 0)
+            {
+                printf("Error: Siren 0x%04X is not registered. Run 'status' or trigger discovery.\n", addr);
+                return;
+            }
+            ZNP_SendSirenWarning( addr, ep, 0xBB, 0, Siren_GetVolume(), 240 );
 #endif
         }
     }

@@ -98,6 +98,7 @@ static void *Siren_Thread( void *arg_ )
 
 static uint8_t s_sirenVolume = 2; // high by default
 static uint8_t s_sirenMode = 1;   // burglar by default
+static uint8_t s_sirenSeq = 0;    // transaction sequence number
 
 static const char SIREN_CONFIG_FILE[] = "siren_config.txt";
 
@@ -384,13 +385,12 @@ void Siren_ControlAll( uint8_t warnMode_ )
     for ( int i = 0; i < tempNum; i++ )
     {
         uint8_t mode = (warnMode_ != 0) ? s_sirenMode : 0;
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, 0xAA, mode, s_sirenVolume, 240 );
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, mode, s_sirenVolume, 240 );
     }
 }
 
 void Siren_ControlSquawk( uint8_t squawkMode_ )
 {
-    (void)squawkMode_; // Unused for emulation
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
@@ -406,11 +406,7 @@ void Siren_ControlSquawk( uint8_t squawkMode_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        // The Frient Siren silently ignores the native ZCL Squawk command (0x01)
-        // unless it is actively armed via an IAS ACE cluster or specific state.
-        // We reliably emulate a squawk by sending a standard Start Warning (0x00)
-        // with a duration of 1 second.
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, 0xAA, s_sirenMode, s_sirenVolume, 1 );
+        ZNP_SendSirenSquawk( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, squawkMode_, s_sirenVolume );
     }
 }
 

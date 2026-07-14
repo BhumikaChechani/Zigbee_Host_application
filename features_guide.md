@@ -39,6 +39,7 @@ Once the application is running, you can interact with the network via the termi
 | **`siren vol <0-3>`** | Sets the global siren volume (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
 | **`siren mode <1-6>`** | Sets the global siren sound mode (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
 | **`siren test <addr> [mode]`** | Sends a test warning to a specific siren. Can optionally override the global mode for testing. |
+| **`siren stop <addr>`** | Instantly stops a specific siren that is currently sounding. |
 
 ---
 

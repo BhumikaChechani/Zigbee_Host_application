@@ -65,15 +65,19 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`permit [duration]`** | Opens the Zigbee network for new devices to join. Defaults to 60 seconds. *(Example: `permit 120` opens it for 2 minutes).* |
 | **`exit`** or **`quit`** | Safely closes the serial connection and exits the application. |
 
+### Sensor Configuration
+| Command | Description |
+| :--- | :--- |
+| **`env <addr>`** | Fetches current environmental readings (e.g., Temp, Humidity, Battery) for supported sensors (Aqara Occupancy, Frient Vibration). Note: Battery-powered sensors must be awake. |
+| **`sensitivity <addr> <level>`** | Sets the sensor's physical sensitivity. For Aqara Occupancy: 1=Low, 2=Med, 3=High. For Frient Vibration: 1=Most Sensitive to 15=Least Sensitive (Default 10). |
+| **`forcesetup <addr>`** | Forces a full re-initialization and Zigbee binding setup for the sensor. |
+
 ### Aqara FP300 Presence Sensor
 | Command | Description |
 | :--- | :--- |
 | **`zone <addr> <idx> <start> <end>`** | Configures a detection zone. Distance slices are 25cm each.<br>*(Example: `zone 7AF2 0 0 2` configures zone 0 to cover 0-50cm).* |
 | **`zonedel <addr> <idx>`** | Deletes a previously configured zone. |
-| **`sensitivity <addr> <1\|2\|3>`** | Sets the sensor's motion sensitivity (1 = Low, 2 = Medium, 3 = High). |
 | **`spatiallearn <addr>`** | Triggers the sensor's spatial learning calibration (ensure the room is completely empty before running). |
-| **`env <addr>`** | Requests the sensor to report its current environmental readings (e.g., temperature). |
-| **`forcesetup <addr>`** | Forces a full re-initialization and Zigbee binding setup for the sensor. |
 
 ### Siren Controls
 | Command | Description |
@@ -81,7 +85,8 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`siren on`** | Turns **all** sirens ON simultaneously. |
 | **`siren off`** | Turns **all** sirens OFF simultaneously. |
 | **`siren vol <0-3>`** | Sets the global siren volume (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
-| **`siren test <addr> <ep>`** | Sends a test warning to a specific siren endpoint. |
+| **`siren mode <1-6>`** | Sets the global siren sound mode (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
+| **`siren test <addr> <ep> [mode]`** | Sends a test warning to a specific siren endpoint. Can optionally override the global mode for testing. |
 
 ---
 

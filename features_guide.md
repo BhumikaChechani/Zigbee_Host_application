@@ -17,15 +17,19 @@ Once the application is running, you can interact with the network via the termi
 | **`permit [duration]`** | Opens the Zigbee network for new devices to join (defaults to 60 seconds). Example: `permit 120`. |
 | **`exit`** / **`quit`** | Safely closes the serial connection and exits the application. |
 
+### Sensor Configuration
+| Command | Description |
+| :--- | :--- |
+| **`env <addr>`** | Fetches current environmental readings (e.g., Temp, Humidity, Battery) for supported sensors (Aqara Occupancy, Frient Vibration). Note: Battery-powered sensors must be awake. |
+| **`sensitivity <addr> <level>`** | Sets the sensor's physical sensitivity. For Aqara Occupancy: 1=Low, 2=Med, 3=High. For Frient Vibration: 1=Most Sensitive to 15=Least Sensitive (Default 10). |
+| **`forcesetup <addr>`** | Forces a full re-initialization and Zigbee binding setup for the sensor. |
+
 ### Aqara FP300 Presence Sensor
 | Command | Description |
 | :--- | :--- |
 | **`zone <addr> <idx> <start> <end>`** | Configures a detection zone. Distance slices are 25cm each (e.g., `zone 7AF2 0 0 2` covers 0-50cm). |
 | **`zonedel <addr> <idx>`** | Deletes a previously configured zone. |
-| **`sensitivity <addr> <1\|2\|3>`** | Sets the sensor's motion sensitivity (1 = Low, 2 = Medium, 3 = High). |
 | **`spatiallearn <addr>`** | Triggers the sensor's spatial learning calibration (ensure room is empty first). |
-| **`env <addr>`** | Requests the sensor to report its current environmental readings (e.g., temperature). |
-| **`forcesetup <addr>`** | Forces a full re-initialization and Zigbee binding setup for the sensor. |
 
 ### Siren Controls
 | Command | Description |
@@ -33,7 +37,8 @@ Once the application is running, you can interact with the network via the termi
 | **`siren on`** | Turns **all** sirens ON simultaneously. |
 | **`siren off`** | Turns **all** sirens OFF simultaneously. |
 | **`siren vol <0-3>`** | Sets the global siren volume (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
-| **`siren test <addr> <ep>`** | Sends a test warning to a specific siren endpoint. |
+| **`siren mode <1-6>`** | Sets the global siren sound mode (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
+| **`siren test <addr> <ep> [mode]`** | Sends a test warning to a specific siren endpoint. Can optionally override the global mode for testing. |
 
 ---
 
@@ -49,6 +54,12 @@ This section details exactly what happens in the system when different sensors a
 ### Onics Smart/Panic Button (SBTZB-110)
 - **Panic State Triggered:** **Action:** Turns the Siren **ON**.
 - **Panic State Cleared:** **Action:** Turns the Siren **OFF**.
+
+### Frient Vibration Sensor (WISZB-13x)
+- **Movement/Tilt (Alarm 1) Detected:** **Action:** Turns the Siren **ON**.
+- **Movement/Tilt (Alarm 1) Cleared:** **Action:** Turns the Siren **OFF** (auto-cleared after 5s of no movement).
+- **Vibration (Alarm 2) Detected:** **Action:** Turns the Siren **ON**.
+- **Vibration (Alarm 2) Cleared:** **Action:** Turns the Siren **OFF** (auto-cleared after 5s of no vibration).
 
 ### Contact Sensors (Door/Window)
 - **Sensor Opened:** Evaluated as a breach. **Action:** Turns the Siren **ON**.
@@ -79,12 +90,14 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 1. 3-presses within 3 seconds on an Aqara Button.
 2. An Onics Panic Button triggers a panic state.
 3. A Contact Sensor opens.
-4. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
-5. User runs the `siren on` CLI command.
+4. Frient Vibration Sensor detects Movement/Tilt (Alarm 1) or Vibration (Alarm 2).
+5. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
+6. User runs the `siren on` CLI command.
 
 **When does the Siren turn OFF?**
 1. 1-press on an Aqara Button *while* the siren is currently active.
 2. An Onics Panic Button clears its panic state.
 3. A Contact Sensor closes.
-4. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
-5. User runs the `siren off` CLI command.
+4. Frient Vibration Sensor clears its Movement/Tilt or Vibration state.
+5. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
+6. User runs the `siren off` CLI command.

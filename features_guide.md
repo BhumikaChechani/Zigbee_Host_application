@@ -62,8 +62,8 @@ This section details exactly what happens in the system when different sensors a
 - **Vibration (Alarm 2) Cleared:** **Action:** Turns the Siren **OFF** (auto-cleared after 5s of no vibration).
 
 ### Contact Sensors (Door/Window)
-- **Sensor Opened:** Evaluated as a breach. **Action:** Turns the Siren **ON**.
-- **Sensor Closed:** **Action:** Turns the Siren **OFF**.
+- **Sensor Opened:** Evaluated as a breach. **Action:** Turns the Siren Strobe **ON** (Silent Visual Alarm).
+- **Sensor Closed:** **Action:** Turns the Siren Strobe **OFF**.
 
 ### Aqara FP300 Presence Sensor (Occupancy)
 - **Presence Detected in a Zone:** Logs `"🚶 [USECASE] Person detected in zone..."`. 
@@ -89,15 +89,19 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 **When does the Siren turn ON?**
 1. 3-presses within 3 seconds on an Aqara Button.
 2. An Onics Panic Button triggers a panic state.
-3. A Contact Sensor opens.
-4. Frient Vibration Sensor detects Movement/Tilt (Alarm 1) or Vibration (Alarm 2).
-5. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
-6. User runs the `siren on` CLI command.
+3. Frient Vibration Sensor detects Movement/Tilt (Alarm 1) or Vibration (Alarm 2).
+4. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
+5. User runs the `siren on` CLI command.
+
+**When does the Siren Strobe (Silent Alarm) turn ON?**
+1. A Contact Sensor opens.
 
 **When does the Siren turn OFF?**
 1. 1-press on an Aqara Button *while* the siren is currently active.
 2. An Onics Panic Button clears its panic state.
-3. A Contact Sensor closes.
-4. Frient Vibration Sensor clears its Movement/Tilt or Vibration state.
-5. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
-6. User runs the `siren off` CLI command.
+3. Frient Vibration Sensor clears its Movement/Tilt or Vibration state.
+4. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
+5. User runs the `siren off` CLI command.
+
+**When does the Siren Strobe (Silent Alarm) turn OFF?**
+1. A Contact Sensor closes.

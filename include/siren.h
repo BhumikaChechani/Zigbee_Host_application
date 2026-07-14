@@ -93,6 +93,10 @@ void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSe
 ///
 void Siren_ControlAll( uint8_t warnMode_ );
 
+/// @brief Start or stop the strobe light on every registered siren (silent).
+/// @param on_ true to flash strobe, false to stop all.
+void Siren_ControlStrobe( bool on_ );
+
 /// @brief Set the global siren volume.
 /// @param volume_ 0=low, 1=medium, 2=high, 3=very high.
 void Siren_SetVolume( uint8_t volume_ );

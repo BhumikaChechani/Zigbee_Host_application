@@ -247,6 +247,18 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     Siren_ControlAll(0);
 #endif
     break;
+  case UC_TAMPER_DETECTED:
+    printf("🚨 [USECASE] Siren TAMPER Switch OPENED -> sirens ON\n");
+#if ENABLE_SIREN
+    Siren_ControlAll(1);
+#endif
+    break;
+  case UC_TAMPER_CLEARED:
+    printf("✅ [USECASE] Siren TAMPER Switch CLOSED -> sirens OFF\n");
+#if ENABLE_SIREN
+    Siren_ControlAll(0);
+#endif
+    break;
   default:
     break;
   }

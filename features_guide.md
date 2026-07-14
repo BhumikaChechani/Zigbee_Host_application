@@ -55,6 +55,10 @@ This section details exactly what happens in the system when different sensors a
 - **Panic State Triggered:** **Action:** Turns the Siren **ON**.
 - **Panic State Cleared:** **Action:** Turns the Siren **OFF**.
 
+### Frient/Develco Siren (SIRZB-110) Tamper
+- **Tamper Switch Opened:** Evaluated as hardware sabotage. **Action:** Turns the Siren **ON** (full alarm).
+- **Tamper Switch Closed:** **Action:** Turns the Siren **OFF**.
+
 ### Frient Vibration Sensor (WISZB-13x)
 - **Movement/Tilt (Alarm 1) Detected:** **Action:** Turns the Siren **ON** (full alarm).
 - **Movement/Tilt (Alarm 1) Cleared:** **Action:** Turns the Siren **OFF** (auto-cleared after 5s of no movement).
@@ -90,8 +94,9 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 1. 3-presses within 3 seconds on an Aqara Button.
 2. An Onics Panic Button triggers a panic state.
 3. Frient Vibration Sensor detects Movement/Tilt (Alarm 1).
-4. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
-5. User runs the `siren on` CLI command.
+4. Siren Tamper switch opens (sabotage).
+5. A generic button sends an `ON` or `TOGGLE` (when currently off) command.
+6. User runs the `siren on` CLI command.
 
 **When does the Siren Strobe (Silent Alarm) turn ON?**
 1. A Contact Sensor opens.
@@ -100,8 +105,9 @@ For quick reference, here are the explicit conditions that affect the Siren stat
 1. 1-press on an Aqara Button *while* the siren is currently active.
 2. An Onics Panic Button clears its panic state.
 3. Frient Vibration Sensor clears its Movement/Tilt state (Alarm 1).
-4. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
-5. User runs the `siren off` CLI command.
+4. Siren Tamper switch closes.
+5. A generic button sends an `OFF` or `TOGGLE` (when currently on) command.
+6. User runs the `siren off` CLI command.
 
 **When does the Siren Strobe (Silent Alarm) turn OFF?**
 1. A Contact Sensor closes.

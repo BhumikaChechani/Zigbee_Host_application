@@ -49,15 +49,44 @@ static void *Siren_Thread( void *arg_ )
             {
                 uint8_t fc = af->data[0];
                 int hdrLen = ( fc & 0x04 ) ? 5 : 3;
-                if ( af->dataLen >= hdrLen && af->data[hdrLen - 1] == 0x01 )
+                if ( af->dataLen >= hdrLen )
                 {
-                    const uint8_t *zcl = &af->data[hdrLen];
-                    int zclLen = af->dataLen - hdrLen;
-                    if ( zclLen >= 2 )
+                    uint8_t cmdId = af->data[hdrLen - 1];
+                    if ( cmdId == 0x01 ) // Zone Enroll Request
                     {
-                        uint16_t zoneType = zcl[0] | ( zcl[1] << 8 );
-                        uint8_t transSeq = af->data[hdrLen - 2];
-                        Siren_HandleEnroll( af->srcAddr, af->srcEp, transSeq, zoneType );
+                        const uint8_t *zcl = &af->data[hdrLen];
+                        int zclLen = af->dataLen - hdrLen;
+                        if ( zclLen >= 2 )
+                        {
+                            uint16_t zoneType = zcl[0] | ( zcl[1] << 8 );
+                            uint8_t transSeq = af->data[hdrLen - 2];
+                            Siren_HandleEnroll( af->srcAddr, af->srcEp, transSeq, zoneType );
+                        }
+                    }
+                    else if ( cmdId == 0x00 ) // Zone Status Change Notification
+                    {
+                        const uint8_t *zcl = &af->data[hdrLen];
+                        int zclLen = af->dataLen - hdrLen;
+                        if ( zclLen >= 2 )
+                        {
+                            uint16_t zoneStatus = zcl[0] | ( zcl[1] << 8 );
+                            uint8_t zoneId = ( zclLen >= 4 ) ? zcl[3] : 0;
+                            printf( "   -> Zone Status Change from Siren 0x%04X: zone_status=0x%04X, zone_id=%u\n",
+                                    af->srcAddr, zoneStatus, zoneId );
+
+                            // Send Default Response
+                            ZNP_SendDefaultResponse( af->srcAddr, af->srcEp, 0x0500, af->data[hdrLen - 2], 0x00, 0x00 );
+
+                            // Bit 2 is Tamper
+                            if ( zoneStatus & 0x0004 )
+                            {
+                                UseCase_Post( UC_TAMPER_DETECTED, af->srcAddr, zoneStatus );
+                            }
+                            else
+                            {
+                                UseCase_Post( UC_TAMPER_CLEARED, af->srcAddr, zoneStatus );
+                            }
+                        }
                     }
                 }
             }

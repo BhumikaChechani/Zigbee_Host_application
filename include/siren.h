@@ -118,6 +118,11 @@ void Siren_PrintStatus( void );
 /// @return true if registered as a siren.
 bool Siren_IsKnown( uint16_t shortAddr_ );
 
+/// @brief Get the endpoint for a known siren.
+/// @param shortAddr_ Device network address.
+/// @return Endpoint (e.g. 0x2B), or 0 if not found.
+uint8_t Siren_GetEndpoint( uint16_t shortAddr_ );
+
 /// @brief  Update a siren's last-seen timestamp.
 /// @param  shortAddr_  Siren network address.
 /// @return None.

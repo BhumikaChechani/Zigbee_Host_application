@@ -388,6 +388,22 @@ bool Siren_IsKnown( uint16_t shortAddr_ )
     return known;
 }
 
+uint8_t Siren_GetEndpoint( uint16_t shortAddr_ )
+{
+    uint8_t ep = 0;
+    pthread_mutex_lock( &g_deviceMutex );
+    for ( int i = 0; i < g_numSirens; i++ )
+    {
+        if ( g_sirens[i].shortAddr == shortAddr_ )
+        {
+            ep = g_sirens[i].endpoint;
+            break;
+        }
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
+    return ep;
+}
+
 void Siren_UpdateSeen( uint16_t shortAddr_ )
 {
     pthread_mutex_lock( &g_deviceMutex );

@@ -390,6 +390,7 @@ void Siren_ControlAll( uint8_t warnMode_ )
 
 void Siren_ControlSquawk( uint8_t squawkMode_ )
 {
+    (void)squawkMode_; // Unused when emulating
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
@@ -405,7 +406,9 @@ void Siren_ControlSquawk( uint8_t squawkMode_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        ZNP_SendSirenSquawk( tempSirens[i].shortAddr, tempSirens[i].endpoint, 0xAA, squawkMode_, s_sirenVolume );
+        // Many sirens (including Frient) ignore the ZCL Squawk command.
+        // We emulate a squawk by sending a normal Start Warning with a 1-second duration.
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, 0xAA, s_sirenMode, s_sirenVolume, 1 );
     }
 }
 

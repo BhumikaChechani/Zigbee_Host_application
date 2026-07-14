@@ -1173,10 +1173,9 @@ bool ZNP_SendSirenWarning( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uin
     zclFrame[6] = 0x00;
     zclFrame[7] = 0x00;
 
-    return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 0, 8, 0x0502,
+    return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 1, 8, 0x0502,
                                  transId_, 0, 30, zclFrame, 8 );
 }
-
 bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint8_t transId_,
                           uint8_t squawkMode_, uint8_t volume_ )
 {
@@ -1193,10 +1192,9 @@ bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint
     zclFrame[2] = 0x01; // Command: Squawk
     zclFrame[3] = squawkInfo;
 
-    return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 0, 4, 0x0502,
+    return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 1, 4, 0x0502,
                                  transId_, 0, 30, zclFrame, 4 );
 }
-
 
 
 

@@ -95,7 +95,8 @@ void Siren_ControlAll( uint8_t warnMode_ );
 
 /// @brief Send a short Squawk/Chime to every registered siren.
 /// @param squawkMode_ e.g., 0=Armed, 1=Disarmed.
-void Siren_ControlSquawk( uint8_t squawkMode_ );
+/// @param squawkLevel_ e.g., 0=Low, 1=Medium, 2=High, 3=Very High.
+void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ );
 
 /// @brief Set the global siren volume.
 /// @param volume_ 0=low, 1=medium, 2=high, 3=very high.

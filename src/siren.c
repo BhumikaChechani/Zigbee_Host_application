@@ -389,7 +389,7 @@ void Siren_ControlAll( uint8_t warnMode_ )
     }
 }
 
-void Siren_ControlSquawk( uint8_t squawkMode_ )
+void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
 {
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
@@ -406,7 +406,7 @@ void Siren_ControlSquawk( uint8_t squawkMode_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        ZNP_SendSirenSquawk( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, squawkMode_, s_sirenVolume );
+        ZNP_SendSirenSquawk( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, squawkMode_, squawkLevel_ );
     }
 }
 

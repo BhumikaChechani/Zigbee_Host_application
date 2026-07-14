@@ -1182,12 +1182,12 @@ bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint
     printf( "Sending Siren SQUAWK to siren 0x%04X ep=0x%02X...\n", sirenShortAddr_, sirenEndpoint_ );
 
     // Bits 4-7: Squawk Mode (0=System is armed)
-    // Bit 3: Strobe (set to 1 as some firmwares require this bit to process the command even without hardware strobe)
+    // Bit 3: Strobe (0)
     // Bits 0-1: Squawk Level
-    uint8_t squawkInfo = ( ( squawkMode_ & 0x0F ) << 4 ) | (1 << 3) | (volume_ & 0x03); 
+    uint8_t squawkInfo = ( ( squawkMode_ & 0x0F ) << 4 ) | (volume_ & 0x03); 
     
     uint8_t zclFrame[4];
-    zclFrame[0] = 0x01; // 0x01 = Cluster specific, Client to Server, Default Response ENABLED
+    zclFrame[0] = 0x11; // 0x11 = Cluster specific, Client to Server, Default Response DISABLED
     zclFrame[1] = transId_;
     zclFrame[2] = 0x01; // Command: Squawk
     zclFrame[3] = squawkInfo;

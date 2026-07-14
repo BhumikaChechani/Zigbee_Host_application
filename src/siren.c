@@ -391,6 +391,8 @@ void Siren_ControlAll( uint8_t warnMode_ )
 
 void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
 {
+    (void)squawkMode_; // Unused for emulation
+
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
@@ -406,7 +408,13 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        ZNP_SendSirenSquawk( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, squawkMode_, squawkLevel_ );
+        // ⚠️ HARDWARE FIRMWARE BUG ⚠️
+        // Even when formatted byte-for-byte perfectly according to the ZCL spec and Develco docs
+        // (endpoint 1, strobe 0, mode 1, level 0), newer Frient SIRZB-110 firmwares completely 
+        // ignore the native Squawk command (0x01) unless armed by a separate security panel.
+        // The industry-standard workaround (used by Z2M/Home Assistant) is to emulate the chirp 
+        // using the highly reliable Start Warning (0x00) command for a 1-second duration.
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, s_sirenMode, squawkLevel_, 1 );
     }
 }
 

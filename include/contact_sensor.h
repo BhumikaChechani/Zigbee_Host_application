@@ -34,5 +34,6 @@ bool ContactSensor_IsKnown( uint16_t shortAddr_ );
 void ContactSensor_UpdateSeen( uint16_t shortAddr_ );
 void ContactSensor_DiscoverAllActiveEp( void );
 void ContactSensor_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ );
+void ContactSensor_ReadEnvironment( uint16_t shortAddr_ );
 
 #endif // CONTACT_SENSOR_H

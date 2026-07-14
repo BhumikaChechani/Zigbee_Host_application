@@ -314,6 +314,16 @@ static void Cli_HandleCommand( const char *cmd_ )
                 VibrationSensor_ReadEnvironment( addr );
             }
 #endif
+#if ENABLE_CONTACT_SENSOR
+            if (ContactSensor_IsKnown(addr)) {
+                ContactSensor_ReadEnvironment( addr );
+            }
+#endif
+#if ENABLE_ONICS_BUTTON
+            if (OnicsButton_IsKnown(addr)) {
+                OnicsButton_ReadEnvironment( addr );
+            }
+#endif
 #if ENABLE_SIREN
             if (Siren_GetEndpoint(addr) != 0) {
                 Siren_ReadEnvironment( addr );

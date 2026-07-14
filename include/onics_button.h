@@ -109,4 +109,9 @@ void OnicsButton_UpdateSeen( uint16_t shortAddr_ );
 /// @return None.
 void OnicsButton_DiscoverAllActiveEp( void );
 
+/// @brief  Send read requests for Battery and Temperature.
+/// @param  shortAddr_  Device network address.
+/// @return None.
+void OnicsButton_ReadEnvironment( uint16_t shortAddr_ );
+
 #endif // ONICS_BUTTON_H

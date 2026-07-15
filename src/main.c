@@ -849,13 +849,30 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 
             // Throttle the discovery burst so a repeatedly re-announcing device
             // cannot stall the dispatcher loop (see the 0xC1 handler above).
-            if ( Device_ShouldQuery( srcAddr ) )
+            // Exception: known Onics buttons re-announce after panic mode activation
+            // reset — always re-discover them so we can see the newly unlocked EP 0x23.
+#if ENABLE_ONICS_BUTTON
+            bool isKnownOnics = OnicsButton_IsKnown( srcAddr );
+#else
+            bool isKnownOnics = false;
+#endif
+            if ( Device_ShouldQuery( srcAddr ) || isKnownOnics )
             {
-
                 uint8_t reqPay[4] = { srcAddr & 0xFF, ( srcAddr >> 8 ) & 0xFF, 0x01, 0x00 };
                 ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 );
                 ZNP_ZdoActiveEpReq( srcAddr );
                 ZNP_QuerySimpleDesc( srcAddr, 43 );
+
+#if ENABLE_ONICS_BUTTON
+                if ( isKnownOnics )
+                {
+                    // After the panic mode reset, re-write CIE address on EP 0x23 in case
+                    // volatile memory was cleared during the reset.
+                    printf( " [Onics] Known button re-announced — re-writing CIE on EP 0x23...\n" );
+                    usleep( 1000000 ); // Give device 1s to settle after reset
+                    ZNP_WriteCieAddress( srcAddr, 0x23, 0x15 );
+                }
+#endif
             }
         }
         else if ( clusterId == 0x8001 && status == 0 )

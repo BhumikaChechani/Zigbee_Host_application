@@ -326,12 +326,17 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
     usleep( 500000 );
 
-    // 2. Write coordinator's IEEE to button's IAS_CIE_Address attribute (0x0010).
-    ZNP_WriteCieAddress( shortAddr_, endpoint, 0x12 );
+    // 2. Send Onics activation write to primary endpoint to unlock Panic endpoint (0x23).
+    ZNP_SendButtonActivation( shortAddr_, endpoint, 0x13 );
+    usleep( 1000000 ); // Wait 1 second for the hardware to enable the new endpoint
+
+    // 3. Bind the newly enabled IAS Zone cluster (0x0500) on endpoint 0x23 (35).
+    ZNP_ZdoBindReq( shortAddr_, buttonIeee, 0x23, 0x0500, g_coordinatorIeee, 8 );
     usleep( 500000 );
 
-    // 3. Send Onics activation write (Binary Input cluster 0x000F).
-    ZNP_SendButtonActivation( shortAddr_, endpoint, 0x13 );
+    // 4. Write coordinator's IEEE to the Panic endpoint's IAS_CIE_Address attribute (0x0010).
+    ZNP_WriteCieAddress( shortAddr_, 0x23, 0x12 );
+    
     printf( "Configuration sent to Onics button 0x%04X!\n", shortAddr_ );
 }
 
@@ -448,26 +453,15 @@ void OnicsButton_DiscoverAllActiveEp( void )
 
 void OnicsButton_ReadEnvironment( uint16_t shortAddr_ )
 {
-    printf( "Requesting Environment Data (Battery & Temp) from Onics Button 0x%04X...\n", shortAddr_ );
+    printf( "Requesting Environment Data (Battery) from Onics Button 0x%04X...\n", shortAddr_ );
     
-    // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 1
+    // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 0x20
     uint8_t zclFrameBat[5];
     zclFrameBat[0] = 0x00; 
     zclFrameBat[1] = 0xD3;
     zclFrameBat[2] = 0x00; // Read Attributes
     zclFrameBat[3] = 0x20; // Attr 0x0020
     zclFrameBat[4] = 0x00; 
-    ZNP_AfDataRequestExt( 2, shortAddr_, 1, 0, 8, 0x0001, 0xD3, 0, 30, zclFrameBat, 5 );
-    
-    usleep( 200000 ); // Wait 200ms
-    
-    // Read Temperature (Cluster 0x0402, Attr 0x0000) on EP 1
-    uint8_t zclFrameTemp[5];
-    zclFrameTemp[0] = 0x00; 
-    zclFrameTemp[1] = 0xD4;
-    zclFrameTemp[2] = 0x00; // Read Attributes
-    zclFrameTemp[3] = 0x00; // Attr 0x0000
-    zclFrameTemp[4] = 0x00; 
-    ZNP_AfDataRequestExt( 2, shortAddr_, 1, 0, 8, 0x0402, 0xD4, 0, 30, zclFrameTemp, 5 );
+    ZNP_AfDataRequestExt( 2, shortAddr_, 0x20, 0, 8, 0x0001, 0xD3, 0, 30, zclFrameBat, 5 );
 }
 #endif

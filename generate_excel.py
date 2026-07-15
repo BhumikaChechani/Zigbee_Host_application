@@ -15,9 +15,9 @@ md_text = """
 ### 🔴 2. Onics Panic Button
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Press and hold button (Panic Set) | FULL SIREN ALARM on all sirens. | Immediate emergency trigger. |
-| Release button (Panic Clear) | ALL SIRENS STOP immediately. | |
-| Type env <addr> in CLI | Prints Battery/Voltage & Temperature. | Tests generic sensor health data. |
+| Press the RED panic button | FULL SIREN ALARM on all sirens. | Tests IAS Zone panic activation mapping. |
+| Press the RED panic button again | ALL SIRENS STOP. | Tests IAS Zone panic clear mapping. |
+| Type env <addr> in CLI | Prints Battery/Voltage. | Tests generic sensor health data. |
 
 ### 🚪 3. Contact Sensor (Door/Window)
 | Test Action (What to do) | Expected Result (System Response) | Notes |

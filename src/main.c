@@ -862,6 +862,25 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                 ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 );
                 ZNP_ZdoActiveEpReq( srcAddr );
                 ZNP_QuerySimpleDesc( srcAddr, 43 );
+
+#if ENABLE_ONICS_BUTTON
+                if ( isKnownOnics )
+                {
+                    uint8_t ieee[8];
+                    if ( Device_GetDiscoveredIeee( srcAddr, ieee ) )
+                    {
+                        printf( " [Onics] Known button re-announced post-reset. Re-establishing bindings directly...\n" );
+                        // The device clears its binding table on panic-mode reset.
+                        // We must re-bind On/Off (0x0006) on EP 0x20 so it keeps sending clicks,
+                        // and re-bind IAS Zone (0x0500) on EP 0x23 + rewrite CIE address.
+                        ZNP_ZdoBindReq( srcAddr, ieee, 0x20, 0x0006, g_coordinatorIeee, 8 );
+                        usleep( 500000 );
+                        ZNP_ZdoBindReq( srcAddr, ieee, 0x23, 0x0500, g_coordinatorIeee, 8 );
+                        usleep( 500000 );
+                        ZNP_WriteCieAddress( srcAddr, 0x23, 0x17 );
+                    }
+                }
+#endif
             }
         }
         else if ( clusterId == 0x8001 && status == 0 )
@@ -913,18 +932,21 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             }
 
 #if ENABLE_ONICS_BUTTON
-            // If the device reported EP 0x23 (Panic endpoint) and it is an Onics button,
-            // re-bind the IAS Zone cluster and re-write the CIE address. This ensures
-            // that the panic configuration survives the device's self-reset.
+            // Backup: if we missed the announce but got the Active EP response,
+            // we can re-bind here. But we already attempt it in the announce handler.
             if ( hasEp23 && OnicsButton_IsKnown( shortAddr ) )
             {
+                // Optionally do nothing here if we already handled it in announce,
+                // but repeating the bind is safe and ensures reliability.
                 uint8_t ieee[8];
                 if ( Device_GetDiscoveredIeee( shortAddr, ieee ) )
                 {
-                    printf( " [Onics] EP 0x23 detected post-reset. Re-binding 0x0500 and writing CIE address...\n" );
+                    printf( " [Onics] EP 0x23 detected in Active EPs. Ensuring bindings exist...\n" );
+                    ZNP_ZdoBindReq( shortAddr, ieee, 0x20, 0x0006, g_coordinatorIeee, 8 );
+                    usleep( 100000 );
                     ZNP_ZdoBindReq( shortAddr, ieee, 0x23, 0x0500, g_coordinatorIeee, 8 );
-                    usleep( 500000 );
-                    ZNP_WriteCieAddress( shortAddr, 0x23, 0x16 );
+                    usleep( 100000 );
+                    ZNP_WriteCieAddress( shortAddr, 0x23, 0x18 );
                 }
             }
 #endif

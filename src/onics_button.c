@@ -43,19 +43,33 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
 
     if ( af_->clusterId == 0x0006 )
     {
-        // Some Onics buttons emit On/Off; treat it as a press.
-        printf( "👉 [ONICS BUTTON] On/Off Command received: cmd_id=0x%02X\n", cmdId );
-        if ( cmdId == 0x01 )
+        // The hardware sends BOTH a 0x0500 Zone Status and a 0x0006 Toggle on the first press.
+        // It DOES NOT send another 0x0500 to clear the alarm.
+        // We therefore use subsequent 0x0006 toggles as the "Manual Clear" for the panic state.
+        // We must debounce this against the initial press so it doesn't instantly clear.
+        double now = ZNP_GetCurrentTime();
+        double timeSincePanic = 999.0;
+        
+        pthread_mutex_lock( &g_deviceMutex );
+        for ( int i = 0; i < g_numOnicsButtons; i++ )
         {
-            UseCase_Post( UC_BUTTON_ON, af_->srcAddr, cmdId );
+            if ( g_onicsButtons[i].shortAddr == af_->srcAddr )
+            {
+                timeSincePanic = now - g_onicsButtons[i].lastPanicTime;
+                break;
+            }
         }
-        else if ( cmdId == 0x00 )
+        pthread_mutex_unlock( &g_deviceMutex );
+
+        if ( timeSincePanic > 2.0 )
         {
-            UseCase_Post( UC_BUTTON_OFF, af_->srcAddr, cmdId );
+            printf( "👉 [ONICS BUTTON] Manual clear via On/Off toggle (cmd=0x%02X)\n", cmdId );
+            // Post a raw zone status of 0x0000 (all clear)
+            UseCase_Post( UC_PANIC_CLEAR, af_->srcAddr, 0x0000 );
         }
-        else if ( cmdId == 0x02 )
+        else
         {
-            UseCase_Post( UC_BUTTON_TOGGLE, af_->srcAddr, cmdId );
+            printf( "👉 [ONICS BUTTON] Ignored On/Off toggle (cmd=0x%02X) - debouncing simultaneous IAS Panic alarm\n", cmdId );
         }
     }
     else if ( af_->clusterId == 0x0500 )
@@ -408,8 +422,13 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     printf( "Configuring Onics SBTZB-110 button 0x%04X...\n", shortAddr_ );
 
     // Per SBTZB-110 Technical Manual Sections 3.3 & 4.2.3.2:
-    // Step 1: We intentionally DO NOT bind the On/Off cluster (0x0006) on EP 0x20.
-    // We only want the native IAS Zone panic alarms from EP 0x23 to avoid double-triggering.
+    // Step 1: Bind On/Off cluster (0x0006) on EP 0x20.
+    // Even though we only want IAS Zone alarms on EP 0x23, the hardware seems
+    // to stop reporting clicks entirely if this primary output is unbound.
+    // We will bind it to keep the button happy, but ignore the 0x0006 messages
+    // in the AF handler so they don't double-trigger the siren.
+    ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
+    usleep( 500000 );
 
     // Step 2: Write attr 0x8000 (Uint16) = 0x002C (PERSONAL_EMERGENCY_DEVICE) to
     //         Binary Input cluster (0x000F) on EP 0x20 to enable the hidden EP 0x23
@@ -455,6 +474,16 @@ void OnicsButton_HandleStatus( uint16_t shortAddr_, uint16_t zoneStatus_, uint8_
     bool alarm = ( zoneStatus_ & 0x0003 ) != 0;
     if ( alarm )
     {
+        pthread_mutex_lock( &g_deviceMutex );
+        for ( int i = 0; i < g_numOnicsButtons; i++ )
+        {
+            if ( g_onicsButtons[i].shortAddr == shortAddr_ )
+            {
+                g_onicsButtons[i].lastPanicTime = ZNP_GetCurrentTime();
+                break;
+            }
+        }
+        pthread_mutex_unlock( &g_deviceMutex );
         UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_ );
     }
     else

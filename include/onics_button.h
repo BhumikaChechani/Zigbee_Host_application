@@ -23,6 +23,7 @@ typedef struct
     bool hasIeee;       ///< True once @ref ieee is known.
     int zoneId;         ///< IAS zone id assigned on enrollment (-1 if none).
     bool configured;    ///< True once bind + CIE + activation have been sent.
+    double lastPanicTime; ///< Timestamp of the last 0x0500 panic alarm (for debouncing toggles).
 } ONICS_BUTTON_T;
 
 #define MAX_ONICS_BUTTONS 32 ///< Maximum Onics buttons tracked.

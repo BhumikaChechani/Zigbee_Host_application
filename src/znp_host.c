@@ -1121,15 +1121,33 @@ bool ZNP_WriteCieAddress( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_, ui
 
 bool ZNP_SendButtonActivation( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_, uint8_t transId_ )
 {
-    // NOTE: This function is intentionally left as a no-op.
-    // The SBTZB-110 (Smart Button) does NOT support the IAS Zone / Panic
-    // cluster. Attribute 0x8000 on cluster 0x000F is only valid on the
-    // PBTZB-110 (Panic Button) — a different hardware model.
-    // Sending this write to SBTZB-110 always returns 0x8D INVALID_DATA_TYPE.
-    (void)buttonShortAddr_;
-    (void)buttonEndpoint_;
-    (void)transId_;
-    return true;
+    printf( "Sending Onics panic activation to button 0x%04X (attr=0x8000, Map16, value=0x002C=PERSONAL_EMERGENCY_DEVICE)...\n", buttonShortAddr_ );
+
+    // Per SBTZB-110 Technical Manual (Section 4.2.3.2, Binary Input Cluster 0x000F):
+    //   Attribute 0x8000 (IAS Zone Activation, manufacturer=0x1015):
+    //     - Data type: Map16 (0x19) — supports values 0x0000–0xFFFF (IAS zone type range)
+    //     - Default: 0xFFFF = IAS_ZONE_DISABLED
+    //     - Write 0x002C = PERSONAL_EMERGENCY_DEVICE to enable EP 0x23 as a panic button
+    //
+    // History of failed attempts:
+    //   0x1B (Map32/32-bit bitmap) → silently ignored (wrong width)
+    //   0x30 (Enum8)               → 0x8D INVALID_DATA_TYPE
+    //   0x18 (Map8)                → 0x8D INVALID_DATA_TYPE
+    //   → Correct type is 0x19 (Map16) because 0xFFFF default requires 16 bits
+    uint8_t zclFrame[10];
+    zclFrame[0] = 0x04;       // Frame control: global, manufacturer-specific
+    zclFrame[1] = 0x15;       // Manufacturer code LSB (0x1015)
+    zclFrame[2] = 0x10;       // Manufacturer code MSB
+    zclFrame[3] = transId_;   // Sequence number
+    zclFrame[4] = 0x02;       // Command: Write Attributes
+    zclFrame[5] = 0x00;       // Attribute ID LSB (0x8000)
+    zclFrame[6] = 0x80;       // Attribute ID MSB
+    zclFrame[7] = 0x19;       // Data type: Map16 (16-bit bitmap, NOT Map8)
+    zclFrame[8] = 0x2C;       // Value LSB: 0x002C = PERSONAL_EMERGENCY_DEVICE
+    zclFrame[9] = 0x00;       // Value MSB
+
+    return ZNP_AfDataRequestExt( 2, buttonShortAddr_, buttonEndpoint_, 0, 8, 0x000F,
+                                 transId_, 0, 30, zclFrame, 10 );
 }
 
 bool ZNP_SendZoneEnrollResponse( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_,

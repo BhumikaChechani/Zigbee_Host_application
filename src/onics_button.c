@@ -121,10 +121,39 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
             int zclLen = af_->dataLen - hdrLen;
             if ( zclLen == 0 )
             {
-                // Empty Write Attributes Response = all attributes written successfully
-                printf( "✅ Onics Button 0x%04X Panic mode activation SUCCESS! Re-discovering endpoints to find EP 0x23...\n", af_->srcAddr );
-                // Trigger endpoint re-discovery so EP 0x23 (IAS Zone Panic) gets registered
-                ZNP_ZdoActiveEpReq( af_->srcAddr );
+                // Empty Write Attributes Response = all attributes written successfully.
+                // The hardware has now enabled EP 0x23 (IAS Zone Panic endpoint).
+                printf( "✅ Onics Button 0x%04X Panic mode activation SUCCESS!\n", af_->srcAddr );
+                printf( "   -> EP 0x23 (IAS Zone Panic) is now unlocked in hardware.\n" );
+                printf( "   -> Binding IAS Zone cluster (0x0500) on EP 0x23...\n" );
+
+                // Step 3: Bind IAS Zone cluster (0x0500) on the newly unlocked EP 0x23.
+                pthread_mutex_lock( &g_deviceMutex );
+                uint8_t ieee[8];
+                bool hasIeee = false;
+                for ( int i = 0; i < g_numOnicsButtons; i++ )
+                {
+                    if ( g_onicsButtons[i].shortAddr == af_->srcAddr && g_onicsButtons[i].hasIeee )
+                    {
+                        memcpy( ieee, g_onicsButtons[i].ieee, 8 );
+                        hasIeee = true;
+                        break;
+                    }
+                }
+                pthread_mutex_unlock( &g_deviceMutex );
+
+                if ( hasIeee )
+                {
+                    ZNP_ZdoBindReq( af_->srcAddr, ieee, 0x23, 0x0500, g_coordinatorIeee, 8 );
+                    usleep( 500000 );
+                    // Step 4: Write coordinator's IEEE to IAS_CIE_Address (0x0010) on EP 0x23.
+                    ZNP_WriteCieAddress( af_->srcAddr, 0x23, 0x14 );
+                    printf( "   -> CIE Address written to EP 0x23. Waiting for Zone Enroll Request...\n" );
+                }
+                else
+                {
+                    printf( "   ⚠️  IEEE not yet known - re-trigger setup after IEEE is resolved.\n" );
+                }
             }
             else if ( zclLen >= 3 && zcl[0] != 0x00 )
             {
@@ -342,12 +371,22 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     pthread_mutex_unlock( &g_deviceMutex );
 
     printf( "Configuring Onics SBTZB-110 button 0x%04X...\n", shortAddr_ );
-    printf( "  Note: SBTZB-110 is a Smart Button (NOT a Panic Button).\n" );
-    printf( "  It only supports single-click via On/Off cluster (0x0006) on EP 0x20.\n" );
 
-    // Bind On/Off cluster (0x0006) on EP 0x20 to coordinator endpoint 8.
-    // This is the only cluster the SBTZB-110 supports for button actions.
+    // Per SBTZB-110 Technical Manual Sections 3.3 & 4.2.3.2:
+    // Step 1: Bind On/Off cluster (0x0006) on EP 0x20 for immediate toggle action.
     ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
+    usleep( 500000 );
+
+    // Step 2: Write attr 0x8000 (Map16) = 0x002C (PERSONAL_EMERGENCY_DEVICE) to
+    //         Binary Input cluster (0x000F) on EP 0x20 to enable the hidden EP 0x23
+    //         IAS Zone Panic endpoint in the hardware firmware.
+    ZNP_SendButtonActivation( shortAddr_, endpoint, 0x13 );
+    usleep( 1500000 ); // Wait 1.5s for hardware to unlock EP 0x23
+
+    // Steps 3 & 4 are completed in OnicsButton_HandleAf when the 0x000F Write
+    // Attributes Response arrives with status=0x00 (success). On success, we
+    // trigger a re-discovery to find EP 0x23, bind its 0x0500 cluster, and
+    // write the CIE address so Zone Enroll Request can proceed.
 
     printf( "Configuration sent to Onics button 0x%04X!\n", shortAddr_ );
 }

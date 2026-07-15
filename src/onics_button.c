@@ -115,7 +115,40 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
     else if ( af_->clusterId == 0x000F ) // Binary Input - activation write response
     {
         // cmd 0x04 = Write Attributes Response (global command)
-        if ( cmdId == 0x04 )
+        if ( cmdId == 0x01 ) // Read Attributes Response — diagnostic
+        {
+            const uint8_t *zcl = &af_->data[hdrLen];
+            int zclLen = af_->dataLen - hdrLen;
+            // ZCL Read Attr Resp: AttrID(2) + Status(1) [+ DataType(1) + Value(variable)]
+            if ( zclLen >= 4 && zcl[0] == 0x00 && zcl[1] == 0x80 ) // Attr 0x8000
+            {
+                uint8_t status = zcl[2];
+                if ( status == 0x00 && zclLen >= 5 )
+                {
+                    uint8_t dataType = zcl[3];
+                    printf( "🔍 [DIAGNOSTIC] Onics 0x%04X attr 0x8000: ZCL data type=0x%02X, value bytes:",
+                            af_->srcAddr, dataType );
+                    for ( int i = 4; i < zclLen; i++ )
+                    {
+                        printf( " 0x%02X", zcl[i] );
+                    }
+                    printf( "\n" );
+                    if ( zclLen >= 6 )
+                    {
+                        uint16_t val = (uint16_t)(zcl[4] | (zcl[5] << 8));
+                        printf( "   -> Current value: 0x%04X (%s)\n", val,
+                                val == 0xFFFF ? "IAS_ZONE_DISABLED" :
+                                val == 0x002C ? "PERSONAL_EMERGENCY_DEVICE" : "other" );
+                    }
+                }
+                else
+                {
+                    printf( "🔍 [DIAGNOSTIC] Onics 0x%04X attr 0x8000 read failed (status=0x%02X)\n",
+                            af_->srcAddr, status );
+                }
+            }
+        }
+        else if ( cmdId == 0x04 ) // Write Attributes Response
         {
             const uint8_t *zcl = &af_->data[hdrLen];
             int zclLen = af_->dataLen - hdrLen;

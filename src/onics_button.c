@@ -112,6 +112,27 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
             }
         }
     }
+    else if ( af_->clusterId == 0x000F ) // Binary Input - activation write response
+    {
+        // cmd 0x04 = Write Attributes Response (global command)
+        if ( cmdId == 0x04 )
+        {
+            const uint8_t *zcl = &af_->data[hdrLen];
+            int zclLen = af_->dataLen - hdrLen;
+            if ( zclLen == 0 )
+            {
+                // Empty Write Attributes Response = all attributes written successfully
+                printf( "✅ Onics Button 0x%04X Panic mode activation SUCCESS! Re-discovering endpoints to find EP 0x23...\n", af_->srcAddr );
+                // Trigger endpoint re-discovery so EP 0x23 (IAS Zone Panic) gets registered
+                ZNP_ZdoActiveEpReq( af_->srcAddr );
+            }
+            else if ( zclLen >= 3 && zcl[0] != 0x00 )
+            {
+                printf( "❌ Onics Button 0x%04X Panic activation FAILED (attr=0x%02X%02X, status=0x%02X)\n",
+                        af_->srcAddr, zcl[2], zcl[1], zcl[0] );
+            }
+        }
+    }
 
     if ((fc & 0x10) == 0 && cmdId != 0x0B) {
         uint8_t transSeq = af_->data[1];

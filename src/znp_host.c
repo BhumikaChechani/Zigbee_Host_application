@@ -1121,23 +1121,26 @@ bool ZNP_WriteCieAddress( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_, ui
 
 bool ZNP_SendButtonActivation( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_, uint8_t transId_ )
 {
-    printf( "Sending Onics activation write to button 0x%04X...\n", buttonShortAddr_ );
+    printf( "Sending Onics activation write to button 0x%04X (attr=0x8000, type=Enum8, value=0x2C=PERSONAL_EMERGENCY_DEVICE)...\n", buttonShortAddr_ );
 
-    uint8_t zclFrame[11];
-    zclFrame[0] = 0x04;
-    zclFrame[1] = 0x15;
-    zclFrame[2] = 0x10;
-    zclFrame[3] = transId_;
-    zclFrame[4] = 0x02;
-    zclFrame[5] = 0x00;
-    zclFrame[6] = 0x80;
-    zclFrame[7] = 0x1B;
-    zclFrame[8] = 0x2C;
-    zclFrame[9] = 0x00;
-    zclFrame[10] = 0x00;
+    // ZCL Write Attributes (global command 0x02), manufacturer-specific (code 0x1015):
+    //   FC=0x04  (global frame, manufacturer-specific bit set, client-to-server)
+    //   Attr ID: 0x8000 - IAS Zone activation / device-type selector
+    //   Data type: 0x30 (Enum8) per SBTZB-110 datasheet (was 0x1B=24-bit - BUG)
+    //   Value: 0x2C = PERSONAL_EMERGENCY_DEVICE (Panic Button mode)
+    uint8_t zclFrame[9];
+    zclFrame[0] = 0x04;       // Frame control: global, manufacturer-specific
+    zclFrame[1] = 0x15;       // Manufacturer code LSB (0x1015)
+    zclFrame[2] = 0x10;       // Manufacturer code MSB
+    zclFrame[3] = transId_;   // Sequence number
+    zclFrame[4] = 0x02;       // Command: Write Attributes
+    zclFrame[5] = 0x00;       // Attribute ID LSB (0x8000)
+    zclFrame[6] = 0x80;       // Attribute ID MSB
+    zclFrame[7] = 0x30;       // Data type: Enum8 (was 0x1B = 24-bit int - BUG FIX)
+    zclFrame[8] = 0x2C;       // Value: 0x2C = PERSONAL_EMERGENCY_DEVICE
 
     return ZNP_AfDataRequestExt( 2, buttonShortAddr_, buttonEndpoint_, 0, 8, 0x000F,
-                                 transId_, 0, 30, zclFrame, 11 );
+                                 transId_, 0, 30, zclFrame, 9 );
 }
 
 bool ZNP_SendZoneEnrollResponse( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_,

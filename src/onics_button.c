@@ -408,11 +408,10 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     printf( "Configuring Onics SBTZB-110 button 0x%04X...\n", shortAddr_ );
 
     // Per SBTZB-110 Technical Manual Sections 3.3 & 4.2.3.2:
-    // Step 1: Bind On/Off cluster (0x0006) on EP 0x20 for immediate toggle action.
-    ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
-    usleep( 500000 );
+    // Step 1: We intentionally DO NOT bind the On/Off cluster (0x0006) on EP 0x20.
+    // We only want the native IAS Zone panic alarms from EP 0x23 to avoid double-triggering.
 
-    // Step 2: Write attr 0x8000 (Map16) = 0x002C (PERSONAL_EMERGENCY_DEVICE) to
+    // Step 2: Write attr 0x8000 (Uint16) = 0x002C (PERSONAL_EMERGENCY_DEVICE) to
     //         Binary Input cluster (0x000F) on EP 0x20 to enable the hidden EP 0x23
     //         IAS Zone Panic endpoint in the hardware firmware.
     ZNP_SendButtonActivation( shortAddr_, endpoint, 0x13 );

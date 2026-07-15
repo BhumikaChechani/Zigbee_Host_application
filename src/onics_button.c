@@ -43,34 +43,11 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
 
     if ( af_->clusterId == 0x0006 )
     {
-        // The hardware sends BOTH a 0x0500 Zone Status and a 0x0006 Toggle on the first press.
-        // It DOES NOT send another 0x0500 to clear the alarm.
-        // We therefore use subsequent 0x0006 toggles as the "Manual Clear" for the panic state.
-        // We must debounce this against the initial press so it doesn't instantly clear.
-        double now = ZNP_GetCurrentTime();
-        double timeSincePanic = 999.0;
-        
-        pthread_mutex_lock( &g_deviceMutex );
-        for ( int i = 0; i < g_numOnicsButtons; i++ )
-        {
-            if ( g_onicsButtons[i].shortAddr == af_->srcAddr )
-            {
-                timeSincePanic = now - g_onicsButtons[i].lastPanicTime;
-                break;
-            }
-        }
-        pthread_mutex_unlock( &g_deviceMutex );
-
-        if ( timeSincePanic > 2.0 )
-        {
-            printf( "👉 [ONICS BUTTON] Manual clear via On/Off toggle (cmd=0x%02X)\n", cmdId );
-            // Post a raw zone status of 0x0000 (all clear)
-            UseCase_Post( UC_PANIC_CLEAR, af_->srcAddr, 0x0000 );
-        }
-        else
-        {
-            printf( "👉 [ONICS BUTTON] Ignored On/Off toggle (cmd=0x%02X) - debouncing simultaneous IAS Panic alarm\n", cmdId );
-        }
+        // The hardware firmware requires EP 0x20 to be bound to 0x0006 to process
+        // button clicks. However, we only care about the IAS Zone (0x0500) panic 
+        // alarms that the device emits simultaneously.
+        // We unconditionally ignore these toggles to avoid double-triggering.
+        printf( "👉 [ONICS BUTTON] Ignored On/Off toggle (cmd=0x%02X) - relying purely on IAS Panic alarm\n", cmdId );
     }
     else if ( af_->clusterId == 0x0500 )
     {
@@ -474,16 +451,6 @@ void OnicsButton_HandleStatus( uint16_t shortAddr_, uint16_t zoneStatus_, uint8_
     bool alarm = ( zoneStatus_ & 0x0003 ) != 0;
     if ( alarm )
     {
-        pthread_mutex_lock( &g_deviceMutex );
-        for ( int i = 0; i < g_numOnicsButtons; i++ )
-        {
-            if ( g_onicsButtons[i].shortAddr == shortAddr_ )
-            {
-                g_onicsButtons[i].lastPanicTime = ZNP_GetCurrentTime();
-                break;
-            }
-        }
-        pthread_mutex_unlock( &g_deviceMutex );
         UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_ );
     }
     else

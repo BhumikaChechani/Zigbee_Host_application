@@ -1052,6 +1052,12 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                             if ( !isVibration )
                             {
                                 isContact = true;
+#if ENABLE_ONICS_BUTTON
+                                if ( OnicsButton_IsKnown( shortAddr ) )
+                                {
+                                    isContact = false; // Prevent Panic EP from being stolen by contact sensor
+                                }
+#endif
                             }
                         }
 
@@ -1217,14 +1223,14 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #if ENABLE_AQARA_BUTTON
         else if ( AqaraButton_IsKnown( af.srcAddr ) ) { AqaraButton_PostAf( af.srcAddr, &af ); }
 #endif
+#if ENABLE_ONICS_BUTTON
+        else if ( OnicsButton_IsKnown( af.srcAddr ) ) { OnicsButton_PostAf( af.srcAddr, &af ); }
+#endif
 #if ENABLE_CONTACT_SENSOR
         else if ( ContactSensor_IsKnown( af.srcAddr ) ) { ContactSensor_PostAf( af.srcAddr, &af ); }
 #endif
 #if ENABLE_VIBRATION_SENSOR
         else if ( VibrationSensor_IsKnown( af.srcAddr ) ) { VibrationSensor_PostAf( af.srcAddr, &af ); }
-#endif
-#if ENABLE_ONICS_BUTTON
-        else if ( OnicsButton_IsKnown( af.srcAddr ) ) { OnicsButton_PostAf( af.srcAddr, &af ); }
 #endif
 #if ENABLE_AQARA_OCCUPANCY
         else if ( AqaraOccupancy_IsKnown( af.srcAddr ) ) { AqaraOccupancy_PostAf( af.srcAddr, &af ); }

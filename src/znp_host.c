@@ -1136,7 +1136,7 @@ bool ZNP_SendButtonActivation( uint16_t buttonShortAddr_, uint8_t buttonEndpoint
     zclFrame[4] = 0x02;       // Command: Write Attributes
     zclFrame[5] = 0x00;       // Attribute ID LSB (0x8000)
     zclFrame[6] = 0x80;       // Attribute ID MSB
-    zclFrame[7] = 0x30;       // Data type: Enum8 (was 0x1B = 24-bit int - BUG FIX)
+    zclFrame[7] = 0x18;       // Data type: Map8 / 8-bit bitmap (was 0x30=Enum8 → 0x8D INVALID_DATA_TYPE)
     zclFrame[8] = 0x2C;       // Value: 0x2C = PERSONAL_EMERGENCY_DEVICE
 
     return ZNP_AfDataRequestExt( 2, buttonShortAddr_, buttonEndpoint_, 0, 8, 0x000F,

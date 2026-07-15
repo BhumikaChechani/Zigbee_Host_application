@@ -64,6 +64,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  zonedel <addr> <id>            - Delete a detection zone (Aqara Occupancy)\n" );
         printf( "  spatiallearn <addr>            - Trigger AI Spatial Learning (Aqara Occupancy)\n" );
         printf( "  forcesetup <addr>              - Force re-bind and config payload to sensor\n" );
+        printf( "  onicsdelay <addr> <ms>         - Write ButtonPressActionDelay (attr 0x8001)\n" );
         printf( "  exit                           - Quit application\n\n" );
     }
     else if ( strcmp( base, "status" ) == 0 )
@@ -264,7 +265,40 @@ static void Cli_HandleCommand( const char *cmd_ )
             printf( "Usage: forcesetup <addr hex>\n" );
         }
     }
+    else if ( strcmp( base, "onicsdelay" ) == 0 )
+    {
+        if ( numParts >= 3 )
+        {
+            uint16_t addr = strtoul( parts[1], NULL, 16 );
+            uint16_t delayMs = (uint16_t)strtoul( parts[2], NULL, 10 );
+#if ENABLE_ONICS_BUTTON
+            if ( OnicsButton_IsKnown( addr ) )
+            {
+                printf( "Writing ButtonPressActionDelay (0x8001) = %d ms to Onics 0x%04X...\n", delayMs, addr );
+                uint8_t payloadFull[8];
+                static uint8_t s_cliSeq = 0;
+                payloadFull[0] = 0x00;
+                payloadFull[1] = s_cliSeq++;
+                payloadFull[2] = 0x02;
+                payloadFull[3] = 0x01;
+                payloadFull[4] = 0x80;
+                payloadFull[5] = 0x21; // Uint16
+                payloadFull[6] = delayMs & 0xFF;
+                payloadFull[7] = (delayMs >> 8) & 0xFF;
 
+                ZNP_AfDataRequestExt( 2, addr, 0x20, 0, 8, 0x0006, 0, 0, 15, payloadFull, 8 );
+            }
+            else
+            {
+                printf( "Error: 0x%04X is not a known Onics Button.\n", addr );
+            }
+#endif
+        }
+        else
+        {
+            printf( "Usage: onicsdelay <addr hex> <delay_in_ms>\n" );
+        }
+    }
     else if ( strcmp( base, "discover" ) == 0 )
     {
         if ( numParts >= 2 )

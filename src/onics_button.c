@@ -448,12 +448,8 @@ void OnicsButton_HandleStatus( uint16_t shortAddr_, uint16_t zoneStatus_, uint8_
     printf( "   -> Zone Status Change from Onics 0x%04X: zone_status=0x%04X, zone_id=%d\n",
             shortAddr_, zoneStatus_, zoneId_ );
 
-    bool hardwareAlarm = ( zoneStatus_ & 0x0003 ) != 0;
-    
-    // User requested inverted behavior:
-    // - Long press natively sends 0x0030 (hardwareAlarm = false) -> We want to SET the siren
-    // - Short press natively sends 0x0032 (hardwareAlarm = true) -> We want to CLEAR the siren
-    if ( !hardwareAlarm )
+    bool alarm = ( zoneStatus_ & 0x0003 ) != 0;
+    if ( alarm )
     {
         UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_ );
     }

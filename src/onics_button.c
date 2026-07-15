@@ -341,23 +341,14 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     g_onicsButtons[idx].configured = true;
     pthread_mutex_unlock( &g_deviceMutex );
 
-    printf( "Configuring Onics button 0x%04X...\n", shortAddr_ );
+    printf( "Configuring Onics SBTZB-110 button 0x%04X...\n", shortAddr_ );
+    printf( "  Note: SBTZB-110 is a Smart Button (NOT a Panic Button).\n" );
+    printf( "  It only supports single-click via On/Off cluster (0x0006) on EP 0x20.\n" );
 
-    // 1. Bind On/Off cluster output (0x0006) to coordinator endpoint 8.
+    // Bind On/Off cluster (0x0006) on EP 0x20 to coordinator endpoint 8.
+    // This is the only cluster the SBTZB-110 supports for button actions.
     ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
-    usleep( 500000 );
 
-    // 2. Send Onics activation write to primary endpoint to unlock Panic endpoint (0x23).
-    ZNP_SendButtonActivation( shortAddr_, endpoint, 0x13 );
-    usleep( 1000000 ); // Wait 1 second for the hardware to enable the new endpoint
-
-    // 3. Bind the newly enabled IAS Zone cluster (0x0500) on endpoint 0x23 (35).
-    ZNP_ZdoBindReq( shortAddr_, buttonIeee, 0x23, 0x0500, g_coordinatorIeee, 8 );
-    usleep( 500000 );
-
-    // 4. Write coordinator's IEEE to the Panic endpoint's IAS_CIE_Address attribute (0x0010).
-    ZNP_WriteCieAddress( shortAddr_, 0x23, 0x12 );
-    
     printf( "Configuration sent to Onics button 0x%04X!\n", shortAddr_ );
 }
 

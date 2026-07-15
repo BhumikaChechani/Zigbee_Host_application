@@ -152,13 +152,15 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
         {
             const uint8_t *zcl = &af_->data[hdrLen];
             int zclLen = af_->dataLen - hdrLen;
-            if ( zclLen == 0 )
+            if ( zclLen == 0 || ( zclLen >= 1 && zcl[0] == 0x00 ) )
             {
-                // Empty Write Attributes Response = all attributes written successfully.
-                // The hardware has now enabled EP 0x23 (IAS Zone Panic endpoint).
+                // Success: either empty payload OR a status=0x00 record.
+                // SBTZB-110 sends a 1-byte payload (0x00) on success.
+                // The device WILL reset immediately after this to apply the panic mode change.
+                // Steps 3 & 4 will be triggered once the device re-pairs with EP 0x23 visible.
                 printf( "✅ Onics Button 0x%04X Panic mode activation SUCCESS!\n", af_->srcAddr );
                 printf( "   -> EP 0x23 (IAS Zone Panic) is now unlocked in hardware.\n" );
-                printf( "   -> Binding IAS Zone cluster (0x0500) on EP 0x23...\n" );
+                printf( "   -> Device will reset to apply mode change. Binding EP 0x23 now...\n" );
 
                 // Step 3: Bind IAS Zone cluster (0x0500) on the newly unlocked EP 0x23.
                 pthread_mutex_lock( &g_deviceMutex );
@@ -185,7 +187,7 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
                 }
                 else
                 {
-                    printf( "   ⚠️  IEEE not yet known - re-trigger setup after IEEE is resolved.\n" );
+                    printf( "   ⚠️  IEEE not yet known - will retry on re-pair.\n" );
                 }
             }
             else if ( zclLen >= 3 && zcl[0] != 0x00 )

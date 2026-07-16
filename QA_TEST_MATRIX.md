@@ -26,8 +26,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚪 3. Contact Sensor (Door/Window)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Move magnet away (Open Door) | 🔔 **1-SECOND CHIME** on sirens. | HARDWARE LIMITATION: Siren ignores low-volume setting and always plays loud. |
-| Bring magnet close (Close Door) | Console logs door closed. **No chime.** | |
+| Move magnet away (Open Door) | 🔔 **DOUBLE BEEP** (2 fast chirps) on sirens. | Beeps use Burglar mode with 20ms ON time and 300ms gap. |
+| Bring magnet close (Close Door) | 🔔 **SINGLE BEEP** (1 fast chirp) on sirens. | |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | Tests generic sensor health data. |
 
 ---

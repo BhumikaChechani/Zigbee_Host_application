@@ -46,7 +46,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚨 5. Frient Smart Siren (SIRZB-110)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Remove mounting backplate (Tamper switch) | 🚨 **FULL SIREN ALARM** on all sirens. | Siren hardware tamper detection. |
+| Remove mounting backplate (Tamper switch) | ⚠️ Console logs tamper event but **no alarm triggers**. | **DISABLED FOR DEMO:** Tamper alarm is disabled to avoid accidental triggers during handling. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Fetches diagnostics from the siren. |
 | Type `siren on` and hit Enter | 🚨 **FULL SIREN ALARM** on all sirens. | Tests global siren activation. |
 | Type `siren off` and hit Enter | 🔇 **ALL SIRENS STOP** immediately. | Stops the global test. |

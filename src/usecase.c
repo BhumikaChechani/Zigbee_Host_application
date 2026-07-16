@@ -79,7 +79,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     AqaraPressHistory *history = GetAqaraHistory(event_->srcAddr);
     if (history != NULL) {
       double elapsed = now - history->lastEventTime;
-      if (elapsed < 0.5) {
+      if (elapsed < 0.10) {
         printf("[USECASE] Debouncing Aqara 0x%04X press (elapsed = %.3fs) -> "
                "ignoring\n",
                event_->srcAddr, elapsed);

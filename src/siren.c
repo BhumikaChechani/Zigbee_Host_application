@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 
 SIREN_T g_sirens[MAX_SIRENS];
 int g_numSirens = 0;
@@ -428,6 +429,41 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
         // The industry-standard workaround (used by Z2M/Home Assistant) is to emulate the chirp 
         // using the highly reliable Start Warning (0x00) command for a 1-second duration.
         ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, s_sirenMode, squawkLevel_, 1 );
+    }
+}
+
+void Siren_Beep( int count_ )
+{
+    pthread_mutex_lock( &g_deviceMutex );
+    if ( g_numSirens == 0 )
+    {
+        pthread_mutex_unlock( &g_deviceMutex );
+        return;
+    }
+    int tempNum = g_numSirens;
+    SIREN_T tempSirens[MAX_SIRENS];
+    memcpy( tempSirens, g_sirens, sizeof( SIREN_T ) * g_numSirens );
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    for ( int c = 0; c < count_; c++ )
+    {
+        for ( int i = 0; i < tempNum; i++ )
+        {
+            // Start warning (1 sec duration to turn it on immediately)
+            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, s_sirenMode, 0, 1 );
+        }
+        usleep( 150000 ); // 150ms ON time
+
+        for ( int i = 0; i < tempNum; i++ )
+        {
+            // Stop warning (0 sec duration)
+            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, s_sirenMode, 0, 0 );
+        }
+        
+        if ( c < count_ - 1 )
+        {
+            usleep( 150000 ); // 150ms OFF time between beeps
+        }
     }
 }
 

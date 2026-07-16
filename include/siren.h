@@ -102,6 +102,10 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ );
 /// @param volume_ 0=low, 1=medium, 2=high, 3=very high.
 void Siren_SetVolume( uint8_t volume_ );
 
+/// @brief Emulate a specific number of short beeps by rapidly toggling Start Warning.
+/// @param count_ Number of beeps.
+void Siren_Beep( int count_ );
+
 /// @brief Get the global siren volume.
 /// @return Current volume level.
 uint8_t Siren_GetVolume( void );

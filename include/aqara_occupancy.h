@@ -94,6 +94,8 @@ void AqaraOccupancy_SetHwDetectionRange( uint16_t shortAddr_, uint32_t bitmask_ 
 void AqaraOccupancy_SpatialLearning( uint16_t shortAddr_ );
 void AqaraOccupancy_SetSensitivity( uint16_t shortAddr_, uint8_t level_ );
 void AqaraOccupancy_ReadEnvironment( uint16_t shortAddr_ );
+void AqaraOccupancy_SetLightThreshold( uint16_t threshold_ );
+uint16_t AqaraOccupancy_GetLightThreshold( void );
 
 /// @brief  Print the registered occupancy sensors (CLI 'status').
 /// @return None.

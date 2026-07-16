@@ -65,6 +65,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  spatiallearn <addr>            - Trigger AI Spatial Learning (Aqara Occupancy)\n" );
         printf( "  forcesetup <addr>              - Force re-bind and config payload to sensor\n" );
         printf( "  onicsdelay <addr> <ms>         - Write ButtonPressActionDelay (attr 0x8001)\n" );
+        printf( "  lightthreshold [value]         - Set or show light threshold for Aqara Occupancy\n" );
         printf( "  exit                           - Quit application\n\n" );
     }
     else if ( strcmp( base, "status" ) == 0 )
@@ -263,6 +264,26 @@ static void Cli_HandleCommand( const char *cmd_ )
         else
         {
             printf( "Usage: forcesetup <addr hex>\n" );
+        }
+    }
+    else if ( strcmp( base, "lightthreshold" ) == 0 )
+    {
+        if ( numParts >= 2 )
+        {
+            uint16_t threshold = (uint16_t)strtoul( parts[1], NULL, 10 );
+#if ENABLE_AQARA_OCCUPANCY
+            AqaraOccupancy_SetLightThreshold( threshold );
+            printf( "Aqara Occupancy light intensity threshold set to %u\n", threshold );
+#else
+            (void)threshold;
+#endif
+        }
+        else
+        {
+#if ENABLE_AQARA_OCCUPANCY
+            printf( "Current Aqara Occupancy light intensity threshold: %u\n", AqaraOccupancy_GetLightThreshold() );
+#endif
+            printf( "Usage: lightthreshold <value>\n" );
         }
     }
     else if ( strcmp( base, "onicsdelay" ) == 0 )

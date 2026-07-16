@@ -18,6 +18,7 @@ int g_numAqaraOccupancies = 0;
 
 static MSG_QUEUE_T s_occupancyInbox;
 static pthread_t s_occupancyThread;
+static uint16_t s_lightThreshold = 10000;
 
 ///
 /// @brief  Fixed byte width of a ZCL data type.
@@ -891,8 +892,8 @@ bool AqaraOccupancy_AllOccupied( void )
 
 void AqaraOccupancy_HandleLightState( uint16_t shortAddr_, uint16_t light_ )
 {
-    // Threshold tuning: light > 10000 implies significant brightness
-    bool lightIsOn = ( light_ > 10000 );
+    // Threshold tuning: light > s_lightThreshold implies significant brightness
+    bool lightIsOn = ( light_ > s_lightThreshold );
     bool stateChanged = false;
 
     pthread_mutex_lock( &g_deviceMutex );
@@ -1042,4 +1043,15 @@ void AqaraOccupancy_DiscoverAllActiveEp( void )
         ZNP_QuerySimpleDesc( tempAddrs[i], 1 );
     }
 }
+
+void AqaraOccupancy_SetLightThreshold( uint16_t threshold_ )
+{
+    s_lightThreshold = threshold_;
+}
+
+uint16_t AqaraOccupancy_GetLightThreshold( void )
+{
+    return s_lightThreshold;
+}
 #endif
+

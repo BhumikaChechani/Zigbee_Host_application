@@ -68,6 +68,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Type `sensitivity <addr> <1\|2\|3>` | ⚙️ Configures radar sensitivity. | 1=Low, 2=Medium, 3=High. |
 | Shine light on sensor (Light ON) | 🚨 **FULL SIREN ALARM** (Emergency Panic) on all sirens. | Triggers Mode 6 sound. |
 | Cover sensor from light (Light OFF) | 🔇 **ALL SIRENS STOP**. | |
+| Type `lightthreshold <value>` | ⚙️ Configures the light sensing trigger threshold. | Set lower for higher sensitivity to light, higher for darker environments. |
 
 ---
 

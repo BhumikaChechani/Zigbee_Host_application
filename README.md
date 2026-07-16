@@ -78,6 +78,7 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`zone <addr> <idx> <start> <end>`** | Configures a detection zone. Distance slices are 25cm each.<br>*(Example: `zone 7AF2 0 0 2` configures zone 0 to cover 0-50cm).* |
 | **`zonedel <addr> <idx>`** | Deletes a previously configured zone. |
 | **`spatiallearn <addr>`** | Triggers the sensor's spatial learning calibration (ensure the room is completely empty before running). |
+| **`lightthreshold [value]`** | Sets or displays the light intensity threshold (lux index) for Aqara Occupancy light sensing (Default: 10000). |
 
 ### Siren Controls
 | Command | Description |

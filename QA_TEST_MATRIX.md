@@ -66,8 +66,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Type `zonedel <addr> <idx>` | 🗑️ Deletes the specific detection zone. | |
 | Type `spatiallearn <addr>` | 📡 Triggers spatial background learning. | Ensure the room is empty first! |
 | Type `sensitivity <addr> <1\|2\|3>` | ⚙️ Configures radar sensitivity. | 1=Low, 2=Medium, 3=High. |
-| Shine light on sensor (Light ON) | 🚨 **SIRENS ON** (Police Panic) for 5 seconds. | Triggers Mode 4 sound for 5s. |
-| Cover sensor from light (Light OFF) | 🔔 **SINGLE BEEP** (short chirp) on sirens. | |
+| Shine light on sensor (Light ON) | 🚨 **FULL SIREN ALARM** (Emergency Panic) on all sirens. | Triggers Mode 6 sound. |
+| Cover sensor from light (Light OFF) | 🔇 **ALL SIRENS STOP**. | |
 
 ---
 

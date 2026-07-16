@@ -209,16 +209,16 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     // Siren_ControlAll( 0 );
     break;
   case UC_LIGHT_ON:
-    printf("☀️ [USECASE] Light turned ON -> sirens ON (Police Panic for 5s)\n");
+    printf("☀️ [USECASE] Light turned ON -> sirens ON (Emergency Panic)\n");
 #if ENABLE_SIREN
-    Siren_SetMode(4);
-    Siren_ControlAllDuration(1, 5);
+    Siren_SetMode(6);
+    Siren_ControlAll(1);
 #endif
     break;
   case UC_LIGHT_OFF:
-    printf("🌙 [USECASE] Light turned OFF -> short beep\n");
+    printf("🌙 [USECASE] Light turned OFF -> sirens OFF\n");
 #if ENABLE_SIREN
-    Siren_Beep(1);
+    Siren_ControlAll(0);
 #endif
     break;
   case UC_CONTACT_OPEN:

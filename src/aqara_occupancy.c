@@ -901,6 +901,7 @@ void AqaraOccupancy_HandleLightState( uint16_t shortAddr_, uint16_t light_ )
     {
         if ( g_aqaraOccupancies[i].shortAddr == shortAddr_ )
         {
+            g_aqaraOccupancies[i].lastLightLevel = light_;
             if ( !g_aqaraOccupancies[i].hasLightState || g_aqaraOccupancies[i].isLightOn != lightIsOn )
             {
                 g_aqaraOccupancies[i].hasLightState = true;
@@ -916,12 +917,12 @@ void AqaraOccupancy_HandleLightState( uint16_t shortAddr_, uint16_t light_ )
     {
         if ( !lightIsOn )
         {
-            printf( "🌙 Light is OFF (0x%04X)\n", shortAddr_ );
+            printf( "🌙 Light is OFF (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_, light_, s_lightThreshold );
             UseCase_Post( UC_LIGHT_OFF, shortAddr_, light_ );
         }
         else
         {
-            printf( "☀️ Light is ON (0x%04X)\n", shortAddr_ );
+            printf( "☀️ Light is ON (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_, light_, s_lightThreshold );
             UseCase_Post( UC_LIGHT_ON, shortAddr_, light_ );
         }
     }
@@ -972,6 +973,17 @@ void AqaraOccupancy_PrintStatus( void )
         }
         printf( ", ep=0x%02X, last_seen=%.1fs ago\n",
                 g_aqaraOccupancies[i].endpoint, now - g_aqaraOccupancies[i].lastSeen );
+        if ( g_aqaraOccupancies[i].hasLightState )
+        {
+            printf( "    Light: %s (Raw: %u, Threshold: %u)\n", 
+                    g_aqaraOccupancies[i].isLightOn ? "ON" : "OFF", 
+                    g_aqaraOccupancies[i].lastLightLevel, 
+                    s_lightThreshold );
+        }
+        else
+        {
+            printf( "    Light: Unknown (Threshold: %u)\n", s_lightThreshold );
+        }
 
         int activeZones = 0;
         for ( int z = 0; z < MAX_OCCUPANCY_ZONES; z++ )

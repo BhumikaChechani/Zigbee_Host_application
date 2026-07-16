@@ -29,6 +29,7 @@ typedef struct {
     uint32_t currentDistanceCm; ///< Last reported distance to target in cm.
     bool hasLightState; ///< True if we have received at least one light reading.
     bool isLightOn;     ///< Last known state of the light.
+    uint16_t lastLightLevel; ///< Last reported raw light intensity level.
     OccupancyZone zones[MAX_OCCUPANCY_ZONES]; ///< Configured distance ranges.
 } AQARA_OCCUPANCY_T;
 

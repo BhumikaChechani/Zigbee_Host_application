@@ -35,8 +35,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 📳 4. Frient Vibration Sensor (Glass Break)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Tap glass gently (Vibration / Alarm 2) | 🔔 **1-SECOND LOUD BEEP** on sirens. | HARDWARE LIMITATION: Siren ignores low-volume setting and always plays loud. |
-| Shake or tilt heavily (Movement / Alarm 1) | 🚨 **FULL SIREN ALARM** on all sirens. | Critical breach / window broken. |
+| Tap glass gently (Vibration / Alarm 2) | 🚨 **FULL SIREN ALARM** (Emergency Panic) on all sirens. | Triggers Mode 6 sound. |
+| Shake or tilt heavily (Movement / Alarm 1) | 🚨 **FULL SIREN ALARM** (Emergency Panic) on all sirens. | Critical breach / window broken. Triggers Mode 6 sound. |
 | Remove battery cover (Tamper switch) | 🚨 **FULL SIREN ALARM** on all sirens. | Protects device from being dismantled. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | **WAKEUP REQUIRED:** You must tap/vibrate the sensor right before hitting enter to wake its radio! |
 | Type `sensitivity <addr> <1-15>` | ⚙️ Configures hardware sensitivity. | 1=Most sensitive, 15=Least sensitive (Default 10). |

@@ -129,8 +129,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
           // was fast enough to trigger.
           history->count = 0;
           if (diff <= 3.0) {
-            printf("[USECASE] 3 presses in <= 3.0s -> turning sirens ON\n");
+            printf("[USECASE] 3 presses in <= 3.0s -> turning sirens ON (FULL CAPACITY)\n");
 #if ENABLE_SIREN
+            Siren_SetVolume(3); // Ensure max capacity
             Siren_ControlAll(1);
 #endif
           } else {

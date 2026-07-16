@@ -452,7 +452,7 @@ void Siren_Beep( int count_ )
             // Start warning (1 sec duration to turn it on immediately)
             ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, s_sirenMode, 0, 1 );
         }
-        usleep( 150000 ); // 150ms ON time
+        usleep( 50000 ); // 50ms ON time (very short beep)
 
         for ( int i = 0; i < tempNum; i++ )
         {
@@ -462,7 +462,7 @@ void Siren_Beep( int count_ )
         
         if ( c < count_ - 1 )
         {
-            usleep( 150000 ); // 150ms OFF time between beeps
+            usleep( 150000 ); // 150ms OFF time between beeps (gap)
         }
     }
 }

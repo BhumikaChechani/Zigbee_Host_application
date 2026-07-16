@@ -452,7 +452,7 @@ void Siren_Beep( int count_ )
             // Start warning (1 sec duration to turn it on immediately)
             ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, 1, 0, 1 ); // 1 = Burglar Mode
         }
-        usleep( 100000 ); // 100ms ON time (short beep)
+        usleep( 20000 ); // 20ms ON time (extremely short beep)
 
         for ( int i = 0; i < tempNum; i++ )
         {

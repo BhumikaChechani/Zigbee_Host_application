@@ -17,6 +17,7 @@ typedef struct
     double lastSeen;
     int zoneId;
     bool configured;
+    bool isOpen;
 } CONTACT_SENSOR_T;
 
 extern CONTACT_SENSOR_T g_contactSensors[MAX_CONTACT_SENSORS];

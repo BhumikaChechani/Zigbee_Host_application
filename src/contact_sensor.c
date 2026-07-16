@@ -271,6 +271,15 @@ void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
          shortAddr_, zoneStatus_, zoneId_);
 
   bool open = (zoneStatus_ & 0x0001) != 0;
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numContactSensors; i++) {
+    if (g_contactSensors[i].shortAddr == shortAddr_) {
+      g_contactSensors[i].isOpen = open;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+
   if (open) {
     UseCase_Post(UC_CONTACT_OPEN, shortAddr_, zoneStatus_);
   } else {
@@ -291,8 +300,9 @@ void ContactSensor_PrintStatus(void) {
     } else {
       printf("Unknown");
     }
-    printf(", ep=0x%02X, zone_id=%d, last_seen=%.1fs ago\n",
+    printf(", ep=0x%02X, zone_id=%d, state=%s, last_seen=%.1fs ago\n",
            g_contactSensors[i].endpoint, g_contactSensors[i].zoneId,
+           g_contactSensors[i].isOpen ? "OPEN" : "CLOSED",
            now - g_contactSensors[i].lastSeen);
   }
   pthread_mutex_unlock(&g_deviceMutex);

@@ -27,8 +27,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAX_ZONES 16
-static bool s_zoneDoorOpen[MAX_ZONES] = {false};
+static bool IsDoorOpenForZone(uint8_t zoneIdx) {
+    bool open = false;
+    pthread_mutex_lock(&g_deviceMutex);
+    
+    // 1. Check if we only have one contact sensor (global fallback)
+    if (g_numContactSensors == 1) {
+        open = g_contactSensors[0].isOpen;
+        pthread_mutex_unlock(&g_deviceMutex);
+        return open;
+    }
+    
+    // 2. Try to find a contact sensor matching the zoneIdx
+    for (int i = 0; i < g_numContactSensors; i++) {
+        if (g_contactSensors[i].zoneId == (int)zoneIdx) {
+            open = g_contactSensors[i].isOpen;
+            pthread_mutex_unlock(&g_deviceMutex);
+            return open;
+        }
+    }
+    
+    // 3. Fallback for unconfigured (-1) contact sensors to map to zone 0
+    if (zoneIdx == 0) {
+        for (int i = 0; i < g_numContactSensors; i++) {
+            if (g_contactSensors[i].zoneId == -1) {
+                open = g_contactSensors[i].isOpen;
+                pthread_mutex_unlock(&g_deviceMutex);
+                return open;
+            }
+        }
+    }
+    
+    pthread_mutex_unlock(&g_deviceMutex);
+    return open;
+}
 
 static MSG_QUEUE_T s_useCaseInbox; ///< Inbox of pending use-case events.
 static pthread_t s_useCaseThread;  ///< The use-case worker thread handle.
@@ -189,10 +221,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   case UC_OCCUPANCY_DETECTED: {
 #if ENABLE_AQARA_OCCUPANCY
     uint8_t zoneIdx = (uint8_t)event_->raw;
-    bool isDoorOpen = false;
-    if (zoneIdx < MAX_ZONES) {
-        isDoorOpen = s_zoneDoorOpen[zoneIdx];
-    }
+    bool isDoorOpen = IsDoorOpenForZone(zoneIdx);
     printf("🚶 [USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
     if (isDoorOpen) {
@@ -232,19 +261,6 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   case UC_CONTACT_OPEN: {
     printf("🚪 [USECASE] Contact Sensor OPENED -> Siren Beep 2 times\n");
-    int zoneId = -1;
-    pthread_mutex_lock(&g_deviceMutex);
-    for (int i = 0; i < g_numContactSensors; i++) {
-        if (g_contactSensors[i].shortAddr == event_->srcAddr) {
-            zoneId = g_contactSensors[i].zoneId;
-            break;
-        }
-    }
-    pthread_mutex_unlock(&g_deviceMutex);
-    if (zoneId >= 0 && zoneId < MAX_ZONES) {
-        s_zoneDoorOpen[zoneId] = true;
-        printf("[USECASE] Zone %d door is now OPEN\n", zoneId);
-    }
 #if ENABLE_SIREN
     Siren_Beep(2);
 #endif
@@ -252,19 +268,6 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   }
   case UC_CONTACT_CLOSED: {
     printf("🚪 [USECASE] Contact Sensor CLOSED -> Siren Beep 1 time\n");
-    int zoneId = -1;
-    pthread_mutex_lock(&g_deviceMutex);
-    for (int i = 0; i < g_numContactSensors; i++) {
-        if (g_contactSensors[i].shortAddr == event_->srcAddr) {
-            zoneId = g_contactSensors[i].zoneId;
-            break;
-        }
-    }
-    pthread_mutex_unlock(&g_deviceMutex);
-    if (zoneId >= 0 && zoneId < MAX_ZONES) {
-        s_zoneDoorOpen[zoneId] = false;
-        printf("[USECASE] Zone %d door is now CLOSED\n", zoneId);
-    }
 #if ENABLE_SIREN
     Siren_Beep(1);
 #endif

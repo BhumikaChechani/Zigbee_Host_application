@@ -7,9 +7,9 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🟢 1. Aqara Wireless Mini Switch (Smart Button)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Press button 1 time | Console logs single press. **No siren.** | Debounce is set to 0.10s to allow fast tapping. |
+| Press button 1 time | Console logs single press. **If sirens are ON, they turn OFF.** | Debounce is set to 0.10s to allow fast tapping. |
 | Press button 2 times | Console logs double press. **No siren.** | |
-| Press button 3 times **FAST** (within 3 secs) | 🚨 **FULL SIREN ALARM** on all sirens. | Simulates SOS. Sirens are forced to MAX volume and Burglar mode. |
+| Press button 3 times **FAST** (within 3 secs) | 🚨 **FULL SIREN ALARM** (Burglar / Mode 1) on all sirens. | Simulates SOS. Sirens are forced to MAX volume and Burglar mode. |
 | Press button 3 times **SLOW** (> 3 secs gap) | Console resets history. **No alarm.** | Tests timeout rejection logic. |
 
 ---
@@ -17,8 +17,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🔴 2. Onics Panic Button
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Press the RED panic button | 🚨 **FULL SIREN ALARM** on all sirens. | Tests IAS Zone panic activation mapping. |
-| Press the RED panic button again | 🔇 **ALL SIRENS STOP**. | Tests IAS Zone panic clear mapping. |
+| Press the RED panic button | 🚨 **FULL SIREN ALARM** (Global Alarm Mode) on all sirens. | Tests IAS Zone panic activation mapping. |
+| Long press the RED panic button | 🔇 **ALL SIRENS STOP** (Panic Cleared). | Tests IAS Zone panic clear mapping (Long press clears panic). |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Tests generic sensor health data. |
 
 ---
@@ -26,8 +26,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚪 3. Contact Sensor (Door/Window)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Move magnet away (Open Door) | 🔔 **DOUBLE BEEP** (2 fast chirps) on sirens. | Beeps use Burglar mode with 20ms ON time and 300ms gap. |
-| Bring magnet close (Close Door) | 🔔 **SINGLE BEEP** (1 fast chirp) on sirens. | |
+| Move magnet away (Open Door) | 🔔 **DOUBLE BEEP** (2 fast chirps) in Burglar mode. | Beeps use Burglar mode (Mode 1) with 100ms ON time and 300ms gap. |
+| Bring magnet close (Close Door) | 🔔 **SINGLE BEEP** (1 fast chirp) in Burglar mode. | Beep uses Burglar mode (Mode 1) with 100ms ON time. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | Tests generic sensor health data. |
 
 ---
@@ -35,8 +35,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 📳 4. Frient Vibration Sensor (Glass Break)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Tap glass gently (Vibration / Alarm 2) | 🚨 **FULL SIREN ALARM** (Police Panic) on all sirens. | Triggers Mode 4 sound. |
-| Shake or tilt heavily (Movement / Alarm 1) | 🚨 **FULL SIREN ALARM** (Police Panic) on all sirens. | Critical breach / window broken. Triggers Mode 4 sound. |
+| Tap glass gently (Vibration / Alarm 2) | 🚨 **FULL SIREN ALARM** (Police Panic / Mode 4) on all sirens. | Triggers Mode 4 sound. Sirens stop when vibration clears. |
+| Shake or tilt heavily (Movement / Alarm 1) | 🚨 **FULL SIREN ALARM** (Police Panic / Mode 4) on all sirens. | Critical breach / window broken. Triggers Mode 4 sound. Sirens stop when movement clears. |
 | Remove battery cover (Tamper switch) | 🚨 **FULL SIREN ALARM** on all sirens. | Protects device from being dismantled. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | **WAKEUP REQUIRED:** You must tap/vibrate the sensor right before hitting enter to wake its radio! |
 | Type `sensitivity <addr> <1-15>` | ⚙️ Configures hardware sensitivity. | 1=Most sensitive, 15=Least sensitive (Default 10). |
@@ -47,7 +47,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
 | Remove mounting backplate (Tamper switch) | ⚠️ Console logs tamper event but **no alarm triggers**. | **DISABLED FOR DEMO:** Tamper alarm is disabled to avoid accidental triggers during handling. |
-| Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Fetches diagnostics from the siren. |
+| Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Light / battery queries. |
 | Type `siren on` and hit Enter | 🚨 **FULL SIREN ALARM** on all sirens. | Tests global siren activation. |
 | Type `siren off` and hit Enter | 🔇 **ALL SIRENS STOP** immediately. | Stops the global test. |
 | Type `siren mode <1-6>` | 🎶 Sets global siren sound mode. | **Modes:** 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic. |
@@ -66,7 +66,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Type `zonedel <addr> <idx>` | 🗑️ Deletes the specific detection zone. | |
 | Type `spatiallearn <addr>` | 📡 Triggers spatial background learning. | Ensure the room is empty first! |
 | Type `sensitivity <addr> <1\|2\|3>` | ⚙️ Configures radar sensitivity. | 1=Low, 2=Medium, 3=High. |
-| Shine light on sensor (Light ON) | 🚨 **FULL SIREN ALARM** (Emergency Panic) on all sirens. | Triggers Mode 6 sound. |
+| Shine light on sensor (Light ON) | 🚨 **FULL SIREN ALARM** (Emergency Panic / Mode 6) on all sirens. | Triggers Mode 6 sound. |
 | Cover sensor from light (Light OFF) | 🔇 **ALL SIRENS STOP**. | |
 | Type `lightthreshold <value>` | ⚙️ Configures the light sensing trigger threshold. | Set lower for higher sensitivity to light, higher for darker environments. |
 
@@ -75,7 +75,28 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 💻 7. Global CLI Commands (Controller Level)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Type `status` and hit Enter | 📋 Prints list of all connected devices. | Shows online status and last-seen time. |
+| Type `status` and hit Enter | 📋 Prints list of all connected devices. | Shows online status, last-seen, and light readings. |
 | Type `permit [seconds]` | 🔓 Opens the Zigbee network for pairing. | Default is 60s if not specified. |
 | Type `discover <addr>` | 🔍 Discovers device endpoints and clusters. | Forces Zigbee active endpoint discovery. |
 | Type `forcesetup <addr>` | ⚙️ Re-runs initial configuration binding. | Fixes devices that didn't set up correctly. |
+
+---
+
+### 🎶 8. System Alarm & Siren Sound Matrix
+
+The table below lists all conditions that trigger or modify the sirens, along with the specific siren mode and sound profile activated.
+
+| Event / Trigger Condition | Target Action | Siren Warning Mode | Sound Profile Description |
+| :--- | :--- | :--- | :--- |
+| **Aqara Button:** 3 Fast Presses | Sirens ON (Full Volume) | **Mode 1 (Burglar)** | Burglar alarm sound |
+| **Aqara Button:** 1 Press | Sirens OFF | **Mode 0 (Stop)** | Silence |
+| **Onics Button:** Red Button Press | Sirens ON | **Global Active Mode** (Default: 1) | Active global sound (Burglar by default) |
+| **Onics Button:** Long Press (Clear) | Sirens OFF | **Mode 0 (Stop)** | Silence |
+| **Contact Sensor:** Magnet open (Door Open) | Double Beep (Chime) | **Mode 1 (Burglar)** | 2 short beeps (100ms ON / 300ms gap) |
+| **Contact Sensor:** Magnet close (Door Close) | Single Beep (Chime) | **Mode 1 (Burglar)** | 1 short beep (100ms ON) |
+| **Vibration Sensor:** Vibration detected | Sirens ON | **Mode 4 (Police Panic)** | Police Panic sound |
+| **Vibration Sensor:** Vibration cleared | Sirens OFF | **Mode 0 (Stop)** | Silence |
+| **Vibration Sensor:** Movement detected | Sirens ON | **Mode 4 (Police Panic)** | Police Panic sound |
+| **Vibration Sensor:** Movement cleared | Sirens OFF | **Mode 0 (Stop)** | Silence |
+| **Light Sensor:** Light ON | Sirens ON | **Mode 6 (Emergency Panic)** | Emergency Panic sound |
+| **Light Sensor:** Light OFF | Sirens OFF | **Mode 0 (Stop)** | Silence |

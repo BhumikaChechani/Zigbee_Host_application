@@ -246,11 +246,36 @@ static void *AqaraOccupancy_Thread( void *arg_ )
     return NULL;
 }
 
+static void AqaraOccupancy_LoadConfig( void )
+{
+    FILE *f = fopen( "occupancy_config.txt", "r" );
+    if ( f )
+    {
+        int t;
+        if ( fscanf( f, "%d", &t ) == 1 )
+        {
+            s_lightThreshold = (uint16_t)t;
+        }
+        fclose( f );
+    }
+}
+
+static void AqaraOccupancy_SaveConfig( void )
+{
+    FILE *f = fopen( "occupancy_config.txt", "w" );
+    if ( f )
+    {
+        fprintf( f, "%d\n", s_lightThreshold );
+        fclose( f );
+    }
+}
+
 void AqaraOccupancy_Init( void )
 {
     memset( g_aqaraOccupancies, 0, sizeof( g_aqaraOccupancies ) );
     g_numAqaraOccupancies = 0;
     MsgQueue_Init( &s_occupancyInbox );
+    AqaraOccupancy_LoadConfig();
 }
 
 void AqaraOccupancy_Start( void )
@@ -1059,6 +1084,7 @@ void AqaraOccupancy_DiscoverAllActiveEp( void )
 void AqaraOccupancy_SetLightThreshold( uint16_t threshold_ )
 {
     s_lightThreshold = threshold_;
+    AqaraOccupancy_SaveConfig();
 }
 
 uint16_t AqaraOccupancy_GetLightThreshold( void )

@@ -7,9 +7,9 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🟢 1. Aqara Wireless Mini Switch (Smart Button)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Press button 1 time | Console logs single press. **No siren.** | Debounce is set to 0.15s. |
+| Press button 1 time | Console logs single press. **No siren.** | Debounce is set to 0.10s to allow fast tapping. |
 | Press button 2 times | Console logs double press. **No siren.** | |
-| Press button 3 times **FAST** (within 3 secs) | 🚨 **FULL SIREN ALARM** on all sirens. | Simulates an SOS / Panic action. |
+| Press button 3 times **FAST** (within 3 secs) | 🚨 **FULL SIREN ALARM** on all sirens. | Simulates SOS. Sirens are forced to MAX volume. |
 | Press button 3 times **SLOW** (> 3 secs gap) | Console resets history. **No alarm.** | Tests timeout rejection logic. |
 
 ---

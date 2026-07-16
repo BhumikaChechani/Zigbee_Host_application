@@ -46,7 +46,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚨 5. Frient Smart Siren (SIRZB-110)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Remove mounting backplate (Tamper switch) | ⚠️ Console logs tamper event but **no alarm triggers**. | **DISABLED FOR DEMO:** Tamper alarm is disabled to avoid accidental triggers during handling. |
+| Remove mounting backplate (Tamper switch) | Tamper switch is ignored, no logs or alarms. | **DISABLED FOR DEMO:** Tamper monitoring is completely disabled in code to avoid handling distraction. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Light / battery queries. |
 | Type `siren on` and hit Enter | 🚨 **FULL SIREN ALARM** on all sirens. | Tests global siren activation. |
 | Type `siren off` and hit Enter | 🔇 **ALL SIRENS STOP** immediately. | Stops the global test. |
@@ -58,6 +58,12 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ---
 
 ### 🚶 6. Aqara FP300 Presence Sensor
+
+> [!NOTE]
+> **Demo Environment Presets:**
+> * **Zone Configuration:** Set zone 0 to slices 5–9 (125cm to 225cm) via command: `zone <addr> 0 5 9`
+> * **Light Threshold:** Set threshold to 20000 via command: `lightthreshold 20000`
+
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
 | Walk into zone when door is CLOSED | Console logs presence but **no alarm triggers**. | Ignores presence when door is closed in that zone. |

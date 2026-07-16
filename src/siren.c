@@ -462,7 +462,7 @@ void Siren_Beep( int count_ )
         
         if ( c < count_ - 1 )
         {
-            usleep( 500000 ); // 500ms OFF time between beeps (gap)
+            usleep( 300000 ); // 300ms OFF time between beeps (gap)
         }
     }
 }

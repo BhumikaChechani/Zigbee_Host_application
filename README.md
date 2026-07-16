@@ -8,7 +8,7 @@ This application acts as the "brain" of your Zigbee network. It communicates wit
 - **Smart Siren (SIRZB-110)** (IAS WD cluster `0x0502`)
 - **Onics Smart/Panic Button (SBTZB-110)** (IAS Zone `0x0500` + On/Off `0x0006`)
 - **Aqara Wireless Mini Switch T1** (On/Off `0x0006`)
-- **Aqara FP300 Presence Sensor** (Occupancy `0x0406` + custom clusters)
+- **Aqara FP300 Presence Sensor** (Occupancy `0x0406`, Light Sensing, + custom clusters)
 - **Contact Sensors**
 
 ---

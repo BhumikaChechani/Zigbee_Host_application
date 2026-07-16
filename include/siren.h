@@ -93,6 +93,9 @@ void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSe
 ///
 void Siren_ControlAll( uint8_t warnMode_ );
 
+/// @brief Start or stop sirens for a specific duration in seconds.
+void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ );
+
 /// @brief Send a short Squawk/Chime to every registered siren.
 /// @param squawkMode_ e.g., 0=Armed, 1=Disarmed.
 /// @param squawkLevel_ e.g., 0=Low, 1=Medium, 2=High, 3=Very High.

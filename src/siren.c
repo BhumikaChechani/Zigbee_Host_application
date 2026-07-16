@@ -380,6 +380,11 @@ uint8_t Siren_GetMode( void )
 
 void Siren_ControlAll( uint8_t warnMode_ )
 {
+    Siren_ControlAllDuration( warnMode_, 240 ); // default to 240 seconds
+}
+
+void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
+{
     g_sirenActive = ( warnMode_ != 0 );
 
     pthread_mutex_lock( &g_deviceMutex );
@@ -399,7 +404,7 @@ void Siren_ControlAll( uint8_t warnMode_ )
     for ( int i = 0; i < tempNum; i++ )
     {
         uint8_t mode = (warnMode_ != 0) ? s_sirenMode : 0;
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, mode, s_sirenVolume, 240 );
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, mode, s_sirenVolume, durationSeconds_ );
     }
 }
 

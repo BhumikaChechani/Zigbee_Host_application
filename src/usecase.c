@@ -18,10 +18,17 @@
 #include "siren.h"
 #endif
 
+#if ENABLE_CONTACT_SENSOR
+#include "contact_sensor.h"
+#endif
+
 #include "znp_host.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#define MAX_ZONES 16
+static bool s_zoneDoorOpen[MAX_ZONES] = {false};
 
 static MSG_QUEUE_T s_useCaseInbox; ///< Inbox of pending use-case events.
 static pthread_t s_useCaseThread;  ///< The use-case worker thread handle.
@@ -181,20 +188,21 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   case UC_OCCUPANCY_DETECTED: {
 #if ENABLE_AQARA_OCCUPANCY
-    // Always log any-zone detection, then alarm only when EVERY
-    // registered occupancy zone reports presence.
-    int occupied = AqaraOccupancy_OccupiedCount();
-    int total = g_numAqaraOccupancies;
-    printf(
-        "🚶 [USECASE] Person detected in zone 0x%04X (index %u) (%d/%d physical sensors occupied)\n",
-        event_->srcAddr, event_->raw, occupied, total);
-    if (AqaraOccupancy_AllOccupied()) {
-      printf("[USECASE] OCCUPANCY in ALL physical sensors -> sirens ON\n");
-      // #if ENABLE_SIREN
-      // Siren_ControlAll( 1 );
-      // #endif
+    uint8_t zoneIdx = (uint8_t)event_->raw;
+    bool isDoorOpen = false;
+    if (zoneIdx < MAX_ZONES) {
+        isDoorOpen = s_zoneDoorOpen[zoneIdx];
+    }
+    printf("🚶 [USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
+           event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
+    if (isDoorOpen) {
+        printf("[USECASE] Door is open & presence detected -> sounding siren for 5 seconds (Mode 5)\n");
+#if ENABLE_SIREN
+        Siren_SetMode(5);
+        Siren_ControlAllDuration(1, 5); // 5 seconds
+#endif
     } else {
-      printf("[USECASE] Not all physical sensors occupied -> holding\n");
+        printf("[USECASE] Door is closed -> ignoring presence detection in Zone %u\n", zoneIdx);
     }
 #else
     printf(
@@ -203,11 +211,12 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
     break;
   }
-  case UC_OCCUPANCY_CLEARED:
-    printf("💨 [USECASE] Occupancy cleared in zone 0x%04X (index %u) -> sirens OFF\n",
-           event_->srcAddr, event_->raw);
-    // Siren_ControlAll( 0 );
+  case UC_OCCUPANCY_CLEARED: {
+    uint8_t zoneIdx = (uint8_t)event_->raw;
+    printf("💨 [USECASE] Occupancy cleared in zone 0x%04X (index %u)\n",
+           event_->srcAddr, zoneIdx);
     break;
+  }
   case UC_LIGHT_ON:
     printf("☀️ [USECASE] Light turned ON -> sirens ON (Emergency Panic)\n");
 #if ENABLE_SIREN
@@ -221,18 +230,46 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     Siren_ControlAll(0);
 #endif
     break;
-  case UC_CONTACT_OPEN:
+  case UC_CONTACT_OPEN: {
     printf("🚪 [USECASE] Contact Sensor OPENED -> Siren Beep 2 times\n");
+    int zoneId = -1;
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numContactSensors; i++) {
+        if (g_contactSensors[i].shortAddr == event_->srcAddr) {
+            zoneId = g_contactSensors[i].zoneId;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (zoneId >= 0 && zoneId < MAX_ZONES) {
+        s_zoneDoorOpen[zoneId] = true;
+        printf("[USECASE] Zone %d door is now OPEN\n", zoneId);
+    }
 #if ENABLE_SIREN
     Siren_Beep(2);
 #endif
     break;
-  case UC_CONTACT_CLOSED:
+  }
+  case UC_CONTACT_CLOSED: {
     printf("🚪 [USECASE] Contact Sensor CLOSED -> Siren Beep 1 time\n");
+    int zoneId = -1;
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numContactSensors; i++) {
+        if (g_contactSensors[i].shortAddr == event_->srcAddr) {
+            zoneId = g_contactSensors[i].zoneId;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (zoneId >= 0 && zoneId < MAX_ZONES) {
+        s_zoneDoorOpen[zoneId] = false;
+        printf("[USECASE] Zone %d door is now CLOSED\n", zoneId);
+    }
 #if ENABLE_SIREN
     Siren_Beep(1);
 #endif
     break;
+  }
   case UC_VIBRATION_DETECTED:
     printf("🔴 📳 [USECASE] Vibration Sensor (Alarm 2) ALARM -> sirens ON (Police Panic)\n");
 #if ENABLE_SIREN

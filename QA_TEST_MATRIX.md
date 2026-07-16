@@ -26,8 +26,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚪 3. Contact Sensor (Door/Window)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Move magnet away (Open Door) | 🔔 **DOUBLE BEEP** (2 fast chirps) in Burglar mode. | Beeps use Burglar mode (Mode 1) with 100ms ON time and 300ms gap. |
-| Bring magnet close (Close Door) | 🔔 **SINGLE BEEP** (1 fast chirp) in Burglar mode. | Beep uses Burglar mode (Mode 1) with 100ms ON time. |
+| Move magnet away (Open Door) | 🔔 **DOUBLE BEEP** (2 fast chirps) in Burglar mode. Sets zone door state to **OPEN**. | Beeps use Burglar mode (Mode 1) with 100ms ON time and 300ms gap. |
+| Bring magnet close (Close Door) | 🔔 **SINGLE BEEP** (1 fast chirp) in Burglar mode. Sets zone door state to **CLOSED**. | Beep uses Burglar mode (Mode 1) with 100ms ON time. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | Tests generic sensor health data. |
 
 ---
@@ -60,7 +60,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚶 6. Aqara FP300 Presence Sensor
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Walk into the room / zone | Console logs person detected. | Siren logic is disabled for testing. |
+| Walk into zone when door is CLOSED | Console logs presence but **no alarm triggers**. | Ignores presence when door is closed in that zone. |
+| Walk into zone when door is OPEN | 🚨 **SIREN SOUNDS** for 5 seconds on all sirens. | Triggers Mode 5 (Fire Panic) warning. |
 | Type `env <addr>` in CLI | 📊 Prints **Temperature** & **Humidity**. | Tests FP300 environmental data. |
 | Type `zone <addr> <idx> <start> <end>` | 📏 Configures a specific detection zone. | Start/End are in 25cm slices. |
 | Type `zonedel <addr> <idx>` | 🗑️ Deletes the specific detection zone. | |
@@ -92,8 +93,10 @@ The table below lists all conditions that trigger or modify the sirens, along wi
 | **Aqara Button:** 1 Press | Sirens OFF | **Mode 0 (Stop)** | Silence |
 | **Onics Button:** Red Button Press | Sirens ON | **Global Active Mode** (Default: 1) | Active global sound (Burglar by default) |
 | **Onics Button:** Long Press (Clear) | Sirens OFF | **Mode 0 (Stop)** | Silence |
-| **Contact Sensor:** Magnet open (Door Open) | Double Beep (Chime) | **Mode 1 (Burglar)** | 2 short beeps (100ms ON / 300ms gap) |
-| **Contact Sensor:** Magnet close (Door Close) | Single Beep (Chime) | **Mode 1 (Burglar)** | 1 short beep (100ms ON) |
+| **Contact Sensor:** Magnet open (Door Open) | Double Beep (Chime) & sets door state to OPEN | **Mode 1 (Burglar)** | 2 short beeps (100ms ON / 300ms gap) |
+| **Contact Sensor:** Magnet close (Door Close) | Single Beep (Chime) & sets door state to CLOSED | **Mode 1 (Burglar)** | 1 short beep (100ms ON) |
+| **Presence Sensor:** Person detected + Door OPEN | Sirens ON for 5 seconds | **Mode 5 (Fire Panic)** | Fire Panic sound |
+| **Presence Sensor:** Person detected + Door CLOSED | Sirens ignored (Ignored for Zone) | - | Silence |
 | **Vibration Sensor:** Vibration detected | Sirens ON | **Mode 4 (Police Panic)** | Police Panic sound |
 | **Vibration Sensor:** Vibration cleared | Sirens OFF | **Mode 0 (Stop)** | Silence |
 | **Vibration Sensor:** Movement detected | Sirens ON | **Mode 4 (Police Panic)** | Police Panic sound |

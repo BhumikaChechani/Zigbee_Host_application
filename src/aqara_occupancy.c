@@ -18,7 +18,7 @@ int g_numAqaraOccupancies = 0;
 
 static MSG_QUEUE_T s_occupancyInbox;
 static pthread_t s_occupancyThread;
-static uint16_t s_lightThreshold = 10000;
+static uint16_t s_lightThreshold = 20000;
 
 ///
 /// @brief  Fixed byte width of a ZCL data type.
@@ -184,35 +184,64 @@ void AqaraOccupancy_PollAll( void )
     num = validNum;
 
     static uint8_t zclSeq = 100; // distinct sequence range
+    static int pollCounter = 0;
+    pollCounter++;
+
+    // Poll presence & distance only once every 10 cycles (~3 seconds) to avoid network congestion
+    bool pollPresence = ( pollCounter % 10 == 0 );
     
     for ( int i = 0; i < num; i++ )
     {
-        if ( rawOcc[i] )
+        if ( pollPresence )
         {
-            // Trigger distance tracking BEFORE polling so the read returns fresh data
-            uint8_t writeZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x02, 0x98, 0x01, 0x20, 0x01 };
-            ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, writeZcl, 9 );
+            if ( rawOcc[i] )
+            {
+                // Trigger distance tracking BEFORE polling so the read returns fresh data
+                uint8_t writeZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x02, 0x98, 0x01, 0x20, 0x01 };
+                ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, writeZcl, 9 );
+                usleep( 50000 );
+            }
+
+            uint8_t readZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x00, 0x42, 0x01, 0x5F, 0x01 };
+            // Poll Presence & Distance
+            ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, readZcl, 9 );
             usleep( 50000 );
         }
 
-        uint8_t readZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x00, 0x42, 0x01, 0x5F, 0x01 };
-        // Poll Presence & Distance
-        ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, readZcl, 9 );
-        usleep( 100000 );
-        
         uint8_t readLhtZcl[5] = { 0x00, ++zclSeq, 0x00, 0x00, 0x00 };
         // Poll Light
         ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0x0400, zclSeq, 0x00, 0x1E, readLhtZcl, 5 );
-        usleep( 100000 );
+        usleep( 50000 );
     }
 }
 
 static void *AqaraOccupancy_PollThread( void *arg_ )
 {
     (void)arg_;
+
+    // Delay startup configuration slightly to allow other systems to initialize
+    sleep( 2 );
+
+    // Configure all known occupancy sensors at startup!
+    pthread_mutex_lock( &g_deviceMutex );
+    int num = g_numAqaraOccupancies;
+    uint16_t addrs[MAX_AQARA_OCCUPANCY];
+    for ( int i = 0; i < num && i < MAX_AQARA_OCCUPANCY; i++ )
+    {
+        addrs[i] = g_aqaraOccupancies[i].shortAddr;
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    for ( int i = 0; i < num; i++ )
+    {
+        printf( "[OCC] Auto-configuring pre-registered sensor 0x%04X\n", addrs[i] );
+        AqaraOccupancy_Setup( addrs[i] );
+        sleep( 1 );
+    }
+
     while ( 1 )
     {
-        sleep( 2 ); // Check presence/light every 2 seconds
+        usleep( 300000 ); // Check presence/light every 300ms for fast response
         AqaraOccupancy_PollAll();
     }
     return NULL;
@@ -486,17 +515,19 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
     printf( "Configuring Aqara occupancy 0x%04X...\n", shortAddr_ );
 
     // -------------------------------------------------------------------------
-    // STEP 1: Bind FCC0 cluster so unsolicited reports reach the coordinator
+    // STEP 1: Bind clusters so unsolicited reports reach the coordinator
     // -------------------------------------------------------------------------
     bool bStd = ZNP_ZdoBindReq( shortAddr_, sensorIeee, endpoint, 0x0406, g_coordinatorIeee, 8 );
+    usleep( 300000 );
     bool bMfr = ZNP_ZdoBindReq( shortAddr_, sensorIeee, endpoint, 0xFCC0, g_coordinatorIeee, 8 );
+    usleep( 300000 );
     bool bMs  = ZNP_ZdoBindReq( shortAddr_, sensorIeee, endpoint, 0x0012, g_coordinatorIeee, 8 );
+    usleep( 300000 );
     bool bLht = ZNP_ZdoBindReq( shortAddr_, sensorIeee, endpoint, 0x0400, g_coordinatorIeee, 8 );
+    usleep( 300000 );
     printf( "   [OCC] bind: 0x0406=%s 0xFCC0=%s 0x0012=%s 0x0400=%s\n",
             bStd ? "OK" : "FAIL", bMfr ? "OK" : "FAIL", bMs ? "OK" : "FAIL", bLht ? "OK" : "FAIL" );
 
-    // Helper macro: ZCL frame header (mfr-specific, cluster 0xFCC0, mfr code 0x115F)
-    // [FC=0x04][MFR_LO=0x5F][MFR_HI=0x11][SEQ][CMD] ...
     uint8_t seq = 0x01;
 
     // -------------------------------------------------------------------------
@@ -506,6 +537,7 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
         uint8_t f[7] = { 0x04, 0x5F, 0x11, seq++, 0x00, 0x42, 0x01 }; // Read Attr 0x0142
         ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 7 );
     }
+    usleep( 300000 );
 
     // -------------------------------------------------------------------------
     // STEP 3: Configure Reporting for Presence (0x0142) - uint8, change=1, max=60s
@@ -522,10 +554,10 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
         };
         ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 14 );
     }
+    usleep( 300000 );
 
     // -------------------------------------------------------------------------
     // STEP 4: Enable target distance tracking (attr 0x0198 = 408, write 1)
-    //   This is REQUIRED - without it the sensor never pushes 0x015F updates.
     // -------------------------------------------------------------------------
     {
         uint8_t f[9] = {
@@ -536,6 +568,7 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
         };
         ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 9 );
     }
+    usleep( 300000 );
 
     // -------------------------------------------------------------------------
     // STEP 5: Configure Reporting for Distance (0x015F) - uint32, change=1
@@ -552,6 +585,7 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
         };
         ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 17 );
     }
+    usleep( 300000 );
 
     // -------------------------------------------------------------------------
     // STEP 6: Set Absence Delay Timer (0x0197) = 10s (minimum supported)
@@ -565,11 +599,72 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
         };
         ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 12 );
     }
+    usleep( 300000 );
 
     // -------------------------------------------------------------------------
     // STEP 7: Reset Hardware Detection Range to Default (0-600cm = 0xFFFFFF)
     // -------------------------------------------------------------------------
     AqaraOccupancy_SetHwDetectionRange( shortAddr_, 0xFFFFFF );
+    usleep( 300000 );
+
+    // -------------------------------------------------------------------------
+    // STEP 8: Configure Reporting for Illuminance (0x0400, Attr 0x0000)
+    // -------------------------------------------------------------------------
+    {
+        uint8_t f[13] = {
+            0x00, seq++, 0x06,                // ZCL header: FC=0, Seq, Cmd=6 (Configure Reporting)
+            0x00,                             // direction = 0
+            0x00, 0x00,                       // Attribute ID = 0x0000 (Measured Value)
+            0x21,                             // Attribute Data Type = 0x21 (uint16)
+            0x00, 0x00,                       // min interval = 0 s
+            0x05, 0x00,                       // max interval = 5 s
+            0x01, 0x00                        // reportable change = 1
+        };
+        ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0x0400, seq, 0x00, 0x1E, f, 13 );
+    }
+    usleep( 300000 );
+
+    // -------------------------------------------------------------------------
+    // STEP 9: Set light_sampling (0x0192) = 3 (High, samples every 500ms)
+    // -------------------------------------------------------------------------
+    {
+        uint8_t f[9] = {
+            0x04, 0x5F, 0x11, seq++, 0x02,  // Write Attributes
+            0x92, 0x01,                       // attr 0x0192 (light_sampling)
+            0x20,                             // uint8 / enum8
+            0x03                              // 3 = High
+        };
+        ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 9 );
+    }
+    usleep( 300000 );
+
+    // -------------------------------------------------------------------------
+    // STEP 10: Set light_reporting_mode (0x0196) = 2 (Combined)
+    // -------------------------------------------------------------------------
+    {
+        uint8_t f[9] = {
+            0x04, 0x5F, 0x11, seq++, 0x02,  // Write Attributes
+            0x96, 0x01,                       // attr 0x0196 (light_reporting_mode)
+            0x20,                             // uint8 / enum8
+            0x02                              // 2 = Combined
+        };
+        ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 9 );
+    }
+    usleep( 300000 );
+
+    // -------------------------------------------------------------------------
+    // STEP 11: Set light_reporting_threshold (0x0195) = 1 (report immediately on change)
+    // -------------------------------------------------------------------------
+    {
+        uint8_t f[10] = {
+            0x04, 0x5F, 0x11, seq++, 0x02,  // Write Attributes
+            0x95, 0x01,                       // attr 0x0195 (light_reporting_threshold)
+            0x21,                             // uint16
+            0x01, 0x00                        // value = 1
+        };
+        ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, f, 10 );
+    }
+    usleep( 300000 );
 
     printf( "Configuration sent to Aqara occupancy 0x%04X!\n", shortAddr_ );
 }

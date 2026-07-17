@@ -63,6 +63,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 > **Demo Environment Presets:**
 > * **Zone Configuration:** Set zone 0 to slices 5–9 (125cm to 225cm) via command: `zone <addr> 0 5 9`
 > * **Light Threshold:** Set threshold to 20000 via command: `lightthreshold 20000`
+> * **Fast Polling:** Polling interval for light and presence is optimized to 300ms for near-instant response.
 
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |

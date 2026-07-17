@@ -251,16 +251,6 @@ void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
          shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
 
-  pthread_mutex_lock(&g_deviceMutex);
-  for (int i = 0; i < g_numContactSensors; i++) {
-    if (g_contactSensors[i].shortAddr == shortAddr_) {
-      g_contactSensors[i].zoneId = zoneId;
-      break;
-    }
-  }
-  pthread_mutex_unlock(&g_deviceMutex);
-  Device_Save();
-
   ZNP_SendZoneEnrollResponse(shortAddr_, endpoint_, transSeq_, zoneId);
 }
 

@@ -263,15 +263,6 @@ void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_
   printf("   -> Zone Enroll Request from Vibration Sensor 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
 
-  pthread_mutex_lock(&g_deviceMutex);
-  for (int i = 0; i < g_numVibrationSensors; i++) {
-    if (g_vibrationSensors[i].shortAddr == shortAddr_) {
-      g_vibrationSensors[i].zoneId = zoneId;
-      break;
-    }
-  }
-  pthread_mutex_unlock(&g_deviceMutex);
-  Device_Save();
   ZNP_SendZoneEnrollResponse(shortAddr_, endpoint_, transSeq_, zoneId);
 }
 
@@ -300,6 +291,11 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
         UseCase_Post(UC_MOVEMENT_DETECTED, shortAddr_, zoneStatus_);
       }
       g_vibrationSensors[idx].lastMovementTime = ZNP_GetCurrentTime();
+    } else {
+      if (g_vibrationSensors[idx].isMoving) {
+        g_vibrationSensors[idx].isMoving = false;
+        UseCase_Post(UC_MOVEMENT_CLEARED, shortAddr_, 0);
+      }
     }
 
     // Handle Vibration (Alarm 2)
@@ -309,10 +305,11 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
         UseCase_Post(UC_VIBRATION_DETECTED, shortAddr_, zoneStatus_);
       }
       g_vibrationSensors[idx].lastVibrationTime = ZNP_GetCurrentTime();
-    }
-    // If all alarm bits are cleared, the sensor explicitly cleared the state
-    else {
-      // Do nothing! Let the 5-second polling loop clear the vibration state to enforce a minimum hold time.
+    } else {
+      if (g_vibrationSensors[idx].isVibrating) {
+        g_vibrationSensors[idx].isVibrating = false;
+        UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, 0);
+      }
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);

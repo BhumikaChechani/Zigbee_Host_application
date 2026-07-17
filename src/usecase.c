@@ -38,28 +38,30 @@ static bool IsDoorOpenForZone(uint8_t zoneIdx) {
         return open;
     }
     
-    // 2. Try to find a contact sensor matching the zoneIdx
+    // 2. Try to find if ANY contact sensor matching the zoneIdx is open
     for (int i = 0; i < g_numContactSensors; i++) {
         if (g_contactSensors[i].zoneId == (int)zoneIdx) {
-            open = g_contactSensors[i].isOpen;
-            pthread_mutex_unlock(&g_deviceMutex);
-            return open;
+            if (g_contactSensors[i].isOpen) {
+                pthread_mutex_unlock(&g_deviceMutex);
+                return true;
+            }
         }
     }
     
-    // 3. Fallback for unconfigured (-1) contact sensors to map to zone 0
+    // 3. Fallback: if zoneIdx is 0, check if ANY unconfigured (-1) contact sensor is open
     if (zoneIdx == 0) {
         for (int i = 0; i < g_numContactSensors; i++) {
             if (g_contactSensors[i].zoneId == -1) {
-                open = g_contactSensors[i].isOpen;
-                pthread_mutex_unlock(&g_deviceMutex);
-                return open;
+                if (g_contactSensors[i].isOpen) {
+                    pthread_mutex_unlock(&g_deviceMutex);
+                    return true;
+                }
             }
         }
     }
     
     pthread_mutex_unlock(&g_deviceMutex);
-    return open;
+    return false;
 }
 
 static MSG_QUEUE_T s_useCaseInbox; ///< Inbox of pending use-case events.

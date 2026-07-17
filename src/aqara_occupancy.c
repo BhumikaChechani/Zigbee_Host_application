@@ -70,6 +70,32 @@ static void AqaraOccupancy_HandleAf( const AF_MSG_T *af_ )
         return;
     }
     uint8_t cmdId = af_->data[hdrLen - 1];
+    if ( cmdId == 0x04 ) // Write Attributes Response
+    {
+        // All-success is a single 0x00 status byte; otherwise a list of
+        // {status, attrId} records for each rejected attribute. Config writes
+        // (absence delay, light sampling, ...) were fire-and-forget before,
+        // so a rejected write was invisible.
+        int offset = hdrLen;
+        int len = af_->dataLen - hdrLen;
+        if ( len >= 1 && af_->data[offset] == 0x00 )
+        {
+            printf( "   [OCC] ✅ write accepted by 0x%04X (cluster 0x%04X)\n",
+                    af_->srcAddr, af_->clusterId );
+        }
+        else
+        {
+            while ( offset + 3 <= af_->dataLen )
+            {
+                uint8_t st = af_->data[offset];
+                uint16_t attr = af_->data[offset + 1] | ( af_->data[offset + 2] << 8 );
+                printf( "   [OCC] ❌ write REJECTED by 0x%04X: cluster 0x%04X attr 0x%04X status=0x%02X\n",
+                        af_->srcAddr, af_->clusterId, attr, st );
+                offset += 3;
+            }
+        }
+        return;
+    }
     if ( cmdId == 0x0A || cmdId == 0x01 ) // Report Attributes or Read Attributes Response
     {
         int offset = hdrLen;
@@ -134,13 +160,21 @@ static void AqaraOccupancy_HandleAf( const AF_MSG_T *af_ )
                     uint16_t light = (uint16_t)(af_->data[offset] | ( af_->data[offset + 1] << 8 ));
                     AqaraOccupancy_HandleLightState( af_->srcAddr, light );
                 }
-                else if ( attrId == 0x0142 || attrId == 0x0000 ) // FP300 presence / std occupancy
+                else if ( ( af_->clusterId == 0xFCC0 && attrId == 0x0142 ) ||   // FP300 presence
+                          ( af_->clusterId == 0x0406 && attrId == 0x0000 ) )    // std occupancy
                 {
                     AqaraOccupancy_HandleState( af_->srcAddr, af_->data[offset] );
                 }
                 else if ( attrId == 0x014D ) // FP300 PIR motion
                 {
                     printf( "🚶 [OCC] MOTION from 0x%04X: %d\n", af_->srcAddr, af_->data[offset] );
+                }
+                else if ( af_->clusterId == 0xFCC0 && attrId == 0x0197 && width == 4 ) // absence delay read-back
+                {
+                    uint32_t secs = af_->data[offset] | ( af_->data[offset + 1] << 8 ) |
+                                    ( af_->data[offset + 2] << 16 ) | ( (uint32_t)af_->data[offset + 3] << 24 );
+                    printf( "   [OCC] ⏱️ absence delay on 0x%04X is %u s (this is how long presence-clear takes)\n",
+                            af_->srcAddr, secs );
                 }
                 else if ( attrId == 0x015F && width == 4 ) // FP300 target distance (cm)
                 {
@@ -169,13 +203,11 @@ void AqaraOccupancy_PollAll( void )
     int validNum = 0;
     uint16_t addrs[MAX_AQARA_OCCUPANCY];
     uint8_t eps[MAX_AQARA_OCCUPANCY];
-    bool rawOcc[MAX_AQARA_OCCUPANCY];
     for ( int i = 0; i < num; i++ )
     {
         if ( !g_aqaraOccupancies[i].configured ) continue;
         addrs[validNum] = g_aqaraOccupancies[i].shortAddr;
         eps[validNum] = g_aqaraOccupancies[i].endpoint;
-        rawOcc[validNum] = g_aqaraOccupancies[i].rawOccupied;
         validNum++;
     }
     pthread_mutex_unlock( &g_deviceMutex );
@@ -183,34 +215,34 @@ void AqaraOccupancy_PollAll( void )
     if ( validNum == 0 ) return;
     num = validNum;
 
+    // Atomic: PollAll runs on the poll thread AND from the CLI 'poll' command.
     static uint8_t zclSeq = 100; // distinct sequence range
     static int pollCounter = 0;
-    pollCounter++;
+    int tick = __atomic_add_fetch( &pollCounter, 1, __ATOMIC_RELAXED );
 
     // Poll presence & distance only once every 10 cycles (~3 seconds) to avoid network congestion
-    bool pollPresence = ( pollCounter % 10 == 0 );
-    
+    bool pollPresence = ( tick % 10 == 0 );
+
     for ( int i = 0; i < num; i++ )
     {
+        uint8_t seq;
         if ( pollPresence )
         {
-            if ( rawOcc[i] )
-            {
-                // Trigger distance tracking BEFORE polling so the read returns fresh data
-                uint8_t writeZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x02, 0x98, 0x01, 0x20, 0x01 };
-                ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, writeZcl, 9 );
-                usleep( 50000 );
-            }
-
-            uint8_t readZcl[9] = { 0x04, 0x5F, 0x11, ++zclSeq, 0x00, 0x42, 0x01, 0x5F, 0x01 };
+            // NOTE: do NOT write 0x0198 (start distance tracking) here. Re-arming
+            // the radar every poll cycle while occupied resets its absence
+            // detection, so presence stays latched at 1 and never clears. The
+            // arm is edge-triggered in AqaraOccupancy_HandleState instead.
+            seq = __atomic_add_fetch( &zclSeq, 1, __ATOMIC_RELAXED );
+            uint8_t readZcl[9] = { 0x04, 0x5F, 0x11, seq, 0x00, 0x42, 0x01, 0x5F, 0x01 };
             // Poll Presence & Distance
-            ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, zclSeq, 0x00, 0x1E, readZcl, 9 );
+            ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, seq, 0x00, 0x1E, readZcl, 9 );
             usleep( 50000 );
         }
 
-        uint8_t readLhtZcl[5] = { 0x00, ++zclSeq, 0x00, 0x00, 0x00 };
+        seq = __atomic_add_fetch( &zclSeq, 1, __ATOMIC_RELAXED );
+        uint8_t readLhtZcl[5] = { 0x00, seq, 0x00, 0x00, 0x00 };
         // Poll Light
-        ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0x0400, zclSeq, 0x00, 0x1E, readLhtZcl, 5 );
+        ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0x0400, seq, 0x00, 0x1E, readLhtZcl, 5 );
         usleep( 50000 );
     }
 }
@@ -235,14 +267,40 @@ static void *AqaraOccupancy_PollThread( void *arg_ )
     for ( int i = 0; i < num; i++ )
     {
         printf( "[OCC] Auto-configuring pre-registered sensor 0x%04X\n", addrs[i] );
-        AqaraOccupancy_Setup( addrs[i] );
+        // Post instead of calling Setup directly: setup then only ever runs on
+        // the occupancy worker thread, so two threads never configure at once.
+        AqaraOccupancy_PostAssign( addrs[i] );
         sleep( 1 );
     }
 
+    int retryTick = 0;
     while ( 1 )
     {
         usleep( 300000 ); // Check presence/light every 300ms for fast response
         AqaraOccupancy_PollAll();
+
+        // Every ~30s, retry setup for sensors whose bind/config never succeeded
+        // (device was asleep or the network was congested during setup).
+        if ( ++retryTick >= 100 )
+        {
+            retryTick = 0;
+            uint16_t retryAddrs[MAX_AQARA_OCCUPANCY];
+            int numRetry = 0;
+            pthread_mutex_lock( &g_deviceMutex );
+            for ( int i = 0; i < g_numAqaraOccupancies; i++ )
+            {
+                if ( !g_aqaraOccupancies[i].configured && g_aqaraOccupancies[i].setupRetries < 5 )
+                {
+                    retryAddrs[numRetry++] = g_aqaraOccupancies[i].shortAddr;
+                }
+            }
+            pthread_mutex_unlock( &g_deviceMutex );
+            for ( int i = 0; i < numRetry; i++ )
+            {
+                printf( "[OCC] Retrying setup for unconfigured sensor 0x%04X\n", retryAddrs[i] );
+                AqaraOccupancy_PostAssign( retryAddrs[i] );
+            }
+        }
     }
     return NULL;
 }
@@ -509,7 +567,6 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
     uint8_t sensorIeee[8];
     uint8_t endpoint = g_aqaraOccupancies[idx].endpoint;
     memcpy( sensorIeee, g_aqaraOccupancies[idx].ieee, 8 );
-    g_aqaraOccupancies[idx].configured = true;
     pthread_mutex_unlock( &g_deviceMutex );
 
     printf( "Configuring Aqara occupancy 0x%04X...\n", shortAddr_ );
@@ -527,6 +584,38 @@ void AqaraOccupancy_Setup( uint16_t shortAddr_ )
     usleep( 300000 );
     printf( "   [OCC] bind: 0x0406=%s 0xFCC0=%s 0x0012=%s 0x0400=%s\n",
             bStd ? "OK" : "FAIL", bMfr ? "OK" : "FAIL", bMs ? "OK" : "FAIL", bLht ? "OK" : "FAIL" );
+
+    // Presence (0xFCC0 + 0x0406) and light (0x0400) binds are what event flow
+    // depends on; if any failed (device asleep / congestion), leave the entry
+    // unconfigured so the poll thread retries instead of silently giving up.
+    if ( !( bStd && bMfr && bLht ) )
+    {
+        pthread_mutex_lock( &g_deviceMutex );
+        for ( int i = 0; i < g_numAqaraOccupancies; i++ )
+        {
+            if ( g_aqaraOccupancies[i].shortAddr == shortAddr_ )
+            {
+                g_aqaraOccupancies[i].setupRetries++;
+                printf( "   [OCC] setup of 0x%04X FAILED (attempt %u) - will retry\n",
+                        shortAddr_, g_aqaraOccupancies[i].setupRetries );
+                break;
+            }
+        }
+        pthread_mutex_unlock( &g_deviceMutex );
+        return;
+    }
+
+    pthread_mutex_lock( &g_deviceMutex );
+    for ( int i = 0; i < g_numAqaraOccupancies; i++ )
+    {
+        if ( g_aqaraOccupancies[i].shortAddr == shortAddr_ )
+        {
+            g_aqaraOccupancies[i].configured = true;
+            g_aqaraOccupancies[i].setupRetries = 0;
+            break;
+        }
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
 
     uint8_t seq = 0x01;
 
@@ -863,36 +952,73 @@ static void EvaluatePresenceLogic( uint16_t shortAddr_ )
 
 void AqaraOccupancy_HandleState( uint16_t shortAddr_, uint8_t occupied_ )
 {
-    pthread_mutex_lock( &g_deviceMutex );
+    bool risingEdge = false;
+    bool applyAbsenceDelay = false;
     uint8_t endpoint = 0x01;
+    pthread_mutex_lock( &g_deviceMutex );
     for ( int i = 0; i < g_numAqaraOccupancies; i++ )
     {
         if ( g_aqaraOccupancies[i].shortAddr == shortAddr_ )
         {
+            risingEdge = ( occupied_ != 0 && !g_aqaraOccupancies[i].rawOccupied );
             g_aqaraOccupancies[i].rawOccupied = ( occupied_ != 0 );
             g_aqaraOccupancies[i].lastSeen = ZNP_GetCurrentTime();
             endpoint = g_aqaraOccupancies[i].endpoint;
+            if ( !g_aqaraOccupancies[i].absenceDelayApplied )
+            {
+                g_aqaraOccupancies[i].absenceDelayApplied = true;
+                applyAbsenceDelay = true;
+            }
             break;
         }
     }
     pthread_mutex_unlock( &g_deviceMutex );
 
-    if ( occupied_ != 0 )
+    if ( risingEdge )
     {
-        // The sensor just sent us a presence report -> it is guaranteed awake RIGHT NOW.
-        // Trigger distance tracking (attr 0x0198 = 1) while the radio is still active.
-        // The sensor will respond with unsolicited 0x015F (distance) reports so that
-        // EvaluatePresenceLogic can apply zone filtering with a real distance value.
+        // Arm distance tracking (attr 0x0198 = 1) ONCE per occupancy episode,
+        // on the 0->1 transition only. Re-arming it while occupied (as the old
+        // poll loop did every ~3s) resets the radar's absence detection, so
+        // presence stayed latched at 1 and never cleared.
         static uint8_t s_distSeq = 0xD0;
-        uint8_t f[9] = { 0x04, 0x5F, 0x11, ++s_distSeq, 0x02,
+        uint8_t seq = __atomic_add_fetch( &s_distSeq, 1, __ATOMIC_RELAXED );
+        uint8_t f[9] = { 0x04, 0x5F, 0x11, seq, 0x02,
                          0x98, 0x01,   // attr 0x0198
                          0x20,         // uint8
                          0x01 };       // value = 1 (start tracking)
         ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0,
-                              s_distSeq, 0x00, 0x1E, f, sizeof(f) );
+                              seq, 0x00, 0x1E, f, sizeof(f) );
     }
 
+    // React to the presence change FIRST, then do maintenance traffic.
     EvaluatePresenceLogic( shortAddr_ );
+
+    if ( applyAbsenceDelay )
+    {
+        // The sensor just reported -> it is provably awake. Re-apply the
+        // absence delay (10s) once per boot: the original setup write was
+        // fire-and-forget and may never have landed, leaving the device on
+        // its factory default (typically 30s), which makes presence-clear
+        // feel slow. Then read the attribute back so the log shows the value
+        // the sensor ACTUALLY uses (see the 0x0197 read-back handler).
+        static uint8_t s_cfgSeq = 0xB0;
+        uint8_t seq = __atomic_add_fetch( &s_cfgSeq, 1, __ATOMIC_RELAXED );
+        uint8_t w[12] = {
+            0x04, 0x5F, 0x11, seq, 0x02,  // mfr-specific Write Attributes
+            0x97, 0x01,                     // attr 0x0197
+            0x23,                           // uint32
+            10, 0x00, 0x00, 0x00            // 10 seconds LE
+        };
+        printf( "   [OCC] re-applying absence delay = 10s on awake sensor 0x%04X\n", shortAddr_ );
+        ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0,
+                              seq, 0x00, 0x1E, w, sizeof(w) );
+        usleep( 200000 );
+
+        seq = __atomic_add_fetch( &s_cfgSeq, 1, __ATOMIC_RELAXED );
+        uint8_t r[7] = { 0x04, 0x5F, 0x11, seq, 0x00, 0x97, 0x01 }; // Read attr 0x0197
+        ZNP_AfDataRequestExt( 0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0,
+                              seq, 0x00, 0x1E, r, sizeof(r) );
+    }
 }
 
 void AqaraOccupancy_HandleDistance( uint16_t shortAddr_, uint32_t cm_ )

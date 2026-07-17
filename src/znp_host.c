@@ -36,6 +36,10 @@ static bool s_readerRunning = false;
 
 // SREQ/SRSP synchronization
 static pthread_mutex_t s_sreqMutex = PTHREAD_MUTEX_INITIALIZER;
+// Low-priority gate: normal callers must take this before s_sreqMutex, so a
+// high-priority caller (siren alarm) that takes s_sreqMutex directly only ever
+// waits for the single in-flight SREQ instead of the whole poll backlog.
+static pthread_mutex_t s_sreqGate = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t s_srspMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_srspCond = PTHREAD_COND_INITIALIZER;
 static MT_FRAME_T s_srspFrame;
@@ -78,8 +82,10 @@ void EventQueue_Push( EVENT_QUEUE_T *queue_, const MT_FRAME_T *frame_ )
     }
     else
     {
-        printf( "⚠️ Event queue overflow, dropping packet cmd0=0x%02X cmd1=0x%02X\n",
-                frame_->cmd0, frame_->cmd1 );
+        static unsigned long s_dropCount = 0;
+        s_dropCount++;
+        printf( "⚠️ Event queue overflow, dropping packet cmd0=0x%02X cmd1=0x%02X (total dropped: %lu)\n",
+                frame_->cmd0, frame_->cmd1, s_dropCount );
     }
     pthread_mutex_unlock( &queue_->mutex );
 }
@@ -253,9 +259,13 @@ static bool ZNP_WriteAll( int fd_, const uint8_t *buf_, int len_ )
     return true;
 }
 
-bool ZNP_Sreq( uint8_t cmd0_, uint8_t cmd1_, const uint8_t *payload_, uint8_t len_,
-               MT_FRAME_T *rxFrame_, int timeoutMs_ )
+static bool ZNP_SreqPrio( uint8_t cmd0_, uint8_t cmd1_, const uint8_t *payload_, uint8_t len_,
+                          MT_FRAME_T *rxFrame_, int timeoutMs_, bool highPrio_ )
 {
+    if ( !highPrio_ )
+    {
+        pthread_mutex_lock( &s_sreqGate );
+    }
     pthread_mutex_lock( &s_sreqMutex );
 
     // Set the expected response id and clear the received flag together under
@@ -287,6 +297,10 @@ bool ZNP_Sreq( uint8_t cmd0_, uint8_t cmd1_, const uint8_t *payload_, uint8_t le
     if ( !ZNP_WriteAll( s_serialFd, txBuf, totalWrite ) )
     {
         pthread_mutex_unlock( &s_sreqMutex );
+        if ( !highPrio_ )
+        {
+            pthread_mutex_unlock( &s_sreqGate );
+        }
         return false;
     }
 
@@ -322,7 +336,17 @@ bool ZNP_Sreq( uint8_t cmd0_, uint8_t cmd1_, const uint8_t *payload_, uint8_t le
     pthread_mutex_unlock( &s_srspMutex );
 
     pthread_mutex_unlock( &s_sreqMutex );
+    if ( !highPrio_ )
+    {
+        pthread_mutex_unlock( &s_sreqGate );
+    }
     return success;
+}
+
+bool ZNP_Sreq( uint8_t cmd0_, uint8_t cmd1_, const uint8_t *payload_, uint8_t len_,
+               MT_FRAME_T *rxFrame_, int timeoutMs_ )
+{
+    return ZNP_SreqPrio( cmd0_, cmd1_, payload_, len_, rxFrame_, timeoutMs_, false );
 }
 
 ///
@@ -935,10 +959,10 @@ bool ZNP_ZdoMsgCbRegister( uint16_t clusterId_ )
     return false;
 }
 
-bool ZNP_AfDataRequestExt( uint8_t dstAddrMode_, uint64_t dstAddr_, uint8_t dstEndpoint_,
-                           uint16_t panId_, uint8_t srcEndpoint_, uint16_t clusterId_,
-                           uint8_t transId_, uint8_t options_, uint8_t radius_,
-                           const uint8_t *data_, uint16_t dataLen_ )
+static bool ZNP_AfDataRequestPrio( uint8_t dstAddrMode_, uint64_t dstAddr_, uint8_t dstEndpoint_,
+                                   uint16_t panId_, uint8_t srcEndpoint_, uint16_t clusterId_,
+                                   uint8_t transId_, uint8_t options_, uint8_t radius_,
+                                   const uint8_t *data_, uint16_t dataLen_, bool highPrio_ )
 {
     uint8_t payload[300];
     int idx = 0;
@@ -974,7 +998,7 @@ bool ZNP_AfDataRequestExt( uint8_t dstAddrMode_, uint64_t dstAddr_, uint8_t dstE
     idx += dataLen_;
 
     MT_FRAME_T rx;
-    if ( ZNP_Sreq( 0x24, 0x02, payload, idx, &rx, 3000 ) )
+    if ( ZNP_SreqPrio( 0x24, 0x02, payload, idx, &rx, 3000, highPrio_ ) )
     {
         if ( rx.len >= 1 && rx.payload[0] == 0 )
         {
@@ -982,6 +1006,15 @@ bool ZNP_AfDataRequestExt( uint8_t dstAddrMode_, uint64_t dstAddr_, uint8_t dstE
         }
     }
     return false;
+}
+
+bool ZNP_AfDataRequestExt( uint8_t dstAddrMode_, uint64_t dstAddr_, uint8_t dstEndpoint_,
+                           uint16_t panId_, uint8_t srcEndpoint_, uint16_t clusterId_,
+                           uint8_t transId_, uint8_t options_, uint8_t radius_,
+                           const uint8_t *data_, uint16_t dataLen_ )
+{
+    return ZNP_AfDataRequestPrio( dstAddrMode_, dstAddr_, dstEndpoint_, panId_, srcEndpoint_,
+                                  clusterId_, transId_, options_, radius_, data_, dataLen_, false );
 }
 
 bool ZNP_ZdoMatchDescReq( uint16_t shortAddr_, uint16_t profileId_,
@@ -1183,8 +1216,10 @@ bool ZNP_SendSirenWarning( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uin
     zclFrame[6] = 0x00;
     zclFrame[7] = 0x00;
 
-    return ZNP_AfDataRequestExt( 2, sirenShortAddr_, sirenEndpoint_, 1, 8, 0x0502,
-                                 transId_, 0, 30, zclFrame, 8 );
+    // High priority: alarm commands skip the low-priority SREQ gate so they
+    // only wait for the single in-flight request, not the poll backlog.
+    return ZNP_AfDataRequestPrio( 2, sirenShortAddr_, sirenEndpoint_, 1, 8, 0x0502,
+                                  transId_, 0, 30, zclFrame, 8, true );
 }
 bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint8_t transId_,
                           uint8_t squawkMode_, uint8_t volume_ )

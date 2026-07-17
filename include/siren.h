@@ -109,6 +109,12 @@ void Siren_SetVolume( uint8_t volume_ );
 /// @param count_ Number of beeps.
 void Siren_Beep( int count_ );
 
+/// @brief  Queue a beep sequence on the siren worker thread (non-blocking).
+///         Use this from the use-case thread instead of Siren_Beep() so the
+///         beep's sleeps never delay other event handling.
+/// @param  count_ Number of beeps.
+void Siren_PostBeep( int count_ );
+
 /// @brief Get the global siren volume.
 /// @return Current volume level.
 uint8_t Siren_GetVolume( void );

@@ -49,7 +49,7 @@ typedef struct {
   uint8_t payload[256]; ///< Frame payload.
 } MT_FRAME_T;
 
-#define EVENT_QUEUE_MAX 64 ///< Capacity of the AREQ event ring buffer.
+#define EVENT_QUEUE_MAX 256 ///< Capacity of the AREQ event ring buffer.
 
 /// @brief Thread-safe ring buffer of asynchronous AREQ frames from the ZNP.
 typedef struct {

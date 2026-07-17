@@ -40,6 +40,12 @@ static void *Siren_Thread( void *arg_ )
         {
             Siren_Setup( msg->shortAddr );
         }
+        else if ( msg->kind == SENSOR_MSG_BEEP )
+        {
+            // Beep sequences contain sleeps; running them here keeps the
+            // use-case thread free to react to the next event immediately.
+            Siren_Beep( (int)msg->shortAddr );
+        }
         else if ( msg->kind == SENSOR_MSG_AF )
         {
             // The siren only sends tamper/zone traffic; a Zone Enroll Request
@@ -112,7 +118,12 @@ static void *Siren_Thread( void *arg_ )
 
 static uint8_t s_sirenVolume = 2; // high by default
 static uint8_t s_sirenMode = 1;   // burglar by default
-static uint8_t s_sirenSeq = 0;    // transaction sequence number
+static uint8_t s_sirenSeq = 0;    // transaction sequence number (atomic: multiple threads send)
+
+static uint8_t Siren_NextSeq( void )
+{
+    return __atomic_add_fetch( &s_sirenSeq, 1, __ATOMIC_RELAXED );
+}
 
 static const char SIREN_CONFIG_FILE[] = "siren_config.txt";
 
@@ -167,6 +178,18 @@ void Siren_PostAssign( uint16_t shortAddr_ )
     }
     msg->kind = SENSOR_MSG_ASSIGN;
     msg->shortAddr = shortAddr_;
+    MsgQueue_Push( &s_sirenInbox, msg );
+}
+
+void Siren_PostBeep( int count_ )
+{
+    SENSOR_MSG_T *msg = (SENSOR_MSG_T *)calloc( 1, sizeof( SENSOR_MSG_T ) );
+    if ( msg == NULL )
+    {
+        return;
+    }
+    msg->kind = SENSOR_MSG_BEEP;
+    msg->shortAddr = (uint16_t)count_;
     MsgQueue_Push( &s_sirenInbox, msg );
 }
 
@@ -404,7 +427,7 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     for ( int i = 0; i < tempNum; i++ )
     {
         uint8_t mode = (warnMode_ != 0) ? s_sirenMode : 0;
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, mode, s_sirenVolume, durationSeconds_ );
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode, s_sirenVolume, durationSeconds_ );
     }
 }
 
@@ -433,7 +456,7 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
         // ignore the native Squawk command (0x01) unless armed by a separate security panel.
         // The industry-standard workaround (used by Z2M/Home Assistant) is to emulate the chirp 
         // using the highly reliable Start Warning (0x00) command for a 1-second duration.
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, s_sirenMode, squawkLevel_, 1 );
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), s_sirenMode, squawkLevel_, 1 );
     }
 }
 
@@ -455,14 +478,14 @@ void Siren_Beep( int count_ )
         for ( int i = 0; i < tempNum; i++ )
         {
             // Start warning (1 sec duration to turn it on immediately)
-            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, 1, 0, 1 ); // 1 = Burglar Mode
+            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), 1, 0, 1 ); // 1 = Burglar Mode
         }
         usleep( 100000 ); // 100ms ON time (short beep)
 
         for ( int i = 0; i < tempNum; i++ )
         {
             // Stop warning (mode = 0)
-            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, s_sirenSeq++, 0, 0, 0 );
+            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), 0, 0, 0 );
         }
         
         if ( c < count_ - 1 )

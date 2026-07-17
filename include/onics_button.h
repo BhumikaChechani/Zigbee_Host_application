@@ -49,6 +49,16 @@ void OnicsButton_PostAssign( uint16_t shortAddr_ );
 /// @return None.
 void OnicsButton_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ );
 
+/// @brief  Queue a REBIND work item (dispatcher context, non-blocking).
+/// @param  shortAddr_  Device network address.
+/// @return None.
+void OnicsButton_PostRebind( uint16_t shortAddr_ );
+
+/// @brief  Re-establish EP 0x20/0x23 bindings + CIE address (Onics thread).
+/// @param  shortAddr_  Device network address.
+/// @return None.
+void OnicsButton_Rebind( uint16_t shortAddr_ );
+
 ///
 /// @brief  Register (or refresh) an Onics button (dispatcher context).
 /// @param  shortAddr_  Device network address.

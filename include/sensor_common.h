@@ -27,7 +27,10 @@ typedef struct
 typedef enum
 {
     SENSOR_MSG_ASSIGN,    ///< Device was assigned to this module; run its setup.
-    SENSOR_MSG_AF         ///< An AF message arrived from one of this module's devices.
+    SENSOR_MSG_AF,        ///< An AF message arrived from one of this module's devices.
+    SENSOR_MSG_BEEP,      ///< Siren only: emulate N short beeps (count in shortAddr).
+    SENSOR_MSG_REBIND,    ///< Onics only: re-establish bindings after a device reset.
+    SENSOR_MSG_REFRESH    ///< Contact only: actively read the IAS zone status attribute.
 } SENSOR_MSG_KIND_T;
 
 /// @brief Work item posted to a sensor worker thread's inbox.

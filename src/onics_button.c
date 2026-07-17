@@ -214,6 +214,10 @@ static void *OnicsButton_Thread( void *arg_ )
         {
             OnicsButton_Setup( msg->shortAddr );
         }
+        else if ( msg->kind == SENSOR_MSG_REBIND )
+        {
+            OnicsButton_Rebind( msg->shortAddr );
+        }
         else if ( msg->kind == SENSOR_MSG_AF )
         {
             OnicsButton_HandleAf( &msg->af );
@@ -258,6 +262,40 @@ void OnicsButton_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ )
     msg->shortAddr = shortAddr_;
     msg->af = *af_;
     MsgQueue_Push( &s_onicsInbox, msg );
+}
+
+void OnicsButton_PostRebind( uint16_t shortAddr_ )
+{
+    SENSOR_MSG_T *msg = (SENSOR_MSG_T *)calloc( 1, sizeof( SENSOR_MSG_T ) );
+    if ( msg == NULL )
+    {
+        return;
+    }
+    msg->kind = SENSOR_MSG_REBIND;
+    msg->shortAddr = shortAddr_;
+    MsgQueue_Push( &s_onicsInbox, msg );
+}
+
+// Re-establish the bindings a known button loses when it resets (panic-mode
+// activation reset clears its binding table). Runs on the Onics worker thread
+// so the dispatcher never blocks on the binds/sleeps.
+void OnicsButton_Rebind( uint16_t shortAddr_ )
+{
+    uint8_t ieee[8];
+    if ( !Device_GetDiscoveredIeee( shortAddr_, ieee ) )
+    {
+        printf( " [Onics] Rebind for 0x%04X skipped - IEEE unknown yet.\n", shortAddr_ );
+        return;
+    }
+
+    printf( " [Onics] Re-establishing bindings for button 0x%04X...\n", shortAddr_ );
+    // Re-bind On/Off (0x0006) on EP 0x20 so it keeps sending clicks,
+    // and re-bind IAS Zone (0x0500) on EP 0x23 + rewrite the CIE address.
+    ZNP_ZdoBindReq( shortAddr_, ieee, 0x20, 0x0006, g_coordinatorIeee, 8 );
+    usleep( 500000 );
+    ZNP_ZdoBindReq( shortAddr_, ieee, 0x23, 0x0500, g_coordinatorIeee, 8 );
+    usleep( 500000 );
+    ZNP_WriteCieAddress( shortAddr_, 0x23, 0x17 );
 }
 
 void OnicsButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )

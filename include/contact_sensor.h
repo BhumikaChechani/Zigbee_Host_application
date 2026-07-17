@@ -16,8 +16,13 @@ typedef struct
     bool hasIeee;
     double lastSeen;
     int zoneId;
-    bool configured;
+    bool configured;        ///< True once bind + CIE write succeeded (verified).
     bool isOpen;
+    uint8_t setupRetries;   ///< Failed setup attempts (retry cap).
+    double lastSetupAttempt;///< Timestamp of the last setup attempt (retry pacing).
+    double lastStatusTime;  ///< Timestamp of the last zone status update received.
+    double lastOpenedTime;  ///< Timestamp of the last CLOSED->OPEN transition.
+    double lastRefreshReq;  ///< Timestamp of the last active status refresh request.
 } CONTACT_SENSOR_T;
 
 extern CONTACT_SENSOR_T g_contactSensors[MAX_CONTACT_SENSORS];
@@ -36,5 +41,13 @@ void ContactSensor_UpdateSeen( uint16_t shortAddr_ );
 void ContactSensor_DiscoverAllActiveEp( void );
 void ContactSensor_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ );
 void ContactSensor_ReadEnvironment( uint16_t shortAddr_ );
+
+/// @brief  Queue an active IAS zone-status read for one sensor (non-blocking).
+void ContactSensor_PostRefresh( uint16_t shortAddr_ );
+
+/// @brief  Queue a zone-status refresh for every sensor whose last status
+///         update is older than @p maxAgeSeconds_ (self-rate-limited).
+///         Call from the use-case thread before trusting a stored door state.
+void ContactSensor_RefreshIfStale( double maxAgeSeconds_ );
 
 #endif // CONTACT_SENSOR_H

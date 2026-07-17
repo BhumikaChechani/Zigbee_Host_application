@@ -24,7 +24,9 @@ typedef struct {
     double lastSeen;    ///< Timestamp (seconds) of the last frame from this device.
     uint8_t ieee[8];    ///< 64-bit IEEE address (little-endian).
     bool hasIeee;       ///< True once @ref ieee is known.
-    bool configured;    ///< True once setup/binding is done.
+    bool configured;    ///< True once setup/binding succeeded (verified).
+    uint8_t setupRetries; ///< Failed setup attempts (retry cap).
+    bool absenceDelayApplied; ///< True once the absence-delay re-write was sent this boot.
     bool rawOccupied;   ///< Raw state from the sensor (before distance filtering).
     uint32_t currentDistanceCm; ///< Last reported distance to target in cm.
     bool hasLightState; ///< True if we have received at least one light reading.

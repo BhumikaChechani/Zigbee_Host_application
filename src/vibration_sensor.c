@@ -263,6 +263,15 @@ void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_
   printf("   -> Zone Enroll Request from Vibration Sensor 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
 
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numVibrationSensors; i++) {
+    if (g_vibrationSensors[i].shortAddr == shortAddr_) {
+      g_vibrationSensors[i].zoneId = zoneId;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+  Device_Save();
   ZNP_SendZoneEnrollResponse(shortAddr_, endpoint_, transSeq_, zoneId);
 }
 

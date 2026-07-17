@@ -28,7 +28,11 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
   if (af_->clusterId == 0x0500) {
     const uint8_t *zcl = &af_->data[hdrLen];
     int zclLen = af_->dataLen - hdrLen;
-    if (cmdId == 0x01) // Zone Enroll Request
+    // Frame type matters here: cluster-specific cmd 0x01 is Zone Enroll
+    // Request, but GLOBAL cmd 0x01 is a Read Attributes Response (our active
+    // zone-status refresh) - they must not be confused.
+    bool clusterSpecific = ((fc & 0x03) == 0x01);
+    if (clusterSpecific && cmdId == 0x01) // Zone Enroll Request
     {
       if (zclLen >= 2) {
         uint16_t zoneType = zcl[0] | (zcl[1] << 8);
@@ -36,12 +40,36 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
         ContactSensor_HandleEnroll(af_->srcAddr, af_->srcEp, transSeq,
                                    zoneType);
       }
-    } else if (cmdId == 0x00) // Zone Status Change Notification
+    } else if (clusterSpecific && cmdId == 0x00) // Zone Status Change Notification
     {
       if (zclLen >= 4) {
         uint16_t zoneStatus = zcl[0] | (zcl[1] << 8);
         uint8_t zoneId = zcl[3];
         ContactSensor_HandleStatus(af_->srcAddr, zoneStatus, zoneId);
+      }
+    } else if (!clusterSpecific && cmdId == 0x01) // Read Attr Response (status refresh)
+    {
+      // AttrID(2)=0x0002 + Status(1)=0 + Type(1)=0x19 map16 + Value(2)
+      if (zclLen >= 6 && zcl[0] == 0x02 && zcl[1] == 0x00 && zcl[2] == 0x00) {
+        uint16_t zoneStatus = zcl[4] | (zcl[5] << 8);
+        bool open = (zoneStatus & 0x0001) != 0;
+        pthread_mutex_lock(&g_deviceMutex);
+        for (int i = 0; i < g_numContactSensors; i++) {
+          if (g_contactSensors[i].shortAddr == af_->srcAddr) {
+            double now = ZNP_GetCurrentTime();
+            if (g_contactSensors[i].isOpen != open) {
+              printf("🚪 Contact Sensor 0x%04X state corrected by refresh: %s "
+                     "(a change notification was missed)\n",
+                     af_->srcAddr, open ? "OPEN" : "CLOSED");
+              if (open)
+                g_contactSensors[i].lastOpenedTime = now;
+            }
+            g_contactSensors[i].isOpen = open;
+            g_contactSensors[i].lastStatusTime = now;
+            break;
+          }
+        }
+        pthread_mutex_unlock(&g_deviceMutex);
       }
     }
   } else if (af_->clusterId == 0x0001) { // Power Configuration
@@ -73,6 +101,35 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
   }
 }
 
+// Actively read the IAS ZoneStatus attribute (0x0500 / 0x0002) so a missed
+// Zone Status Change Notification cannot leave isOpen stale forever. The
+// response is parsed in ContactSensor_HandleAf (global Read Attr Response).
+static void ContactSensor_SendStatusRead(uint16_t shortAddr_) {
+  uint8_t endpoint = 1;
+  bool found = false;
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numContactSensors; i++) {
+    if (g_contactSensors[i].shortAddr == shortAddr_) {
+      endpoint = g_contactSensors[i].endpoint;
+      found = true;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+  if (!found)
+    return;
+
+  static uint8_t s_refreshSeq = 0xE0;
+  uint8_t seq = __atomic_add_fetch(&s_refreshSeq, 1, __ATOMIC_RELAXED);
+  uint8_t zcl[5];
+  zcl[0] = 0x00; // FC: global, client->server
+  zcl[1] = seq;
+  zcl[2] = 0x00; // Read Attributes
+  zcl[3] = 0x02; // Attr 0x0002 (ZoneStatus)
+  zcl[4] = 0x00;
+  ZNP_AfDataRequestExt(2, shortAddr_, endpoint, 0, 8, 0x0500, seq, 0, 30, zcl, 5);
+}
+
 static void *ContactSensor_Thread(void *arg_) {
   (void)arg_;
   while (1) {
@@ -82,6 +139,8 @@ static void *ContactSensor_Thread(void *arg_) {
 
     if (msg->kind == SENSOR_MSG_ASSIGN) {
       ContactSensor_Setup(msg->shortAddr);
+    } else if (msg->kind == SENSOR_MSG_REFRESH) {
+      ContactSensor_SendStatusRead(msg->shortAddr);
     } else if (msg->kind == SENSOR_MSG_AF) {
       ContactSensor_HandleAf(&msg->af);
     }
@@ -120,6 +179,13 @@ void ContactSensor_PostAf(uint16_t shortAddr_, const AF_MSG_T *af_) {
 }
 
 void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
+  // Battery sensors frequently rejoin with a brand-new short address, so the
+  // IEEE - not the short address - is the stable identity. Matching on it
+  // updates the existing entry (preserving zoneId and isOpen) instead of
+  // accumulating phantom duplicates that break the door/zone lookup.
+  uint8_t ieee[8];
+  bool haveIeee = Device_GetDiscoveredIeee(shortAddr_, ieee);
+
   pthread_mutex_lock(&g_deviceMutex);
   int idx = -1;
   for (int i = 0; i < g_numContactSensors; i++) {
@@ -127,9 +193,15 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       idx = i;
       break;
     }
+    if (haveIeee && g_contactSensors[i].hasIeee &&
+        memcmp(g_contactSensors[i].ieee, ieee, 8) == 0) {
+      idx = i;
+      break;
+    }
   }
 
   bool changed = false;
+  bool isRejoin = false;
   if (idx == -1) {
     if (g_numContactSensors < MAX_CONTACT_SENSORS) {
       printf(" Contact Sensor discovered: short=0x%04X, ep=0x%02X\n",
@@ -138,30 +210,44 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_contactSensors[g_numContactSensors].endpoint = endpoint_;
       g_contactSensors[g_numContactSensors].lastSeen = ZNP_GetCurrentTime();
       g_contactSensors[g_numContactSensors].zoneId = -1;
-      g_contactSensors[g_numContactSensors].hasIeee = Device_GetDiscoveredIeee(
-          shortAddr_, g_contactSensors[g_numContactSensors].ieee);
+      g_contactSensors[g_numContactSensors].hasIeee = haveIeee;
+      if (haveIeee) {
+        memcpy(g_contactSensors[g_numContactSensors].ieee, ieee, 8);
+      }
       g_contactSensors[g_numContactSensors].configured = false;
       g_numContactSensors++;
       changed = true;
     }
   } else {
+    if (g_contactSensors[idx].shortAddr != shortAddr_) {
+      printf(" Contact Sensor 0x%04X rejoined as 0x%04X (same IEEE) - reusing entry\n",
+             g_contactSensors[idx].shortAddr, shortAddr_);
+      g_contactSensors[idx].shortAddr = shortAddr_;
+      isRejoin = true;
+      changed = true;
+    }
     if (g_contactSensors[idx].endpoint != endpoint_) {
       g_contactSensors[idx].endpoint = endpoint_;
       changed = true;
     }
     g_contactSensors[idx].lastSeen = ZNP_GetCurrentTime();
-    if (!g_contactSensors[idx].hasIeee) {
-      g_contactSensors[idx].hasIeee =
-          Device_GetDiscoveredIeee(shortAddr_, g_contactSensors[idx].ieee);
-      if (g_contactSensors[idx].hasIeee)
-        changed = true;
+    if (!g_contactSensors[idx].hasIeee && haveIeee) {
+      memcpy(g_contactSensors[idx].ieee, ieee, 8);
+      g_contactSensors[idx].hasIeee = true;
+      changed = true;
     }
   }
+
+  // Device-side bindings target the coordinator's (stable) IEEE, so they
+  // survive a rejoin; skip the setup flood for a pure rejoin of an
+  // already-configured sensor.
+  bool alreadyConfigured = (idx != -1 && g_contactSensors[idx].configured);
   pthread_mutex_unlock(&g_deviceMutex);
 
   if (changed)
     Device_Save();
-  ContactSensor_PostAssign(shortAddr_);
+  if (!(isRejoin && alreadyConfigured))
+    ContactSensor_PostAssign(shortAddr_);
 }
 
 void ContactSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
@@ -223,25 +309,46 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
   uint8_t sensorIeee[8];
   uint8_t endpoint = g_contactSensors[idx].endpoint;
   memcpy(sensorIeee, g_contactSensors[idx].ieee, 8);
-  g_contactSensors[idx].configured = true;
+  g_contactSensors[idx].lastSetupAttempt = ZNP_GetCurrentTime();
   pthread_mutex_unlock(&g_deviceMutex);
 
   printf("Configuring Contact Sensor 0x%04X...\n", shortAddr_);
 
   // 1. Bind IAS Zone cluster (0x0500)
-  ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0500, g_coordinatorIeee,
-                 8);
+  bool bindOk = ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0500,
+                               g_coordinatorIeee, 8);
   usleep(500000);
 
   // 2. Write coordinator's IEEE to sensor's IAS_CIE_Address attribute (0x0010).
-  ZNP_WriteCieAddress(shortAddr_, endpoint, 0x20);
+  bool cieOk = ZNP_WriteCieAddress(shortAddr_, endpoint, 0x20);
   usleep(500000);
 
   // 3. Force send a Zone Enroll Response in case it doesn't send a Request
   ZNP_SendZoneEnrollResponse(shortAddr_, endpoint, 0x21, 0x01);
   usleep(200000);
 
-  printf("Configuration sent to Contact Sensor 0x%04X!\n", shortAddr_);
+  // Only mark configured when the critical steps were accepted; otherwise
+  // leave it unconfigured so the next frame from the device retriggers setup.
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numContactSensors; i++) {
+    if (g_contactSensors[i].shortAddr == shortAddr_) {
+      if (bindOk && cieOk) {
+        g_contactSensors[i].configured = true;
+        g_contactSensors[i].setupRetries = 0;
+      } else {
+        g_contactSensors[i].setupRetries++;
+        printf("Contact Sensor 0x%04X setup FAILED (bind=%s cie=%s, attempt %u) - will retry\n",
+               shortAddr_, bindOk ? "OK" : "FAIL", cieOk ? "OK" : "FAIL",
+               g_contactSensors[i].setupRetries);
+      }
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+
+  if (bindOk && cieOk) {
+    printf("Configuration sent to Contact Sensor 0x%04X!\n", shortAddr_);
+  }
 }
 
 void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
@@ -250,6 +357,16 @@ void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
          "zone_type=0x%04X\n",
          shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
+
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numContactSensors; i++) {
+    if (g_contactSensors[i].shortAddr == shortAddr_) {
+      g_contactSensors[i].zoneId = zoneId;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+  Device_Save();
 
   ZNP_SendZoneEnrollResponse(shortAddr_, endpoint_, transSeq_, zoneId);
 }
@@ -264,7 +381,11 @@ void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
   pthread_mutex_lock(&g_deviceMutex);
   for (int i = 0; i < g_numContactSensors; i++) {
     if (g_contactSensors[i].shortAddr == shortAddr_) {
+      double now = ZNP_GetCurrentTime();
+      if (open)
+        g_contactSensors[i].lastOpenedTime = now;
       g_contactSensors[i].isOpen = open;
+      g_contactSensors[i].lastStatusTime = now;
       break;
     }
   }
@@ -312,14 +433,26 @@ bool ContactSensor_IsKnown(uint16_t shortAddr_) {
 }
 
 void ContactSensor_UpdateSeen(uint16_t shortAddr_) {
+  bool retrySetup = false;
   pthread_mutex_lock(&g_deviceMutex);
   for (int i = 0; i < g_numContactSensors; i++) {
     if (g_contactSensors[i].shortAddr == shortAddr_) {
-      g_contactSensors[i].lastSeen = ZNP_GetCurrentTime();
+      double now = ZNP_GetCurrentTime();
+      g_contactSensors[i].lastSeen = now;
+      // The device is provably awake right now: if setup never succeeded,
+      // this is the best moment to retry it (paced, capped).
+      if (!g_contactSensors[i].configured && g_contactSensors[i].setupRetries < 5 &&
+          now - g_contactSensors[i].lastSetupAttempt > 30.0) {
+        retrySetup = true;
+      }
       break;
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);
+  if (retrySetup) {
+    printf("Contact Sensor 0x%04X is awake and unconfigured - retrying setup\n", shortAddr_);
+    ContactSensor_PostAssign(shortAddr_);
+  }
 }
 
 void ContactSensor_DiscoverAllActiveEp(void) {
@@ -334,6 +467,39 @@ void ContactSensor_DiscoverAllActiveEp(void) {
   for (int i = 0; i < tempNum; i++) {
     ZNP_ZdoActiveEpReq(tempAddrs[i]);
     ZNP_QuerySimpleDesc(tempAddrs[i], 1);
+  }
+}
+
+void ContactSensor_PostRefresh(uint16_t shortAddr_) {
+  SENSOR_MSG_T *msg = (SENSOR_MSG_T *)calloc(1, sizeof(SENSOR_MSG_T));
+  if (msg == NULL)
+    return;
+  msg->kind = SENSOR_MSG_REFRESH;
+  msg->shortAddr = shortAddr_;
+  MsgQueue_Push(&s_contactInbox, msg);
+}
+
+void ContactSensor_RefreshIfStale(double maxAgeSeconds_) {
+  uint16_t staleAddrs[MAX_CONTACT_SENSORS];
+  int numStale = 0;
+  double now = ZNP_GetCurrentTime();
+
+  pthread_mutex_lock(&g_deviceMutex);
+  for (int i = 0; i < g_numContactSensors; i++) {
+    if (!g_contactSensors[i].configured)
+      continue;
+    if (now - g_contactSensors[i].lastStatusTime < maxAgeSeconds_)
+      continue;
+    // Rate-limit: occupancy events can arrive several times per second.
+    if (now - g_contactSensors[i].lastRefreshReq < 10.0)
+      continue;
+    g_contactSensors[i].lastRefreshReq = now;
+    staleAddrs[numStale++] = g_contactSensors[i].shortAddr;
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+
+  for (int i = 0; i < numStale; i++) {
+    ContactSensor_PostRefresh(staleAddrs[i]);
   }
 }
 

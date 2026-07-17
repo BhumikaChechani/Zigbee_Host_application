@@ -27,41 +27,56 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// A person walking through the door passes closest to the radar first (often
+// below the zone's minimum distance) and only enters the configured zone band
+// after the door has already swung shut - so "door open AND presence in zone"
+// rarely overlap instantaneously. Treat a door as open for a grace window
+// after its CLOSED->OPEN transition so the intrusion condition becomes
+// "presence detected AND the door opened recently".
+#define DOOR_OPEN_GRACE_S 10.0
+
+static bool ContactCountsAsOpen(int idx, double now) {
+    if (g_contactSensors[idx].isOpen)
+        return true;
+    return g_contactSensors[idx].lastOpenedTime > 0.0 &&
+           (now - g_contactSensors[idx].lastOpenedTime) < DOOR_OPEN_GRACE_S;
+}
+
 static bool IsDoorOpenForZone(uint8_t zoneIdx) {
+    // NOTE: the contact sensor's zoneId is its IAS enrollment id (handed out
+    // by g_nextZoneId++, shared with sirens/buttons) - it is NOT related to
+    // the FP300's software zone index (0-3). Matching the two only makes
+    // sense if the installer deliberately assigned matching ids; in every
+    // other case fall back to "is ANY door open", which is the correct
+    // semantic for the door+presence alarm.
     bool open = false;
+    bool matchedById = false;
+    double now = ZNP_GetCurrentTime();
+
     pthread_mutex_lock(&g_deviceMutex);
-    
-    // 1. Check if we only have one contact sensor (global fallback)
-    if (g_numContactSensors == 1) {
-        open = g_contactSensors[0].isOpen;
-        pthread_mutex_unlock(&g_deviceMutex);
-        return open;
-    }
-    
-    // 2. Try to find if ANY contact sensor matching the zoneIdx is open
+
+    // 1. Exact zoneId match (deliberate multi-door mapping).
     for (int i = 0; i < g_numContactSensors; i++) {
         if (g_contactSensors[i].zoneId == (int)zoneIdx) {
-            if (g_contactSensors[i].isOpen) {
-                pthread_mutex_unlock(&g_deviceMutex);
-                return true;
-            }
+            open = ContactCountsAsOpen(i, now);
+            matchedById = true;
+            break;
         }
     }
-    
-    // 3. Fallback: if zoneIdx is 0, check if ANY unconfigured (-1) contact sensor is open
-    if (zoneIdx == 0) {
+
+    // 2. Fallback: any registered door open counts. Robust against the IAS
+    //    id / zone index mismatch and against stale duplicate entries.
+    if (!matchedById) {
         for (int i = 0; i < g_numContactSensors; i++) {
-            if (g_contactSensors[i].zoneId == -1) {
-                if (g_contactSensors[i].isOpen) {
-                    pthread_mutex_unlock(&g_deviceMutex);
-                    return true;
-                }
+            if (ContactCountsAsOpen(i, now)) {
+                open = true;
+                break;
             }
         }
     }
-    
+
     pthread_mutex_unlock(&g_deviceMutex);
-    return false;
+    return open;
 }
 
 static MSG_QUEUE_T s_useCaseInbox; ///< Inbox of pending use-case events.
@@ -223,6 +238,12 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   case UC_OCCUPANCY_DETECTED: {
 #if ENABLE_AQARA_OCCUPANCY
     uint8_t zoneIdx = (uint8_t)event_->raw;
+#if ENABLE_CONTACT_SENSOR
+    // If a door's last status update is old, a change notification may have
+    // been lost - queue an active re-read so the stored state self-heals for
+    // the next decision (non-blocking, rate-limited).
+    ContactSensor_RefreshIfStale(30.0);
+#endif
     bool isDoorOpen = IsDoorOpenForZone(zoneIdx);
     printf("🚶 [USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
@@ -264,14 +285,14 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   case UC_CONTACT_OPEN: {
     printf("🚪 [USECASE] Contact Sensor OPENED -> Siren Beep 2 times\n");
 #if ENABLE_SIREN
-    Siren_Beep(2);
+    Siren_PostBeep(2);
 #endif
     break;
   }
   case UC_CONTACT_CLOSED: {
     printf("🚪 [USECASE] Contact Sensor CLOSED -> Siren Beep 1 time\n");
 #if ENABLE_SIREN
-    Siren_Beep(1);
+    Siren_PostBeep(1);
 #endif
     break;
   }

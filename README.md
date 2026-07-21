@@ -83,11 +83,12 @@ Once the application is running, you can interact with the Zigbee network direct
 ### Siren Controls
 | Command | Description |
 | :--- | :--- |
-| **`siren on`** | Turns **all** sirens ON simultaneously. |
-| **`siren off`** | Turns **all** sirens OFF simultaneously. |
-| **`siren vol <0-3>`** | Sets the global siren volume (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
-| **`siren mode <1-6>`** | Sets the global siren sound mode (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
-| **`siren test <addr> [mode]`** | Sends a test warning to a specific siren. Can optionally override the global mode for testing. |
+| **`siren on <addr>`** | Turns a specific siren ON. |
+| **`siren off <addr>`** | Turns a specific siren OFF. |
+| **`siren vol <addr> <0-3>`** | Sets the volume for a specific siren (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
+| **`siren mode <addr> <1-6>`** | Sets the sound mode for a specific siren (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
+| **`siren test <addr> [mode]`** | Sends a test warning to a specific siren. Can optionally override its mode for testing. |
+| **`siren stop <addr>`** | Stops the test for a specific siren. |
 
 ---
 

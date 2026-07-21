@@ -50,10 +50,10 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | :--- | :--- | :--- |
 | Remove mounting backplate (Tamper switch) | 🚨 **FULL SIREN ALARM** (Mode 4). | Tests IAS Zone tamper alarm on wall removal. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Light / battery queries. |
-| Type `siren on` and hit Enter | 🚨 **FULL SIREN ALARM** on all sirens. | Tests global siren activation. |
-| Type `siren off` and hit Enter | 🔇 **ALL SIRENS STOP** immediately. | Stops the global test. |
-| Type `siren mode <1-6>` | 🎶 Sets global siren sound mode. | **Modes:** 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic. |
-| Type `siren vol <0-3>` | 🔊 Sets global siren volume level. | **Levels:** 0=Low, 1=Medium, 2=High, 3=Very High. Note: Some firmwares ignore volume. |
+| Type `siren on <addr>` and hit Enter | 🚨 **FULL SIREN ALARM** on the specific siren. | Tests specific siren activation. |
+| Type `siren off <addr>` and hit Enter | 🔇 **SIREN STOPS** immediately. | Stops the specific siren. |
+| Type `siren mode <addr> <1-6>` | 🎶 Sets specific siren sound mode. | **Modes:** 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic. |
+| Type `siren vol <addr> <0-3>` | 🔊 Sets specific siren volume level. | **Levels:** 0=Low, 1=Medium, 2=High, 3=Very High. Note: Some firmwares ignore volume. |
 | Type `siren test <addr> [mode]` | 🚨 Sounds ONLY the specific siren address. | Provide mode 1-6 to test a specific sound (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
 | Type `siren stop <addr>` | 🔇 **ONLY THAT SPECIFIC SIREN** stops. | Stops a siren test. |
 

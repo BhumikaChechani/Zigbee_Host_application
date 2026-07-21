@@ -38,7 +38,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int g_logLevel = LOG_LEVEL_INFO;
+
 
 #include <pthread.h>
 

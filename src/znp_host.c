@@ -736,7 +736,7 @@ bool ZNP_FactoryNew( void )
     bool resetOk = ZNP_SysResetReq( false );
     if ( !resetOk )
     {
-        LOG_DEBUG("Soft reset unconfirmed - escalating to hard reset...\n" );
+        LOG_WARNING("Soft reset unconfirmed - escalating to hard reset...\n" );
         resetOk = ZNP_SysResetReq( true );
     }
     if ( resetOk )
@@ -747,7 +747,7 @@ bool ZNP_FactoryNew( void )
     }
     else
     {
-        LOG_DEBUG("Both resets unconfirmed. Proceeding anyway after 3s delay...\n" );
+        LOG_WARNING("Both resets unconfirmed. Proceeding anyway after 3s delay...\n" );
         sleep( 3 );
     }
 
@@ -800,7 +800,7 @@ bool ZNP_FactoryNew( void )
     resetOk = ZNP_SysResetReq( false );
     if ( !resetOk )
     {
-        LOG_DEBUG("Soft reset unconfirmed - escalating to hard reset...\n" );
+        LOG_WARNING("Soft reset unconfirmed - escalating to hard reset...\n" );
         resetOk = ZNP_SysResetReq( true );
     }
     if ( resetOk )
@@ -810,7 +810,7 @@ bool ZNP_FactoryNew( void )
     }
     else
     {
-        LOG_DEBUG("Final reset unconfirmed. Proceeding after 3s delay...\n" );
+        LOG_WARNING("Final reset unconfirmed. Proceeding after 3s delay...\n" );
         sleep( 3 );
     }
     return true;

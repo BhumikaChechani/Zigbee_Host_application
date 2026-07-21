@@ -17,46 +17,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#define LOG_LEVEL_DEBUG 0
-#define LOG_LEVEL_INFO  1
-
-extern int g_logLevel;
-
-#define LOG_RAW(...) do { if (g_logLevel <= LOG_LEVEL_DEBUG) { printf(__VA_ARGS__); } } while(0)
-#define LOG_DEBUG(...) \
-    do { \
-        if (g_logLevel <= LOG_LEVEL_DEBUG) { \
-            print_timestamp(); \
-            printf("[DEBUG] "); \
-            printf(__VA_ARGS__); \
-        } \
-    } while(0)
-
-#define LOG_ERROR(...) \
-    do { \
-        print_timestamp(); \
-        printf("[ERROR] "); \
-        printf(__VA_ARGS__); \
-    } while(0)
-
-#define LOG_INFO(...)  do { if (g_logLevel <= LOG_LEVEL_INFO)  { printf(__VA_ARGS__); } } while(0)
-
-static inline void print_timestamp(void) {
-    time_t now;
-    time(&now);
-    struct tm *local = localtime(&now);
-    printf("[%02d:%02d:%02d] ", local->tm_hour, local->tm_min, local->tm_sec);
-}
-
-#define LOG_EVENT(MODULE, ADDR, ...) \
-    do { \
-        if (g_logLevel <= LOG_LEVEL_INFO) { \
-            print_timestamp(); \
-            printf("[INFO] [%-10s] [0x%04X] ", MODULE, ADDR); \
-            printf(__VA_ARGS__); \
-        } \
-    } while(0)
-
+#include "logger.h"
 
 #define PORT_DEFAULT "/dev/ttyACM0" ///< Default serial device if none is given.
 #define PERMIT_JOIN_DURATION 0xFE   ///< Permit-join window, 254 seconds.
@@ -125,8 +86,7 @@ extern uint8_t g_nextZoneId; ///< Next IAS zone id to hand out on enrollment.
 extern uint8_t
     g_coordinatorIeee[8]; ///< This coordinator's IEEE (little-endian).
 extern bool
-    g_hasCoordinatorIeee;  ///< True once @ref g_coordinatorIeee is known.
-
+    g_hasCoordinatorIeee; ///< True once @ref g_coordinatorIeee is known.
 
 extern EVENT_QUEUE_T g_eventQueue; ///< AREQ indications from the reader thread.
 
@@ -292,7 +252,8 @@ bool ZNP_PermitJoin(uint8_t duration_);
 /// @p require_ = false lets such devices stay on the well-known global key.
 /// Uses MT_APP_CNF APP_CNF_BDB_SET_TC_REQUIRE_KEY_EXCHANGE (0x2F / 0x09).
 ///
-/// @param  require_  true to require the exchange (Z3.0 default), false to allow
+/// @param  require_  true to require the exchange (Z3.0 default), false to
+/// allow
 ///                   devices to remain on the global key.
 /// @return true if the ZNP acknowledged the command with status 0.
 ///
@@ -351,7 +312,6 @@ bool ZNP_AfDataRequestExt(uint8_t dstAddrMode_, uint64_t dstAddr_,
 /// @param  dstEndpoint_  Destination endpoint.
 /// @param  srcEndpoint_  Source endpoint on the coordinator (e.g. 1 or 8).
 
-
 ///
 /// @brief  ZDO_MATCH_DESC_REQ - find devices matching a cluster profile.
 /// @param  shortAddr_       Destination/interest address (e.g. 0xFFFD
@@ -377,12 +337,14 @@ bool ZNP_ZdoActiveEpReq(uint16_t shortAddr_);
 ///
 /// @brief  ZDO_MGMT_LEAVE_REQ - tell a device to leave the network.
 /// @param  shortAddr_      Target device network address.
-/// @param  extAddr_        Optional IEEE address of the device to remove (NULL to use shortAddr only).
+/// @param  extAddr_        Optional IEEE address of the device to remove (NULL
+/// to use shortAddr only).
 /// @param  removeChildren_ True to remove children as well.
 /// @param  rejoin_         True to instruct the device to rejoin immediately.
 /// @return true if the request was accepted.
 ///
-bool ZNP_ZdoMgmtLeaveReq(uint16_t shortAddr_, const uint8_t *extAddr_, bool removeChildren_, bool rejoin_);
+bool ZNP_ZdoMgmtLeaveReq(uint16_t shortAddr_, const uint8_t *extAddr_,
+                         bool removeChildren_, bool rejoin_);
 
 ///
 /// @brief  ZDO_SIMPLE_DESC_REQ - fetch one endpoint's descriptor (clusters).
@@ -444,7 +406,8 @@ bool ZNP_SendZoneEnrollResponse(uint16_t buttonShortAddr_,
 /// @param  sirenEndpoint_   Endpoint hosting the IAS WD cluster.
 /// @param  transId_         ZCL transaction sequence number.
 /// @param  warnMode_        Warning mode (0 = stop, non-zero = warn/burglar).
-/// @param  volume_          Volume level (0=low, 1=medium, 2=high, 3=very high).
+/// @param  volume_          Volume level (0=low, 1=medium, 2=high, 3=very
+/// high).
 /// @param  duration_        Warning duration in seconds.
 /// @return true if the command was accepted by the ZNP.
 ///
@@ -457,10 +420,12 @@ bool ZNP_SendSirenWarning(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
 /// @param  sirenEndpoint_   Endpoint hosting the IAS WD cluster.
 /// @param  transId_         ZCL transaction sequence number.
 /// @param  squawkMode_      Squawk mode (e.g. 0=armed).
-/// @param  volume_          Squawk volume (0=low, 1=medium, 2=high, 3=very high).
+/// @param  volume_          Squawk volume (0=low, 1=medium, 2=high, 3=very
+/// high).
 /// @return true if the command was accepted by the ZNP.
 bool ZNP_SendSirenSquawk(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
-                         uint8_t transId_, uint8_t squawkMode_, uint8_t volume_);
+                         uint8_t transId_, uint8_t squawkMode_,
+                         uint8_t volume_);
 
 /// @brief  Send a ZCL Default Response.
 /// @param  shortAddr_   Target network address.
@@ -470,8 +435,9 @@ bool ZNP_SendSirenSquawk(uint16_t sirenShortAddr_, uint8_t sirenEndpoint_,
 /// @param  cmdId_       ZCL command ID being responded to.
 /// @param  status_      Status code.
 /// @return true if accepted.
-bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t endpoint_, uint16_t clusterId_,
-                             uint8_t transId_, uint8_t cmdId_, uint8_t status_);
+bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t endpoint_,
+                             uint16_t clusterId_, uint8_t transId_,
+                             uint8_t cmdId_, uint8_t status_);
 
 /// @brief  Monotonic-ish wall-clock time in seconds (for timeouts/last-seen).
 /// @return Current time in seconds as a double.

@@ -380,8 +380,7 @@ void Siren_SetVolume( uint8_t volume_ )
 {
     if (volume_ > 3) volume_ = 3;
     s_sirenVolume = volume_;
-    LOG_DEBUG( "Siren global volume set to %d (0=low, 1=medium, 2=high, 3=very high)\n", volume_ );
-    Siren_SaveConfig();
+        Siren_SaveConfig();
 }
 
 uint8_t Siren_GetVolume( void )
@@ -393,8 +392,7 @@ void Siren_SetMode( uint8_t mode_ )
 {
     if (mode_ < 1 || mode_ > 6) mode_ = 1;
     s_sirenMode = mode_;
-    LOG_DEBUG( "Siren global mode set to %d\n", mode_ );
-    Siren_SaveConfig();
+        Siren_SaveConfig();
 }
 
 uint8_t Siren_GetMode( void )
@@ -414,8 +412,7 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-        LOG_DEBUG("No sirens registered yet.\n" );
-        pthread_mutex_unlock( &g_deviceMutex );
+                pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
 
@@ -439,8 +436,7 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-        LOG_DEBUG("No sirens registered yet.\n" );
-        pthread_mutex_unlock( &g_deviceMutex );
+                pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
 

@@ -182,10 +182,12 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
 void VibrationSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
   bool found = false;
   pthread_mutex_lock(&g_deviceMutex);
+  int targetIdx = -1;
   for (int i = 0; i < g_numVibrationSensors; i++) {
     if (g_vibrationSensors[i].shortAddr == shortAddr_) {
       memcpy(g_vibrationSensors[i].ieee, ieee_, 8);
       g_vibrationSensors[i].hasIeee = true;
+      targetIdx = i;
       found = true;
       break;
     }
@@ -193,10 +195,19 @@ void VibrationSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
   if (found) {
     for (int i = g_numVibrationSensors - 1; i >= 0; i--) {
       if (g_vibrationSensors[i].shortAddr != shortAddr_ && g_vibrationSensors[i].hasIeee && memcmp(g_vibrationSensors[i].ieee, ieee_, 8) == 0) {
+        // Preserve configuration from the old (now stale) entry
+        g_vibrationSensors[targetIdx].zoneId = g_vibrationSensors[i].zoneId;
+        g_vibrationSensors[targetIdx].configured = g_vibrationSensors[i].configured;
+        g_vibrationSensors[targetIdx].sensitivity = g_vibrationSensors[i].sensitivity;
+
         for (int j = i; j < g_numVibrationSensors - 1; j++) {
           g_vibrationSensors[j] = g_vibrationSensors[j + 1];
         }
         g_numVibrationSensors--;
+
+        if (targetIdx > i) {
+            targetIdx--;
+        }
       }
     }
   }

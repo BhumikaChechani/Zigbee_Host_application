@@ -359,12 +359,14 @@ void OnicsButton_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
 {
     bool found = false;
     pthread_mutex_lock( &g_deviceMutex );
+    int targetIdx = -1;
     for ( int i = 0; i < g_numOnicsButtons; i++ )
     {
         if ( g_onicsButtons[i].shortAddr == shortAddr_ )
         {
             memcpy( g_onicsButtons[i].ieee, ieee_, 8 );
             g_onicsButtons[i].hasIeee = true;
+            targetIdx = i;
             found = true;
             break;
         }
@@ -378,11 +380,19 @@ void OnicsButton_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
             if ( g_onicsButtons[i].shortAddr != shortAddr_ && g_onicsButtons[i].hasIeee &&
                  memcmp( g_onicsButtons[i].ieee, ieee_, 8 ) == 0 )
             {
+                // Preserve configuration from the old (now stale) entry
+                g_onicsButtons[targetIdx].zoneId = g_onicsButtons[i].zoneId;
+                g_onicsButtons[targetIdx].configured = g_onicsButtons[i].configured;
+
                 for ( int j = i; j < g_numOnicsButtons - 1; j++ )
                 {
                     g_onicsButtons[j] = g_onicsButtons[j + 1];
                 }
                 g_numOnicsButtons--;
+
+                if (targetIdx > i) {
+                    targetIdx--;
+                }
             }
         }
     }

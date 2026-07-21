@@ -168,12 +168,14 @@ void AqaraButton_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
 {
     bool found = false;
     pthread_mutex_lock( &g_deviceMutex );
+    int targetIdx = -1;
     for ( int i = 0; i < g_numAqaraButtons; i++ )
     {
         if ( g_aqaraButtons[i].shortAddr == shortAddr_ )
         {
             memcpy( g_aqaraButtons[i].ieee, ieee_, 8 );
             g_aqaraButtons[i].hasIeee = true;
+            targetIdx = i;
             found = true;
             break;
         }
@@ -188,11 +190,18 @@ void AqaraButton_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
             if ( g_aqaraButtons[i].shortAddr != shortAddr_ && g_aqaraButtons[i].hasIeee &&
                  memcmp( g_aqaraButtons[i].ieee, ieee_, 8 ) == 0 )
             {
+                // Preserve configuration from the old (now stale) entry
+                g_aqaraButtons[targetIdx].configured = g_aqaraButtons[i].configured;
+
                 for ( int j = i; j < g_numAqaraButtons - 1; j++ )
                 {
                     g_aqaraButtons[j] = g_aqaraButtons[j + 1];
                 }
                 g_numAqaraButtons--;
+
+                if (targetIdx > i) {
+                    targetIdx--;
+                }
             }
         }
     }

@@ -239,12 +239,14 @@ void Siren_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
 {
     bool found = false;
     pthread_mutex_lock( &g_deviceMutex );
+    int targetIdx = -1;
     for ( int i = 0; i < g_numSirens; i++ )
     {
         if ( g_sirens[i].shortAddr == shortAddr_ )
         {
             memcpy( g_sirens[i].ieee, ieee_, 8 );
             g_sirens[i].hasIeee = true;
+            targetIdx = i;
             found = true;
             break;
         }
@@ -258,11 +260,21 @@ void Siren_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
             if ( g_sirens[i].shortAddr != shortAddr_ && g_sirens[i].hasIeee &&
                  memcmp( g_sirens[i].ieee, ieee_, 8 ) == 0 )
             {
+                // Preserve configuration from the old (now stale) entry
+                g_sirens[targetIdx].zoneId = g_sirens[i].zoneId;
+                g_sirens[targetIdx].configured = g_sirens[i].configured;
+                g_sirens[targetIdx].volume = g_sirens[i].volume;
+                g_sirens[targetIdx].mode = g_sirens[i].mode;
+
                 for ( int j = i; j < g_numSirens - 1; j++ )
                 {
                     g_sirens[j] = g_sirens[j + 1];
                 }
                 g_numSirens--;
+
+                if (targetIdx > i) {
+                    targetIdx--;
+                }
             }
         }
     }

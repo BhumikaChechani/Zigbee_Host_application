@@ -255,10 +255,12 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
 void ContactSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
   bool found = false;
   pthread_mutex_lock(&g_deviceMutex);
+  int targetIdx = -1;
   for (int i = 0; i < g_numContactSensors; i++) {
     if (g_contactSensors[i].shortAddr == shortAddr_) {
       memcpy(g_contactSensors[i].ieee, ieee_, 8);
       g_contactSensors[i].hasIeee = true;
+      targetIdx = i;
       found = true;
       break;
     }
@@ -268,10 +270,21 @@ void ContactSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
       if (g_contactSensors[i].shortAddr != shortAddr_ &&
           g_contactSensors[i].hasIeee &&
           memcmp(g_contactSensors[i].ieee, ieee_, 8) == 0) {
+        
+        // Preserve configuration from the old (now stale) entry
+        g_contactSensors[targetIdx].zoneId = g_contactSensors[i].zoneId;
+        g_contactSensors[targetIdx].configured = g_contactSensors[i].configured;
+        g_contactSensors[targetIdx].isOpen = g_contactSensors[i].isOpen;
+        g_contactSensors[targetIdx].lastOpenedTime = g_contactSensors[i].lastOpenedTime;
+
         for (int j = i; j < g_numContactSensors - 1; j++) {
           g_contactSensors[j] = g_contactSensors[j + 1];
         }
         g_numContactSensors--;
+
+        if (targetIdx > i) {
+            targetIdx--;
+        }
       }
     }
   }

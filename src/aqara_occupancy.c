@@ -540,24 +540,39 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
 void AqaraOccupancy_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
   bool found = false;
   pthread_mutex_lock(&g_deviceMutex);
+  int targetIdx = -1;
   for (int i = 0; i < g_numAqaraOccupancies; i++) {
     if (g_aqaraOccupancies[i].shortAddr == shortAddr_) {
       memcpy(g_aqaraOccupancies[i].ieee, ieee_, 8);
       g_aqaraOccupancies[i].hasIeee = true;
+      targetIdx = i;
       found = true;
       break;
     }
   }
   if (found) {
-    // Collapse stale duplicates
+    // Collapse stale duplicates, copying configuration first
     for (int i = g_numAqaraOccupancies - 1; i >= 0; i--) {
       if (g_aqaraOccupancies[i].shortAddr != shortAddr_ &&
           g_aqaraOccupancies[i].hasIeee &&
           memcmp(g_aqaraOccupancies[i].ieee, ieee_, 8) == 0) {
+        
+        // Preserve configuration from the old (now stale) entry
+        g_aqaraOccupancies[targetIdx].lightThreshold = g_aqaraOccupancies[i].lightThreshold;
+        for (int z = 0; z < MAX_OCCUPANCY_ZONES; z++) {
+            g_aqaraOccupancies[targetIdx].zones[z] = g_aqaraOccupancies[i].zones[z];
+        }
+        g_aqaraOccupancies[targetIdx].configured = g_aqaraOccupancies[i].configured;
+
         for (int j = i; j < g_numAqaraOccupancies - 1; j++) {
           g_aqaraOccupancies[j] = g_aqaraOccupancies[j + 1];
         }
         g_numAqaraOccupancies--;
+        
+        // Adjust targetIdx if it was shifted down by the collapse
+        if (targetIdx > i) {
+            targetIdx--;
+        }
       }
     }
   }

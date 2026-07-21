@@ -212,6 +212,7 @@ void Device_Save( void )
             fprintf( file, " %d %u %u", g_aqaraOccupancies[i].zones[z].isActive ? 1 : 0, 
                      g_aqaraOccupancies[i].zones[z].minCm, g_aqaraOccupancies[i].zones[z].maxCm );
         }
+        fprintf( file, " %u", g_aqaraOccupancies[i].lightThreshold );
         fprintf( file, "\n" );
     }
 #endif
@@ -346,6 +347,9 @@ void Device_Load( void )
                     if ( fscanf( file, "%d %u %u", &zActive[z], &zMin[z], &zMax[z] ) != 3 ) break;
                 }
                 
+                uint32_t lightThresh = 18000; // default
+                fscanf( file, "%u", &lightThresh ); // ignore return since it might not be present
+                
                 g_aqaraOccupancies[g_numAqaraOccupancies].shortAddr = shortAddr;
                 g_aqaraOccupancies[g_numAqaraOccupancies].endpoint = endpoint;
                 g_aqaraOccupancies[g_numAqaraOccupancies].lastSeen = ZNP_GetCurrentTime();
@@ -359,6 +363,7 @@ void Device_Load( void )
                     g_aqaraOccupancies[g_numAqaraOccupancies].zones[z].maxCm = zMax[z];
                 }
                 
+                g_aqaraOccupancies[g_numAqaraOccupancies].lightThreshold = (uint16_t)lightThresh;
                 g_aqaraOccupancies[g_numAqaraOccupancies].configured = true;
                 g_numAqaraOccupancies++;
                 Device_AddDiscoveredIeee( shortAddr, ieee );

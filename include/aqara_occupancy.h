@@ -34,6 +34,7 @@ typedef struct {
   bool hasLightState; ///< True if we have received at least one light reading.
   bool isLightOn;     ///< Last known state of the light.
   uint16_t lastLightLevel; ///< Last reported raw light intensity level.
+  uint16_t lightThreshold; ///< Per-device threshold for Day/Night detection.
   double lastPolled;  ///< Timestamp of the last outgoing poll (Read Attributes) sent to this device.
   OccupancyZone zones[MAX_OCCUPANCY_ZONES]; ///< Configured distance ranges.
 } AQARA_OCCUPANCY_T;
@@ -103,8 +104,7 @@ void AqaraOccupancy_SetHwDetectionRange(uint16_t shortAddr_, uint32_t bitmask_);
 void AqaraOccupancy_SpatialLearning(uint16_t shortAddr_);
 void AqaraOccupancy_SetSensitivity(uint16_t shortAddr_, uint8_t level_);
 void AqaraOccupancy_ReadEnvironment(uint16_t shortAddr_);
-void AqaraOccupancy_SetLightThreshold(uint16_t threshold_);
-uint16_t AqaraOccupancy_GetLightThreshold(void);
+void AqaraOccupancy_SetLightThreshold(uint16_t shortAddr_, uint16_t threshold_);
 
 /// @brief  Print the registered occupancy sensors (CLI 'status').
 /// @return None.

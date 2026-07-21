@@ -19,7 +19,6 @@ int g_numAqaraOccupancies = 0;
 
 static MSG_QUEUE_T s_occupancyInbox;
 static pthread_t s_occupancyThread;
-static uint16_t s_lightThreshold = 20000;
 
 ///
 /// @brief  Fixed byte width of a ZCL data type.
@@ -413,30 +412,11 @@ static void *AqaraOccupancy_Thread(void *arg_) {
   return NULL;
 }
 
-static void AqaraOccupancy_LoadConfig(void) {
-  FILE *f = fopen("occupancy_config.txt", "r");
-  if (f) {
-    int t;
-    if (fscanf(f, "%d", &t) == 1) {
-      s_lightThreshold = (uint16_t)t;
-    }
-    fclose(f);
-  }
-}
-
-static void AqaraOccupancy_SaveConfig(void) {
-  FILE *f = fopen("occupancy_config.txt", "w");
-  if (f) {
-    fprintf(f, "%d\n", s_lightThreshold);
-    fclose(f);
-  }
-}
 
 void AqaraOccupancy_Init(void) {
   memset(g_aqaraOccupancies, 0, sizeof(g_aqaraOccupancies));
   g_numAqaraOccupancies = 0;
   MsgQueue_Init(&s_occupancyInbox);
-  AqaraOccupancy_LoadConfig();
 }
 
 void AqaraOccupancy_Start(void) {
@@ -510,6 +490,7 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_aqaraOccupancies[g_numAqaraOccupancies].zones[0].isActive = true;
       g_aqaraOccupancies[g_numAqaraOccupancies].zones[0].minCm = 0;
       g_aqaraOccupancies[g_numAqaraOccupancies].zones[0].maxCm = 600;
+      g_aqaraOccupancies[g_numAqaraOccupancies].lightThreshold = 18000;
       g_numAqaraOccupancies++;
       changed = true;
     }
@@ -1185,13 +1166,15 @@ bool AqaraOccupancy_AllOccupied(void) {
 }
 
 void AqaraOccupancy_HandleLightState(uint16_t shortAddr_, uint16_t light_) {
-  // Threshold tuning: light > s_lightThreshold implies significant brightness
-  bool lightIsOn = (light_ > s_lightThreshold);
   bool stateChanged = false;
+  bool lightIsOn = false;
+  uint16_t thresh = 18000;
 
   pthread_mutex_lock(&g_deviceMutex);
   for (int i = 0; i < g_numAqaraOccupancies; i++) {
     if (g_aqaraOccupancies[i].shortAddr == shortAddr_) {
+      thresh = g_aqaraOccupancies[i].lightThreshold;
+      lightIsOn = (light_ > thresh);
       g_aqaraOccupancies[i].lastLightLevel = light_;
       if (!g_aqaraOccupancies[i].hasLightState ||
           g_aqaraOccupancies[i].isLightOn != lightIsOn) {
@@ -1207,11 +1190,11 @@ void AqaraOccupancy_HandleLightState(uint16_t shortAddr_, uint16_t light_) {
   if (stateChanged) {
     if (!lightIsOn) {
       LOG_DEBUG("Light is OFF (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_,
-             light_, s_lightThreshold);
+             light_, thresh);
       UseCase_Post(UC_LIGHT_OFF, shortAddr_, light_, 0);
     } else {
       LOG_DEBUG("Light is ON (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_,
-             light_, s_lightThreshold);
+             light_, thresh);
       UseCase_Post(UC_LIGHT_ON, shortAddr_, light_, 0);
     }
   }
@@ -1255,9 +1238,9 @@ void AqaraOccupancy_PrintStatus(void) {
     if (g_aqaraOccupancies[i].hasLightState) {
       printf("    Light: %s (Raw: %u, Threshold: %u)\n",
              g_aqaraOccupancies[i].isLightOn ? "ON" : "OFF",
-             g_aqaraOccupancies[i].lastLightLevel, s_lightThreshold);
+             g_aqaraOccupancies[i].lastLightLevel, g_aqaraOccupancies[i].lightThreshold);
     } else {
-      printf("    Light: Unknown (Threshold: %u)\n", s_lightThreshold);
+      printf("    Light: Unknown (Threshold: %u)\n", g_aqaraOccupancies[i].lightThreshold);
     }
 
     int activeZones = 0;
@@ -1319,10 +1302,22 @@ void AqaraOccupancy_DiscoverAllActiveEp(void) {
   }
 }
 
-void AqaraOccupancy_SetLightThreshold(uint16_t threshold_) {
-  s_lightThreshold = threshold_;
-  AqaraOccupancy_SaveConfig();
+void AqaraOccupancy_SetLightThreshold(uint16_t shortAddr_, uint16_t threshold_) {
+  pthread_mutex_lock(&g_deviceMutex);
+  bool found = false;
+  for (int i = 0; i < g_numAqaraOccupancies; i++) {
+    if (g_aqaraOccupancies[i].shortAddr == shortAddr_) {
+      g_aqaraOccupancies[i].lightThreshold = threshold_;
+      found = true;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+  if (found) {
+    Device_Save();
+    printf("SUCCESS: Aqara Occupancy 0x%04X light intensity threshold set to %u.\n", shortAddr_, threshold_);
+  } else {
+    printf("ERROR: Aqara Occupancy 0x%04X not found.\n", shortAddr_);
+  }
 }
-
-uint16_t AqaraOccupancy_GetLightThreshold(void) { return s_lightThreshold; }
 #endif

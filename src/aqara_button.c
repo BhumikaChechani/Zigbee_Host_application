@@ -127,7 +127,7 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     {
         if ( g_numAqaraButtons < MAX_AQARA_BUTTONS )
         {
-            LOG_DEBUG( " Aqara Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_DEBUG("Aqara Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
             LOG_EVENT("AQARA BTN", shortAddr_, "Network Join\n");
             g_aqaraButtons[g_numAqaraButtons].shortAddr = shortAddr_;
             g_aqaraButtons[g_numAqaraButtons].endpoint = endpoint_;
@@ -257,7 +257,7 @@ void AqaraButton_Setup( uint16_t shortAddr_ )
 // NOT drive the siren itself - that policy lives in usecase.c.
 void AqaraButton_HandleCommand( uint16_t shortAddr_, uint8_t cmdId_ )
 {
-    LOG_DEBUG( "👉 [AQARA BUTTON] Command received: cmd_id=0x%02X from src=0x%04X\n", cmdId_, shortAddr_ );
+    LOG_DEBUG("[AQARA BUTTON] Command received: cmd_id=0x%02X from src=0x%04X\n", cmdId_, shortAddr_ );
     if ( cmdId_ == 0x01 ) // On
     {
         UseCase_Post( UC_BUTTON_ON, shortAddr_, cmdId_, 0 );

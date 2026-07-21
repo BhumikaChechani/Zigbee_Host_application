@@ -110,13 +110,13 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
     int offset = hdrLen;
     int len = af_->dataLen - hdrLen;
     if (len >= 1 && af_->data[offset] == 0x00) {
-      LOG_DEBUG("   [OCC] ✅ write accepted by 0x%04X (cluster 0x%04X)\n",
+      LOG_DEBUG("[OCC]  write accepted by 0x%04X (cluster 0x%04X)\n",
              af_->srcAddr, af_->clusterId);
     } else {
       while (offset + 3 <= af_->dataLen) {
         uint8_t st = af_->data[offset];
         uint16_t attr = af_->data[offset + 1] | (af_->data[offset + 2] << 8);
-        LOG_DEBUG("   [OCC] ❌ write REJECTED by 0x%04X: cluster 0x%04X attr "
+        LOG_DEBUG("[OCC]  write REJECTED by 0x%04X: cluster 0x%04X attr "
                "0x%04X status=0x%02X\n",
                af_->srcAddr, af_->clusterId, attr, st);
         offset += 3;
@@ -136,7 +136,7 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
         if (cmdId == 0x01) {
           status = af_->data[offset + 2];
           if (status != 0) {
-            LOG_DEBUG("   [OCC] cluster=0x%04X attr=0x%04X status=0x%02X\n",
+            LOG_DEBUG("[OCC] cluster=0x%04X attr=0x%04X status=0x%02X\n",
                    af_->clusterId, attrId, status);
             offset += 3;
             continue;
@@ -163,8 +163,7 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
 
         int width = AqaraOccupancy_ZclTypeLen(dataType);
         if (width < 0 || offset + width > af_->dataLen) {
-          LOG_DEBUG(
-              "   [OCC] unhandled type 0x%02X (attr 0x%04X) - stopping parse\n",
+          LOG_DEBUG("[OCC] unhandled type 0x%02X (attr 0x%04X) - stopping parse\n",
               dataType, attrId);
           break;
         }
@@ -172,12 +171,12 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
         if (af_->clusterId == 0x0402 && attrId == 0x0000 && width == 2) {
           int16_t temp =
               (int16_t)(af_->data[offset] | (af_->data[offset + 1] << 8));
-          LOG_DEBUG("🌡️ [OCC] Temperature from 0x%04X: %.2f °C\n", af_->srcAddr,
+          LOG_DEBUG("[OCC] Temperature from 0x%04X: %.2f °C\n", af_->srcAddr,
                  temp / 100.0);
         } else if (af_->clusterId == 0x0405 && attrId == 0x0000 && width == 2) {
           uint16_t hum =
               (uint16_t)(af_->data[offset] | (af_->data[offset + 1] << 8));
-          LOG_DEBUG("💧 [OCC] Humidity from 0x%04X: %.2f %%\n", af_->srcAddr,
+          LOG_DEBUG("[OCC] Humidity from 0x%04X: %.2f %%\n", af_->srcAddr,
                  hum / 100.0);
         } else if (af_->clusterId == 0x0400 && attrId == 0x0000 && width == 2) {
           uint16_t light =
@@ -191,7 +190,7 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
           AqaraOccupancy_HandleState(af_->srcAddr, af_->data[offset]);
         } else if (attrId == 0x014D) // FP300 PIR motion
         {
-          LOG_DEBUG("🚶 [OCC] MOTION from 0x%04X: %d\n", af_->srcAddr,
+          LOG_DEBUG("[OCC] MOTION from 0x%04X: %d\n", af_->srcAddr,
                  af_->data[offset]);
         } else if (af_->clusterId == 0xFCC0 && attrId == 0x0197 &&
                    width == 4) // absence delay read-back
@@ -199,7 +198,7 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
           uint32_t secs = af_->data[offset] | (af_->data[offset + 1] << 8) |
                           (af_->data[offset + 2] << 16) |
                           ((uint32_t)af_->data[offset + 3] << 24);
-          LOG_DEBUG("   [OCC] ⏱️ absence delay on 0x%04X is %u s (this is how long "
+          LOG_DEBUG("[OCC] ⏱ absence delay on 0x%04X is %u s (this is how long "
                  "presence-clear takes)\n",
                  af_->srcAddr, secs);
         } else if (attrId == 0x015F && width == 4) // FP300 target distance (cm)
@@ -210,7 +209,7 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
           AqaraOccupancy_HandleDistance(af_->srcAddr, cm);
         } else {
           if (af_->clusterId == 0xFCC0) {
-            LOG_DEBUG("   [OCC] unhandled 0xFCC0 attr=0x%04X type=0x%02X\n",
+            LOG_DEBUG("[OCC] unhandled 0xFCC0 attr=0x%04X type=0x%02X\n",
                    attrId, dataType);
           }
         }
@@ -495,7 +494,7 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   bool isRejoin = false;
   if (idx == -1) {
     if (g_numAqaraOccupancies < MAX_AQARA_OCCUPANCY) {
-      LOG_DEBUG(" Aqara Occupancy Sensor discovered: short=0x%04X, ep=0x%02X\n",
+      LOG_DEBUG("Aqara Occupancy Sensor discovered: short=0x%04X, ep=0x%02X\n",
              shortAddr_, endpoint_);
       LOG_EVENT("OCCUPANCY", shortAddr_, "Network Join\n");
       g_aqaraOccupancies[g_numAqaraOccupancies].shortAddr = shortAddr_;
@@ -517,7 +516,7 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   } else {
     // Known device (possibly rejoining under a new short address).
     if (g_aqaraOccupancies[idx].shortAddr != shortAddr_) {
-      LOG_DEBUG(" Aqara Occupancy 0x%04X rejoined as 0x%04X (same IEEE) - reusing "
+      LOG_DEBUG("Aqara Occupancy 0x%04X rejoined as 0x%04X (same IEEE) - reusing "
              "entry (bindings are IEEE-based, no re-setup needed)\n",
              g_aqaraOccupancies[idx].shortAddr, shortAddr_);
       LOG_EVENT("OCCUPANCY", shortAddr_, "Network Rejoin\n");
@@ -640,7 +639,7 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   bool bLht = ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0400,
                              g_coordinatorIeee, 8);
   usleep(300000);
-  LOG_DEBUG("   [OCC] bind: 0x0406=%s 0xFCC0=%s 0x0012=%s 0x0400=%s\n",
+  LOG_ERROR("[OCC] bind: 0x0406=%s 0xFCC0=%s 0x0012=%s 0x0400=%s\n",
          bStd ? "OK" : "FAIL", bMfr ? "OK" : "FAIL", bMs ? "OK" : "FAIL",
          bLht ? "OK" : "FAIL");
 
@@ -652,7 +651,7 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
     for (int i = 0; i < g_numAqaraOccupancies; i++) {
       if (g_aqaraOccupancies[i].shortAddr == shortAddr_) {
         g_aqaraOccupancies[i].setupRetries++;
-        LOG_DEBUG("   [OCC] setup of 0x%04X FAILED (attempt %u) - will retry\n",
+        LOG_ERROR("[OCC] setup of 0x%04X FAILED (attempt %u) - will retry\n",
                shortAddr_, g_aqaraOccupancies[i].setupRetries);
         break;
       }
@@ -1002,7 +1001,7 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
 
     if (stateChanged) {
       if (logicalOccupied) {
-        LOG_DEBUG("   ✅ PRESENCE DETECTED on sensor 0x%04X (distance %u cm is in "
+        LOG_DEBUG("PRESENCE DETECTED on sensor 0x%04X (distance %u cm is in "
                "zone %d [%u-%u])\n",
                shortAddr_, dist, z, g_aqaraOccupancies[idx].zones[z].minCm,
                g_aqaraOccupancies[idx].zones[z].maxCm);
@@ -1015,7 +1014,7 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
           LOG_EVENT("OCCUPANCY", shortAddr_, "Presence IGNORED in Zone %d (%u cm) -> Outside boundaries [%u-%u cm]\n", z, dist, g_aqaraOccupancies[idx].zones[z].minCm, g_aqaraOccupancies[idx].zones[z].maxCm);
         }
         else
-          LOG_DEBUG("   ❌ PRESENCE CLEARED on sensor 0x%04X (zone %d)\n",
+          LOG_DEBUG("PRESENCE CLEARED on sensor 0x%04X (zone %d)\n",
                  shortAddr_, z);
 
         UseCase_Post(UC_OCCUPANCY_CLEARED, shortAddr_, z, dist);
@@ -1078,7 +1077,7 @@ void AqaraOccupancy_HandleState(uint16_t shortAddr_, uint8_t occupied_) {
         0x23,                        // uint32
         10,   0x00, 0x00, 0x00       // 10 seconds LE
     };
-    LOG_DEBUG("   [OCC] re-applying absence delay = 10s on awake sensor 0x%04X\n",
+    LOG_DEBUG("[OCC] re-applying absence delay = 10s on awake sensor 0x%04X\n",
            shortAddr_);
     ZNP_AfDataRequestExt(0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq,
                          0x00, 0x1E, w, sizeof(w));
@@ -1216,11 +1215,11 @@ void AqaraOccupancy_HandleLightState(uint16_t shortAddr_, uint16_t light_) {
 
   if (stateChanged) {
     if (!lightIsOn) {
-      LOG_DEBUG("🌙 Light is OFF (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_,
+      LOG_DEBUG("Light is OFF (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_,
              light_, s_lightThreshold);
       UseCase_Post(UC_LIGHT_OFF, shortAddr_, light_, 0);
     } else {
-      LOG_DEBUG("☀️ Light is ON (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_,
+      LOG_DEBUG("Light is ON (0x%04X) [Raw: %u, Threshold: %u]\n", shortAddr_,
              light_, s_lightThreshold);
       UseCase_Post(UC_LIGHT_ON, shortAddr_, light_, 0);
     }

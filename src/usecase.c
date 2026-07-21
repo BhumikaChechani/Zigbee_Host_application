@@ -173,7 +173,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
         LOG_DEBUG("[USECASE] Aqara 0x%04X pressed (count=%d)\n", event_->srcAddr,
                history->count);
         for (int i = 0; i < history->count; i++) {
-          LOG_DEBUG("  - Press %d: %.3f\n", i + 1, history->pressTimes[i]);
+          LOG_DEBUG("- Press %d: %.3f\n", i + 1, history->pressTimes[i]);
         }
 
         if (history->count == 3) {
@@ -244,7 +244,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     ContactSensor_RefreshIfStale(30.0);
 #endif
     bool isDoorOpen = IsDoorOpenForZone(zoneIdx);
-    LOG_DEBUG("🚶 [USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
+    LOG_DEBUG("[USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
     if (isDoorOpen) {
         LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence DETECTED in Zone %u (%u cm) -> Siren ON (Mode 5: Intrusion)\n", zoneIdx, event_->val2);
@@ -256,8 +256,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
         LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence IGNORED in Zone %u (%u cm) -> Reason: Door is CLOSED -> Siren OFF\n", zoneIdx, event_->val2);
     }
 #else
-    LOG_DEBUG(
-        "🚶 [USECASE] Person detected in zone 0x%04X (index %u)\n",
+    LOG_DEBUG("[USECASE] Person detected in zone 0x%04X (index %u)\n",
         event_->srcAddr, event_->raw);
 #endif
     break;

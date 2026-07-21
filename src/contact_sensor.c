@@ -58,7 +58,7 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
           if (g_contactSensors[i].shortAddr == af_->srcAddr) {
             double now = ZNP_GetCurrentTime();
             if (g_contactSensors[i].isOpen != open) {
-              LOG_DEBUG("🚪 Contact Sensor 0x%04X state corrected by refresh: %s "
+              LOG_DEBUG("Contact Sensor 0x%04X state corrected by refresh: %s "
                      "(a change notification was missed)\n",
                      af_->srcAddr, open ? "OPEN" : "CLOSED");
               if (open)
@@ -78,7 +78,7 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Success
         uint8_t bat = zcl[4]; // Unit is 100 mV
-        LOG_DEBUG("🔋 Contact Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
+        LOG_DEBUG("Contact Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
       }
     }
   } else if (af_->clusterId == 0x0402) { // Temperature Measurement
@@ -87,10 +87,10 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Read Resp Success
         int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
-        LOG_DEBUG("🌡️ Contact Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_DEBUG("Contact Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
       } else if (cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00) { // Report
         int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
-        LOG_DEBUG("🌡️ Contact Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_DEBUG("Contact Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
       }
     }
   }
@@ -204,7 +204,7 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   bool isRejoin = false;
   if (idx == -1) {
     if (g_numContactSensors < MAX_CONTACT_SENSORS) {
-      LOG_DEBUG(" Contact Sensor discovered: short=0x%04X, ep=0x%02X\n",
+      LOG_DEBUG("Contact Sensor discovered: short=0x%04X, ep=0x%02X\n",
              shortAddr_, endpoint_);
       LOG_EVENT("CONTACT", shortAddr_, "Network Join\n");
       g_contactSensors[g_numContactSensors].shortAddr = shortAddr_;
@@ -221,7 +221,7 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     }
   } else {
     if (g_contactSensors[idx].shortAddr != shortAddr_) {
-      LOG_DEBUG(" Contact Sensor 0x%04X rejoined as 0x%04X (same IEEE) - reusing entry\n",
+      LOG_DEBUG("Contact Sensor 0x%04X rejoined as 0x%04X (same IEEE) - reusing entry\n",
              g_contactSensors[idx].shortAddr, shortAddr_);
       LOG_EVENT("CONTACT", shortAddr_, "Network Rejoin\n");
       g_contactSensors[idx].shortAddr = shortAddr_;
@@ -339,7 +339,7 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
         g_contactSensors[i].setupRetries = 0;
       } else {
         g_contactSensors[i].setupRetries++;
-        LOG_DEBUG("Contact Sensor 0x%04X setup FAILED (bind=%s cie=%s, attempt %u) - will retry\n",
+        LOG_ERROR("Contact Sensor 0x%04X setup FAILED (bind=%s cie=%s, attempt %u) - will retry\n",
                shortAddr_, bindOk ? "OK" : "FAIL", cieOk ? "OK" : "FAIL",
                g_contactSensors[i].setupRetries);
       }
@@ -355,7 +355,7 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
 
 void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
                                 uint8_t transSeq_, uint16_t zoneType_) {
-  LOG_DEBUG("   -> Zone Enroll Request from Contact Sensor 0x%04X, "
+  LOG_DEBUG("-> Zone Enroll Request from Contact Sensor 0x%04X, "
          "zone_type=0x%04X\n",
          shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
@@ -375,7 +375,7 @@ void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
 
 void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
                                 uint8_t zoneId_) {
-  LOG_DEBUG("   -> Zone Status Change from Contact Sensor 0x%04X: "
+  LOG_DEBUG("-> Zone Status Change from Contact Sensor 0x%04X: "
          "zone_status=0x%04X, zone_id=%d\n",
          shortAddr_, zoneStatus_, zoneId_);
 

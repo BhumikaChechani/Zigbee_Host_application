@@ -52,22 +52,22 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
     // We just print the payload so the user can see it's not hardcoded!
     const uint8_t *zcl = &af_->data[hdrLen];
     int zclLen = af_->dataLen - hdrLen;
-    LOG_DEBUG("   -> [Aqara Vibration Action] from 0x%04X, cluster 0x0012: ", af_->srcAddr);
+    LOG_DEBUG("-> [Aqara Vibration Action] from 0x%04X, cluster 0x0012: ", af_->srcAddr);
     for (int i = 0; i < zclLen; i++) LOG_DEBUG("%02X ", zcl[i]);
-    LOG_DEBUG("\n");
+    LOG_RAW("\n");
   } else if (af_->clusterId == 0x0000) { // Basic cluster (Aqara custom attributes)
     const uint8_t *zcl = &af_->data[hdrLen];
     int zclLen = af_->dataLen - hdrLen;
-    LOG_DEBUG("   -> [Aqara Vibration Basic] from 0x%04X, cluster 0x0000: ", af_->srcAddr);
+    LOG_DEBUG("-> [Aqara Vibration Basic] from 0x%04X, cluster 0x0000: ", af_->srcAddr);
     for (int i = 0; i < zclLen; i++) LOG_DEBUG("%02X ", zcl[i]);
-    LOG_DEBUG("\n");
+    LOG_RAW("\n");
   } else if (af_->clusterId == 0x0001) { // Power Configuration
     if (cmdId == 0x01) { // Read Attributes Response
       const uint8_t *zcl = &af_->data[hdrLen];
       int zclLen = af_->dataLen - hdrLen;
       if (zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Success
         uint8_t bat = zcl[4]; // Unit is 100 mV
-        LOG_DEBUG("🔋 Vibration Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
+        LOG_DEBUG("Vibration Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
       }
     }
   } else if (af_->clusterId == 0x0402) { // Temperature Measurement
@@ -76,10 +76,10 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Read Resp Success
         int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
-        LOG_DEBUG("🌡️ Vibration Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_DEBUG("Vibration Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
       } else if (cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00) { // Report
         int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
-        LOG_DEBUG("🌡️ Vibration Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_DEBUG("Vibration Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
       }
     }
   }
@@ -144,7 +144,7 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   bool changed = false;
   if (idx == -1) {
     if (g_numVibrationSensors < MAX_VIBRATION_SENSORS) {
-      LOG_DEBUG(" Vibration Sensor discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_);
+      LOG_DEBUG("Vibration Sensor discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_);
       LOG_EVENT("VIBRATION", shortAddr_, "Network Join\n");
       g_vibrationSensors[g_numVibrationSensors].shortAddr = shortAddr_;
       g_vibrationSensors[g_numVibrationSensors].endpoint = endpoint_;
@@ -261,7 +261,7 @@ void VibrationSensor_Setup(uint16_t shortAddr_) {
 }
 
 void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSeq_, uint16_t zoneType_) {
-  LOG_DEBUG("   -> Zone Enroll Request from Vibration Sensor 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_);
+  LOG_DEBUG("-> Zone Enroll Request from Vibration Sensor 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
 
   pthread_mutex_lock(&g_deviceMutex);
@@ -277,7 +277,7 @@ void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_
 }
 
 void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uint8_t zoneId_) {
-  LOG_DEBUG("   -> Zone Status Change from Vibration Sensor 0x%04X: zone_status=0x%04X, zone_id=%d\n", shortAddr_, zoneStatus_, zoneId_);
+  LOG_DEBUG("-> Zone Status Change from Vibration Sensor 0x%04X: zone_status=0x%04X, zone_id=%d\n", shortAddr_, zoneStatus_, zoneId_);
 
   pthread_mutex_lock(&g_deviceMutex);
   int idx = -1;
@@ -392,7 +392,7 @@ void VibrationSensor_PollAll(void) {
       // Clear the Alarm 2 bit in lastZoneStatus
       g_vibrationSensors[i].lastZoneStatus &= ~0x0002;
       UseCase_Post(UC_VIBRATION_CLEARED, g_vibrationSensors[i].shortAddr, 0, 0);
-      LOG_DEBUG("   -> Auto-cleared Vibration (Alarm 2) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
+      LOG_DEBUG("-> Auto-cleared Vibration (Alarm 2) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
     }
 
     // Check Movement timeout
@@ -401,7 +401,7 @@ void VibrationSensor_PollAll(void) {
       // Clear the Alarm 1 bit in lastZoneStatus
       g_vibrationSensors[i].lastZoneStatus &= ~0x0001;
       UseCase_Post(UC_MOVEMENT_CLEARED, g_vibrationSensors[i].shortAddr, 0, 0);
-      LOG_DEBUG("   -> Auto-cleared Movement (Alarm 1) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
+      LOG_DEBUG("-> Auto-cleared Movement (Alarm 1) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);

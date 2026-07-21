@@ -79,7 +79,7 @@ static void *Siren_Thread( void *arg_ )
                             {
                                 uint16_t zoneStatus = zcl[0] | ( zcl[1] << 8 );
                                 uint8_t zoneId = ( zclLen >= 4 ) ? zcl[3] : 0;
-                                LOG_DEBUG( "   -> Zone Status Change from Siren 0x%04X: zone_status=0x%04X, zone_id=%u\n",
+                                LOG_DEBUG("-> Zone Status Change from Siren 0x%04X: zone_status=0x%04X, zone_id=%u\n",
                                         af->srcAddr, zoneStatus, zoneId );
 
                                 // Send Default Response
@@ -104,7 +104,7 @@ static void *Siren_Thread( void *arg_ )
                             if ( zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00 )
                             {
                                 uint8_t bat = zcl[4]; // Unit is 100 mV
-                                LOG_DEBUG("🔋 Siren 0x%04X Battery Voltage: %.1f V\n", af->srcAddr, (float)bat / 10.0);
+                                LOG_DEBUG("Siren 0x%04X Battery Voltage: %.1f V\n", af->srcAddr, (float)bat / 10.0);
                             }
                         }
                     }
@@ -227,7 +227,7 @@ void Siren_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     {
         if ( g_numSirens < MAX_SIRENS )
         {
-            LOG_DEBUG( " Siren discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_DEBUG("Siren discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
             LOG_EVENT("SIREN", shortAddr_, "Network Join\n");
             g_sirens[g_numSirens].shortAddr = shortAddr_;
             g_sirens[g_numSirens].endpoint = endpoint_;
@@ -358,7 +358,7 @@ void Siren_Setup( uint16_t shortAddr_ )
 
 void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSeq_, uint16_t zoneType_ )
 {
-    LOG_DEBUG( "   -> Zone Enroll Request from Siren 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_ );
+    LOG_DEBUG("-> Zone Enroll Request from Siren 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_ );
     uint8_t zoneId = g_nextZoneId++;
 
     pthread_mutex_lock( &g_deviceMutex );
@@ -414,7 +414,7 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-        LOG_DEBUG( "⚠️ No sirens registered yet.\n" );
+        LOG_DEBUG("No sirens registered yet.\n" );
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
@@ -439,7 +439,7 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-        LOG_DEBUG( "⚠️ No sirens registered yet.\n" );
+        LOG_DEBUG("No sirens registered yet.\n" );
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
@@ -451,7 +451,7 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        // ⚠️ HARDWARE FIRMWARE BUG ⚠️
+        //  HARDWARE FIRMWARE BUG 
         // Even when formatted byte-for-byte perfectly according to the ZCL spec and Develco docs
         // (endpoint 1, strobe 0, mode 1, level 0), newer Frient SIRZB-110 firmwares completely 
         // ignore the native Squawk command (0x01) unless armed by a separate security panel.
@@ -545,7 +545,7 @@ void Siren_ReadEnvironment( uint16_t shortAddr_ )
 {
     uint8_t ep = Siren_GetEndpoint(shortAddr_);
     if (ep == 0) {
-        LOG_DEBUG("Error: Siren 0x%04X is not registered. Cannot read environment.\n", shortAddr_);
+        LOG_ERROR("Error: Siren 0x%04X is not registered. Cannot read environment.\n", shortAddr_);
         return;
     }
 

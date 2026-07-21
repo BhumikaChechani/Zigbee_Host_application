@@ -22,7 +22,23 @@
 
 extern int g_logLevel;
 
-#define LOG_DEBUG(...) do { if (g_logLevel <= LOG_LEVEL_DEBUG) { printf(__VA_ARGS__); } } while(0)
+#define LOG_RAW(...) do { if (g_logLevel <= LOG_LEVEL_DEBUG) { printf(__VA_ARGS__); } } while(0)
+#define LOG_DEBUG(...) \
+    do { \
+        if (g_logLevel <= LOG_LEVEL_DEBUG) { \
+            print_timestamp(); \
+            printf("[DEBUG] "); \
+            printf(__VA_ARGS__); \
+        } \
+    } while(0)
+
+#define LOG_ERROR(...) \
+    do { \
+        print_timestamp(); \
+        printf("[ERROR] "); \
+        printf(__VA_ARGS__); \
+    } while(0)
+
 #define LOG_INFO(...)  do { if (g_logLevel <= LOG_LEVEL_INFO)  { printf(__VA_ARGS__); } } while(0)
 
 static inline void print_timestamp(void) {

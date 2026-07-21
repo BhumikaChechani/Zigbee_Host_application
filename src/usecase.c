@@ -313,6 +313,12 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     Siren_ControlAll(0);
 #endif
     break;
+  case UC_DEVICE_OFFLINE:
+    LOG_EVENT("HEALTH", event_->srcAddr, "\033[1;31mDevice OFFLINE (Unreachable)\033[0m\n");
+    break;
+  case UC_DEVICE_ONLINE:
+    LOG_EVENT("HEALTH", event_->srcAddr, "\033[1;32mDevice Reconnected (ONLINE)\033[0m\n");
+    break;
   default:
     break;
   }

@@ -692,6 +692,40 @@ int main( int argc, char *argv[] )
     return 0;
 }
 
+static uint16_t s_offlineDevices[256];
+static int s_numOfflineDevices = 0;
+
+static bool Main_IsOffline( uint16_t addr_ )
+{
+    for ( int i = 0; i < s_numOfflineDevices; i++ )
+    {
+        if ( s_offlineDevices[i] == addr_ ) return true;
+    }
+    return false;
+}
+
+static void Main_SetOffline( uint16_t addr_ )
+{
+    if ( !Main_IsOffline( addr_ ) && s_numOfflineDevices < 256 )
+    {
+        s_offlineDevices[s_numOfflineDevices++] = addr_;
+        UseCase_Post( UC_DEVICE_OFFLINE, addr_, 0, 0 );
+    }
+}
+
+static void Main_SetOnline( uint16_t addr_ )
+{
+    for ( int i = 0; i < s_numOfflineDevices; i++ )
+    {
+        if ( s_offlineDevices[i] == addr_ )
+        {
+            s_offlineDevices[i] = s_offlineDevices[--s_numOfflineDevices];
+            UseCase_Post( UC_DEVICE_ONLINE, addr_, 0, 0 );
+            return;
+        }
+    }
+}
+
 ///
 /// @brief  Check if actively-polled devices are failing to respond to polls.
 ///
@@ -741,11 +775,52 @@ static void Main_CheckDeviceOfflineStatus( double now_ )
 #else
     (void)now_;
 #endif
-    // NOTE: Buttons, Contact Sensor, Vibration Sensor are intentionally
-    // NOT checked here. They are sleepy event-driven devices. Not hearing
-    // from them for hours is perfectly normal behaviour. They will show
-    // their last-seen age in the 'status' command for manual inspection.
-    // Use 'discover <addr>' or 'env <addr>' from the CLI to actively probe them.
+    // Check sleepy end devices (Buttons, Contact, Vibration) for a 2-hour timeout
+    // Check mains-powered routers (Sirens, Occupancy) for a 5-minute timeout
+    pthread_mutex_lock( &g_deviceMutex );
+#if ENABLE_AQARA_OCCUPANCY
+    for ( int i = 0; i < g_numAqaraOccupancies; i++ )
+    {
+        if ( now_ - g_aqaraOccupancies[i].lastSeen > 300.0 )
+            Main_SetOffline( g_aqaraOccupancies[i].shortAddr );
+    }
+#endif
+#if ENABLE_SIREN
+    for ( int i = 0; i < g_numSirens; i++ )
+    {
+        if ( now_ - g_sirens[i].lastSeen > 300.0 )
+            Main_SetOffline( g_sirens[i].shortAddr );
+    }
+#endif
+#if ENABLE_CONTACT_SENSOR
+    for ( int i = 0; i < g_numContactSensors; i++ )
+    {
+        if ( now_ - g_contactSensors[i].lastSeen > 7200.0 )
+            Main_SetOffline( g_contactSensors[i].shortAddr );
+    }
+#endif
+#if ENABLE_VIBRATION_SENSOR
+    for ( int i = 0; i < g_numVibrationSensors; i++ )
+    {
+        if ( now_ - g_vibrationSensors[i].lastSeen > 7200.0 )
+            Main_SetOffline( g_vibrationSensors[i].shortAddr );
+    }
+#endif
+#if ENABLE_AQARA_BUTTON
+    for ( int i = 0; i < g_numAqaraButtons; i++ )
+    {
+        if ( now_ - g_aqaraButtons[i].lastSeen > 7200.0 )
+            Main_SetOffline( g_aqaraButtons[i].shortAddr );
+    }
+#endif
+#if ENABLE_ONICS_BUTTON
+    for ( int i = 0; i < g_numOnicsButtons; i++ )
+    {
+        if ( now_ - g_onicsButtons[i].lastSeen > 7200.0 )
+            Main_SetOffline( g_onicsButtons[i].shortAddr );
+    }
+#endif
+    pthread_mutex_unlock( &g_deviceMutex );
 }
 
 // ---------------------------------------------------------------------------
@@ -783,6 +858,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         LOG_RAW("\n");
 
         Device_AddDiscoveredIeee( nwkAddr, ieeeBytes );
+        Main_SetOnline( nwkAddr );
 
         // Throttle the discovery burst: a device that re-announces repeatedly
         // (e.g. a flaky/flooding siren) must NOT re-run this blocking sequence
@@ -937,6 +1013,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             {
                 uint16_t annceShort = asdu[0] | ( asdu[1] << 8 );
                 Device_AddDiscoveredIeee( annceShort, &asdu[2] );
+                Main_SetOnline( annceShort );
             }
 
             // Throttle the discovery burst so a repeatedly re-announcing device
@@ -1259,22 +1336,22 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 
         bool isKnown = false;
 #if ENABLE_SIREN
-        if ( Siren_IsKnown( af.srcAddr ) ) { isKnown = true; Siren_UpdateSeen( af.srcAddr ); }
+        if ( Siren_IsKnown( af.srcAddr ) ) { isKnown = true; Siren_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
 #if ENABLE_AQARA_BUTTON
-        if ( AqaraButton_IsKnown( af.srcAddr ) ) { isKnown = true; AqaraButton_UpdateSeen( af.srcAddr ); }
+        if ( AqaraButton_IsKnown( af.srcAddr ) ) { isKnown = true; AqaraButton_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
 #if ENABLE_ONICS_BUTTON
-        if ( OnicsButton_IsKnown( af.srcAddr ) ) { isKnown = true; OnicsButton_UpdateSeen( af.srcAddr ); }
+        if ( OnicsButton_IsKnown( af.srcAddr ) ) { isKnown = true; OnicsButton_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
 #if ENABLE_AQARA_OCCUPANCY
-        if ( AqaraOccupancy_IsKnown( af.srcAddr ) ) { isKnown = true; AqaraOccupancy_UpdateSeen( af.srcAddr ); }
+        if ( AqaraOccupancy_IsKnown( af.srcAddr ) ) { isKnown = true; AqaraOccupancy_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
 #if ENABLE_CONTACT_SENSOR
-        if ( ContactSensor_IsKnown( af.srcAddr ) ) { isKnown = true; ContactSensor_UpdateSeen( af.srcAddr ); }
+        if ( ContactSensor_IsKnown( af.srcAddr ) ) { isKnown = true; ContactSensor_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
 #if ENABLE_VIBRATION_SENSOR
-        if ( VibrationSensor_IsKnown( af.srcAddr ) ) { isKnown = true; VibrationSensor_UpdateSeen( af.srcAddr ); }
+        if ( VibrationSensor_IsKnown( af.srcAddr ) ) { isKnown = true; VibrationSensor_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
 
         if ( !isKnown && Device_ShouldQuery( af.srcAddr ) )

@@ -317,7 +317,7 @@ void OnicsButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
         if ( g_numOnicsButtons < MAX_ONICS_BUTTONS )
         {
             LOG_DEBUG( " Onics Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
-            LOG_INFO("Onics Button 0x%04X - Network Join\n", shortAddr_);
+            LOG_EVENT("ONICS BTN", shortAddr_, "Network Join\n");
             g_onicsButtons[g_numOnicsButtons].shortAddr = shortAddr_;
             g_onicsButtons[g_numOnicsButtons].endpoint = endpoint_;
             g_onicsButtons[g_numOnicsButtons].lastSeen = ZNP_GetCurrentTime();

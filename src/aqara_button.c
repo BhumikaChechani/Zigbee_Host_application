@@ -128,7 +128,7 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
         if ( g_numAqaraButtons < MAX_AQARA_BUTTONS )
         {
             LOG_DEBUG( " Aqara Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
-            LOG_INFO("Aqara Button 0x%04X - Network Join\n", shortAddr_);
+            LOG_EVENT("AQARA BTN", shortAddr_, "Network Join\n");
             g_aqaraButtons[g_numAqaraButtons].shortAddr = shortAddr_;
             g_aqaraButtons[g_numAqaraButtons].endpoint = endpoint_;
             g_aqaraButtons[g_numAqaraButtons].lastSeen = ZNP_GetCurrentTime();

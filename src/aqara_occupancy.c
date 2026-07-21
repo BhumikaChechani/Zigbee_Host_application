@@ -497,7 +497,7 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     if (g_numAqaraOccupancies < MAX_AQARA_OCCUPANCY) {
       LOG_DEBUG(" Aqara Occupancy Sensor discovered: short=0x%04X, ep=0x%02X\n",
              shortAddr_, endpoint_);
-      LOG_INFO("Aqara Occupancy 0x%04X - Network Join\n", shortAddr_);
+      LOG_EVENT("OCCUPANCY", shortAddr_, "Network Join\n");
       g_aqaraOccupancies[g_numAqaraOccupancies].shortAddr = shortAddr_;
       g_aqaraOccupancies[g_numAqaraOccupancies].endpoint = endpoint_;
       g_aqaraOccupancies[g_numAqaraOccupancies].lastSeen = ZNP_GetCurrentTime();
@@ -520,7 +520,7 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       LOG_DEBUG(" Aqara Occupancy 0x%04X rejoined as 0x%04X (same IEEE) - reusing "
              "entry (bindings are IEEE-based, no re-setup needed)\n",
              g_aqaraOccupancies[idx].shortAddr, shortAddr_);
-      LOG_INFO("Aqara Occupancy 0x%04X - Network Rejoin\n", shortAddr_);
+      LOG_EVENT("OCCUPANCY", shortAddr_, "Network Rejoin\n");
       g_aqaraOccupancies[idx].shortAddr = shortAddr_;
       // DO NOT reset configured or absenceDelayApplied here. The device
       // retains its configuration (bindings, absence delay) across a simple
@@ -1012,9 +1012,7 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
         UseCase_Post(UC_OCCUPANCY_DETECTED, shortAddr_, z, dist);
       } else {
         if (sensorSaysOccupied && dist > 0) {
-          LOG_INFO("Aqara Occupancy 0x%04X - Presence (IGNORED) in Zone %d (Distance: %u cm) - Reason: Outside configured zone boundaries [%u-%u cm]\n",
-                 shortAddr_, z, dist, g_aqaraOccupancies[idx].zones[z].minCm,
-                 g_aqaraOccupancies[idx].zones[z].maxCm);
+          LOG_EVENT("OCCUPANCY", shortAddr_, "Presence IGNORED in Zone %d (%u cm) -> Outside boundaries [%u-%u cm]\n", z, dist, g_aqaraOccupancies[idx].zones[z].minCm, g_aqaraOccupancies[idx].zones[z].maxCm);
         }
         else
           LOG_DEBUG("   ❌ PRESENCE CLEARED on sensor 0x%04X (zone %d)\n",

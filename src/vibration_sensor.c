@@ -145,7 +145,7 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   if (idx == -1) {
     if (g_numVibrationSensors < MAX_VIBRATION_SENSORS) {
       LOG_DEBUG(" Vibration Sensor discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_);
-      LOG_INFO("Vibration Sensor 0x%04X - Network Join\n", shortAddr_);
+      LOG_EVENT("VIBRATION", shortAddr_, "Network Join\n");
       g_vibrationSensors[g_numVibrationSensors].shortAddr = shortAddr_;
       g_vibrationSensors[g_numVibrationSensors].endpoint = endpoint_;
       g_vibrationSensors[g_numVibrationSensors].lastSeen = ZNP_GetCurrentTime();

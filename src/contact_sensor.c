@@ -206,7 +206,7 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     if (g_numContactSensors < MAX_CONTACT_SENSORS) {
       LOG_DEBUG(" Contact Sensor discovered: short=0x%04X, ep=0x%02X\n",
              shortAddr_, endpoint_);
-      LOG_INFO("Contact Sensor 0x%04X - Network Join\n", shortAddr_);
+      LOG_EVENT("CONTACT", shortAddr_, "Network Join\n");
       g_contactSensors[g_numContactSensors].shortAddr = shortAddr_;
       g_contactSensors[g_numContactSensors].endpoint = endpoint_;
       g_contactSensors[g_numContactSensors].lastSeen = ZNP_GetCurrentTime();
@@ -223,7 +223,7 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     if (g_contactSensors[idx].shortAddr != shortAddr_) {
       LOG_DEBUG(" Contact Sensor 0x%04X rejoined as 0x%04X (same IEEE) - reusing entry\n",
              g_contactSensors[idx].shortAddr, shortAddr_);
-      LOG_INFO("Contact Sensor 0x%04X - Network Rejoin\n", shortAddr_);
+      LOG_EVENT("CONTACT", shortAddr_, "Network Rejoin\n");
       g_contactSensors[idx].shortAddr = shortAddr_;
       isRejoin = true;
       changed = true;

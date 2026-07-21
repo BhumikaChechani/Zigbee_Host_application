@@ -228,7 +228,7 @@ void Siren_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
         if ( g_numSirens < MAX_SIRENS )
         {
             LOG_DEBUG( " Siren discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
-            LOG_INFO("Siren 0x%04X - Network Join\n", shortAddr_);
+            LOG_EVENT("SIREN", shortAddr_, "Network Join\n");
             g_sirens[g_numSirens].shortAddr = shortAddr_;
             g_sirens[g_numSirens].endpoint = endpoint_;
             g_sirens[g_numSirens].lastSeen = ZNP_GetCurrentTime();

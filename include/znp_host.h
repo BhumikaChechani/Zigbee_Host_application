@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #define LOG_LEVEL_DEBUG 0
 #define LOG_LEVEL_INFO  1
@@ -23,6 +24,22 @@ extern int g_logLevel;
 
 #define LOG_DEBUG(...) do { if (g_logLevel <= LOG_LEVEL_DEBUG) { printf(__VA_ARGS__); } } while(0)
 #define LOG_INFO(...)  do { if (g_logLevel <= LOG_LEVEL_INFO)  { printf(__VA_ARGS__); } } while(0)
+
+static inline void print_timestamp(void) {
+    time_t now;
+    time(&now);
+    struct tm *local = localtime(&now);
+    printf("[%02d:%02d:%02d] ", local->tm_hour, local->tm_min, local->tm_sec);
+}
+
+#define LOG_EVENT(MODULE, ADDR, ...) \
+    do { \
+        if (g_logLevel <= LOG_LEVEL_INFO) { \
+            print_timestamp(); \
+            printf("[INFO] [%-10s] [0x%04X] ", MODULE, ADDR); \
+            printf(__VA_ARGS__); \
+        } \
+    } while(0)
 
 
 #define PORT_DEFAULT "/dev/ttyACM0" ///< Default serial device if none is given.

@@ -695,7 +695,7 @@ int main( int argc, char *argv[] )
 static uint16_t s_offlineDevices[256];
 static int s_numOfflineDevices = 0;
 
-static bool Main_IsOffline( uint16_t addr_ )
+bool Device_IsOffline( uint16_t addr_ )
 {
     for ( int i = 0; i < s_numOfflineDevices; i++ )
     {
@@ -706,7 +706,7 @@ static bool Main_IsOffline( uint16_t addr_ )
 
 static void Main_SetOffline( uint16_t addr_ )
 {
-    if ( !Main_IsOffline( addr_ ) && s_numOfflineDevices < 256 )
+    if ( !Device_IsOffline( addr_ ) && s_numOfflineDevices < 256 )
     {
         s_offlineDevices[s_numOfflineDevices++] = addr_;
         UseCase_Post( UC_DEVICE_OFFLINE, addr_, 0, 0 );

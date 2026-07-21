@@ -32,7 +32,9 @@ typedef enum
     UC_MOVEMENT_DETECTED, ///< Movement/Tilt detected        -> sirens on.
     UC_MOVEMENT_CLEARED,  ///< Movement/Tilt cleared         -> sirens off.
     UC_TAMPER_DETECTED,   ///< Siren physical tamper         -> sirens on.
-    UC_TAMPER_CLEARED     ///< Siren physical tamper cleared -> sirens off.
+    UC_TAMPER_CLEARED,    ///< Siren physical tamper cleared -> sirens off.
+    UC_DEVICE_OFFLINE,    ///< Device stopped reporting      -> log warning
+    UC_DEVICE_ONLINE      ///< Device resumed reporting      -> log info
 } UC_EVT_TYPE_T;
 
 /// @brief One event enqueued to the use-case thread.

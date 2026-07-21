@@ -444,6 +444,13 @@ void Siren_Control( uint16_t shortAddr_, uint8_t warnMode_ )
             uint8_t ep = g_sirens[i].endpoint;
             uint8_t vol = g_sirens[i].volume;
             pthread_mutex_unlock( &g_deviceMutex );
+            
+            if ( Device_IsOffline( shortAddr_ ) )
+            {
+                printf("\033[1;31mERROR: Siren 0x%04X is OFFLINE! Trigger skipped.\033[0m\n", shortAddr_);
+                return;
+            }
+            
             ZNP_SendSirenWarning( shortAddr_, ep, Siren_NextSeq(), mode, vol, 240 );
             return;
         }
@@ -474,6 +481,13 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     for ( int i = 0; i < tempNum; i++ )
     {
         uint8_t mode = (warnMode_ != 0) ? tempSirens[i].mode : 0;
+        
+        if ( Device_IsOffline( tempSirens[i].shortAddr ) )
+        {
+            printf("\033[1;31mERROR: Siren 0x%04X is OFFLINE! Trigger skipped.\033[0m\n", tempSirens[i].shortAddr);
+            continue;
+        }
+
         if (warnMode_ != 0) {
             printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode, tempSirens[i].volume);
         } else {
@@ -504,6 +518,12 @@ void Siren_TriggerAll( uint8_t mode_, uint16_t durationSeconds_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
+        if ( Device_IsOffline( tempSirens[i].shortAddr ) )
+        {
+            printf("\033[1;31mERROR: Siren 0x%04X is OFFLINE! Trigger skipped.\033[0m\n", tempSirens[i].shortAddr);
+            continue;
+        }
+        
         if (mode_ != 0) {
             printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode_, tempSirens[i].volume);
         } else {
@@ -531,6 +551,11 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
+        if ( Device_IsOffline( tempSirens[i].shortAddr ) )
+        {
+            continue;
+        }
+        
         //  HARDWARE FIRMWARE BUG 
         // Even when formatted byte-for-byte perfectly according to the ZCL spec and Develco docs
         // (endpoint 1, strobe 0, mode 1, level 0), newer Frient SIRZB-110 firmwares completely 

@@ -467,4 +467,10 @@ void Device_Save(void);
 /// @return None.
 void Device_Load(void);
 
+/// @brief Remove a device from the global device list and registry file.
+void Device_Remove( uint16_t shortAddr_ );
+
+/// @brief Check if a device is currently marked OFFLINE by the health watchdog.
+bool Device_IsOffline( uint16_t shortAddr_ );
+
 #endif // ZNP_HOST_H

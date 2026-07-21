@@ -187,7 +187,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
           if (diff <= 3.0) {
             LOG_EVENT("AQARA BTN", event_->srcAddr, "Press Count: 3\n");
 #if ENABLE_SIREN
-            Siren_TriggerAll(1, 3, 240);
+            Siren_TriggerAll(1, 240);
 #endif
           } else {
             LOG_DEBUG("[USECASE] 3 presses but window too wide (%.3fs > 3.0s) -> "
@@ -223,7 +223,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   case UC_PANIC_SET:
     LOG_EVENT("ONICS BTN", event_->srcAddr, "Press START\n");
 #if ENABLE_SIREN
-    Siren_TriggerAll(6, 3, 240);
+    Siren_TriggerAll(6, 240);
 #endif
     break;
   case UC_PANIC_CLEAR:
@@ -247,7 +247,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     if (isDoorOpen) {
         LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence DETECTED in Zone %u (%u cm)\n", zoneIdx, event_->val2);
 #if ENABLE_SIREN
-        Siren_TriggerAll(5, 3, 5); // Mode 5, vol 3, 5 seconds
+        Siren_TriggerAll(5, 5); // Mode 5, 5 seconds
 #endif
     } else {
         LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence IGNORED in Zone %u (%u cm) -> Reason: Door is CLOSED\n", zoneIdx, event_->val2);
@@ -266,7 +266,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   case UC_LIGHT_ON:
     LOG_EVENT("OCCUPANCY", event_->srcAddr, "Light ON (Intensity %u)\n", event_->raw);
 #if ENABLE_SIREN
-    Siren_TriggerAll(6, 3, 240);
+    Siren_TriggerAll(6, 240);
 #endif
     break;
   case UC_LIGHT_OFF:
@@ -292,7 +292,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   case UC_VIBRATION_DETECTED:
     LOG_EVENT("VIBRATION", event_->srcAddr, "Vibration DETECTED\n");
 #if ENABLE_SIREN
-    Siren_TriggerAll(4, 3, 240);
+    Siren_TriggerAll(4, 240);
 #endif
     break;
   case UC_VIBRATION_CLEARED:
@@ -304,7 +304,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   case UC_MOVEMENT_DETECTED:
     LOG_EVENT("VIBRATION", event_->srcAddr, "Movement DETECTED\n");
 #if ENABLE_SIREN
-    Siren_TriggerAll(4, 3, 240);
+    Siren_TriggerAll(4, 240);
 #endif
     break;
   case UC_MOVEMENT_CLEARED:

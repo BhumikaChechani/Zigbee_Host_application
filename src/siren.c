@@ -471,7 +471,7 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     }
 }
 
-void Siren_TriggerAll( uint8_t mode_, uint8_t volume_, uint16_t durationSeconds_ )
+void Siren_TriggerAll( uint8_t mode_, uint16_t durationSeconds_ )
 {
     g_sirenActive = ( mode_ != 0 );
 
@@ -493,11 +493,11 @@ void Siren_TriggerAll( uint8_t mode_, uint8_t volume_, uint16_t durationSeconds_
     for ( int i = 0; i < tempNum; i++ )
     {
         if (mode_ != 0) {
-            printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode_, volume_);
+            printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode_, tempSirens[i].volume);
         } else {
             printf("SUCCESS: Siren 0x%04X turned OFF.\n", tempSirens[i].shortAddr);
         }
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode_, volume_, durationSeconds_ );
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode_, tempSirens[i].volume, durationSeconds_ );
     }
 }
 

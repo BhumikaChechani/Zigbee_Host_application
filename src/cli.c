@@ -67,6 +67,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  onicsdelay <addr> <ms>         - Write ButtonPressActionDelay (attr 0x8001)\n" );
         printf( "  lightthreshold <addr> <val>    - Set light threshold for an Aqara Occupancy sensor\n" );
         printf( "  remove <addr>                  - Send a ZDO Leave Request to forcefully remove a device\n" );
+        printf( "  rebind <addr>                  - Force re-send Zigbee bindings/config without removing\n" );
         printf( "  exit                           - Quit application\n\n" );
     }
     else if ( strcmp( base, "status" ) == 0 )
@@ -392,6 +393,102 @@ static void Cli_HandleCommand( const char *cmd_ )
         }
         printf( "Opening permit join for %d seconds...\n", duration );
         ZNP_PermitJoin( duration );
+    }
+    else if ( strcmp( base, "rebind" ) == 0 )
+    {
+        if ( numParts == 2 )
+        {
+            uint16_t addr = (uint16_t)strtoul( parts[1], NULL, 16 );
+            
+            pthread_mutex_lock( &g_deviceMutex );
+            bool found = false;
+#if ENABLE_AQARA_OCCUPANCY
+            for ( int i = 0; i < g_numAqaraOccupancies; i++ ) {
+                if ( g_aqaraOccupancies[i].shortAddr == addr ) {
+                    g_aqaraOccupancies[i].configured = false;
+                    found = true;
+                    break;
+                }
+            }
+#endif
+#if ENABLE_CONTACT_SENSOR
+            for ( int i = 0; i < g_numContactSensors; i++ ) {
+                if ( g_contactSensors[i].shortAddr == addr ) {
+                    g_contactSensors[i].configured = false;
+                    found = true;
+                    break;
+                }
+            }
+#endif
+#if ENABLE_VIBRATION_SENSOR
+            for ( int i = 0; i < g_numVibrationSensors; i++ ) {
+                if ( g_vibrationSensors[i].shortAddr == addr ) {
+                    g_vibrationSensors[i].configured = false;
+                    found = true;
+                    break;
+                }
+            }
+#endif
+#if ENABLE_AQARA_BUTTON
+            for ( int i = 0; i < g_numAqaraButtons; i++ ) {
+                if ( g_aqaraButtons[i].shortAddr == addr ) {
+                    g_aqaraButtons[i].configured = false;
+                    found = true;
+                    break;
+                }
+            }
+#endif
+#if ENABLE_ONICS_BUTTON
+            for ( int i = 0; i < g_numOnicsButtons; i++ ) {
+                if ( g_onicsButtons[i].shortAddr == addr ) {
+                    g_onicsButtons[i].configured = false;
+                    found = true;
+                    break;
+                }
+            }
+#endif
+#if ENABLE_SIREN
+            for ( int i = 0; i < g_numSirens; i++ ) {
+                if ( g_sirens[i].shortAddr == addr ) {
+                    g_sirens[i].configured = false;
+                    found = true;
+                    break;
+                }
+            }
+#endif
+            pthread_mutex_unlock( &g_deviceMutex );
+
+            if ( found )
+            {
+                printf("✅ SUCCESS: Forced reconfiguration for 0x%04X.\n", addr);
+#if ENABLE_AQARA_OCCUPANCY
+                AqaraOccupancy_PostAssign( addr );
+#endif
+#if ENABLE_CONTACT_SENSOR
+                ContactSensor_PostAssign( addr );
+#endif
+#if ENABLE_VIBRATION_SENSOR
+                VibrationSensor_PostAssign( addr );
+#endif
+#if ENABLE_AQARA_BUTTON
+                AqaraButton_PostAssign( addr );
+#endif
+#if ENABLE_ONICS_BUTTON
+                OnicsButton_PostAssign( addr );
+#endif
+#if ENABLE_SIREN
+                Siren_PostAssign( addr );
+#endif
+            }
+            else
+            {
+                printf("❌ ERROR: Device 0x%04X not found in any registry.\n", addr);
+            }
+        }
+        else
+        {
+            printf("❌ ERROR: Usage: rebind <shortAddr>\n");
+        }
     }
     else if ( strcmp( base, "remove" ) == 0 )
     {

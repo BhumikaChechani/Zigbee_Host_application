@@ -684,6 +684,9 @@ int main( int argc, char *argv[] )
 #if ENABLE_VIBRATION_SENSOR
         VibrationSensor_PollAll();
 #endif
+#if ENABLE_SIREN
+        Siren_PollAll();
+#endif
 
         usleep( 5000 ); // Small yield
     }

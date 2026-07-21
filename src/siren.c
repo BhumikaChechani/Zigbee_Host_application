@@ -652,6 +652,42 @@ uint8_t Siren_GetEndpoint( uint16_t shortAddr_ )
     return ep;
 }
 
+void Siren_PollAll( void )
+{
+    pthread_mutex_lock( &g_deviceMutex );
+    int num = g_numSirens;
+    uint16_t addrs[MAX_SIRENS];
+    uint8_t eps[MAX_SIRENS];
+    for ( int i = 0; i < num; i++ )
+    {
+        if ( !g_sirens[i].configured ) continue;
+        addrs[i] = g_sirens[i].shortAddr;
+        eps[i] = g_sirens[i].endpoint;
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    if ( num == 0 ) return;
+
+    // Poll every 60 seconds (called from a loop that yields 5ms, so ~12000 ticks)
+    // Actually, we can just use a timestamp
+    static double lastPollTime = 0;
+    double now = ZNP_GetCurrentTime();
+    if ( now - lastPollTime < 60.0 )
+    {
+        return;
+    }
+    lastPollTime = now;
+
+    static uint8_t seq = 200;
+    for ( int i = 0; i < num; i++ )
+    {
+        // Read Basic Cluster (0x0000), ZCLVersion (0x0000) just to keep it alive
+        uint8_t readZcl[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+        ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0x0000, seq, 0x00, 30, readZcl, 5 );
+        usleep( 50000 );
+    }
+}
+
 void Siren_ReadEnvironment( uint16_t shortAddr_ )
 {
     uint8_t ep = Siren_GetEndpoint(shortAddr_);

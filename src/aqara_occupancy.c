@@ -1001,10 +1001,6 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
 
     if (stateChanged) {
       if (logicalOccupied) {
-        LOG_DEBUG("PRESENCE DETECTED on sensor 0x%04X (distance %u cm is in "
-               "zone %d [%u-%u])\n",
-               shortAddr_, dist, z, g_aqaraOccupancies[idx].zones[z].minCm,
-               g_aqaraOccupancies[idx].zones[z].maxCm);
 
         // Pack zone index into the 'raw' argument of UC_EVT_T so usecase knows
         // which zone triggered
@@ -1013,9 +1009,7 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
         if (sensorSaysOccupied && dist > 0) {
           LOG_EVENT("OCCUPANCY", shortAddr_, "Presence IGNORED in Zone %d (%u cm) -> Outside boundaries [%u-%u cm]\n", z, dist, g_aqaraOccupancies[idx].zones[z].minCm, g_aqaraOccupancies[idx].zones[z].maxCm);
         }
-        else
-          LOG_DEBUG("PRESENCE CLEARED on sensor 0x%04X (zone %d)\n",
-                 shortAddr_, z);
+
 
         UseCase_Post(UC_OCCUPANCY_CLEARED, shortAddr_, z, dist);
       }

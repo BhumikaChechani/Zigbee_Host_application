@@ -534,6 +534,7 @@ void Siren_Beep( int count_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
+        printf("ERROR: Failed to trigger siren beep. No sirens registered in the network.\n");
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
@@ -541,6 +542,11 @@ void Siren_Beep( int count_ )
     SIREN_T tempSirens[MAX_SIRENS];
     memcpy( tempSirens, g_sirens, sizeof( SIREN_T ) * g_numSirens );
     pthread_mutex_unlock( &g_deviceMutex );
+
+    for ( int i = 0; i < tempNum; i++ )
+    {
+        printf("SUCCESS: Siren 0x%04X emitted BEEP (x%d).\n", tempSirens[i].shortAddr, count_);
+    }
 
     for ( int c = 0; c < count_; c++ )
     {

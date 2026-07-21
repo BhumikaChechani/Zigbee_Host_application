@@ -13,7 +13,7 @@ This application acts as the "brain" of your Zigbee network. It communicates wit
 
 ---
 
-## 🚀 Quick Start Guide
+## Quick Start Guide
 
 ### 1. Install Dependencies
 Before compiling, you need to install the C compiler, make utility, and serial diagnostic tools. Run the automated setup script included in this repository (supports Debian/Ubuntu, Fedora, CentOS, and Red Hat systems):
@@ -52,7 +52,7 @@ You **must** run the application from the root `host_c/` folder. This ensures th
 
 ---
 
-## 💻 CLI Commands
+## CLI Commands
 
 Once the application is running, you can interact with the Zigbee network directly by typing commands into your terminal. 
 
@@ -63,6 +63,8 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`status`** | Displays a summary of all registered devices, their network addresses, last seen times, and active configurations. |
 | **`discover [addr hex]`** | Broadcasts discovery requests to find new devices on the network. If a specific address is provided, it actively queries only that device. |
 | **`permit [duration]`** | Opens the Zigbee network for new devices to join. Defaults to 60 seconds. *(Example: `permit 120` opens it for 2 minutes).* |
+| **`remove <addr>`** | Forcefully removes a device from the internal registry and instructs it to leave the network. |
+| **`rebind <addr>`** | Forces the coordinator to re-establish Zigbee bindings for a device that is unresponsive. |
 | **`exit`** or **`quit`** | Safely closes the serial connection and exits the application. |
 
 ### Sensor Configuration
@@ -78,7 +80,7 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`zone <addr> <idx> <start> <end>`** | Configures a detection zone. Distance slices are 25cm each.<br>*(Example: `zone 7AF2 0 0 2` configures zone 0 to cover 0-50cm).* |
 | **`zonedel <addr> <idx>`** | Deletes a previously configured zone. |
 | **`spatiallearn <addr>`** | Triggers the sensor's spatial learning calibration (ensure the room is completely empty before running). |
-| **`lightthreshold [value]`** | Sets or displays the light intensity threshold (lux index) for Aqara Occupancy light sensing (Default: 10000). |
+| **`lightthreshold <addr> [value]`** | Sets or displays the light intensity threshold (lux index) for Aqara Occupancy light sensing (Default: 10000). |
 
 ### Siren Controls
 | Command | Description |
@@ -92,7 +94,7 @@ Once the application is running, you can interact with the Zigbee network direct
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 The design separates three core responsibilities to ensure stability and responsiveness:
 1. **Transport**: Manages the serial link to the Zigbee chip.

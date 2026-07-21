@@ -64,6 +64,7 @@ void Logger_PrintTimestamp(void);
 #define LOG_EVENT(MODULE, ADDR, ...) \
     do { \
         if (g_logLevel <= LOG_LEVEL_INFO) { \
+            printf("\n"); \
             Logger_PrintTimestamp(); \
             printf("[EVENT] [%-10s] [0x%04X] ", MODULE, ADDR); \
             printf(__VA_ARGS__); \

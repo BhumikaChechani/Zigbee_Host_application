@@ -635,7 +635,7 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   bool bLht = ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0400,
                              g_coordinatorIeee, 8);
   usleep(300000);
-  LOG_ERROR("[OCC] bind: 0x0406=%s 0xFCC0=%s 0x0012=%s 0x0400=%s\n",
+  LOG_DEBUG("[OCC] bind: 0x0406=%s 0xFCC0=%s 0x0012=%s 0x0400=%s\n",
          bStd ? "OK" : "FAIL", bMfr ? "OK" : "FAIL", bMs ? "OK" : "FAIL",
          bLht ? "OK" : "FAIL");
 

@@ -24,6 +24,7 @@ typedef struct
     int zoneId;         ///< IAS zone id assigned on enrollment (-1 if none).
     bool configured;    ///< True once bind + CIE + activation have been sent.
     bool isPanic;       ///< True if currently in alarm state.
+    bool isTampered;
 } ONICS_BUTTON_T;
 
 #define MAX_ONICS_BUTTONS 32 ///< Maximum Onics buttons tracked.

@@ -86,13 +86,34 @@ static void *Siren_Thread( void *arg_ )
                                 ZNP_SendDefaultResponse( af->srcAddr, af->srcEp, 0x0500, af->data[hdrLen - 2], 0x00, 0x00 );
 
                                 // Bit 2 is Tamper
-                                if ( zoneStatus & 0x0004 )
+                                bool tamper_active = ( zoneStatus & 0x0004 ) != 0;
+                                
+                                pthread_mutex_lock( &g_deviceMutex );
+                                bool tamperChanged = false;
+                                for ( int i = 0; i < g_numSirens; i++ )
                                 {
-                                    UseCase_Post( UC_TAMPER_DETECTED, af->srcAddr, zoneStatus, 0 );
+                                    if ( g_sirens[i].shortAddr == af->srcAddr )
+                                    {
+                                        if ( g_sirens[i].isTampered != tamper_active )
+                                        {
+                                            g_sirens[i].isTampered = tamper_active;
+                                            tamperChanged = true;
+                                        }
+                                        break;
+                                    }
                                 }
-                                else
+                                pthread_mutex_unlock( &g_deviceMutex );
+
+                                if ( tamperChanged )
                                 {
-                                    UseCase_Post( UC_TAMPER_CLEARED, af->srcAddr, zoneStatus, 0 );
+                                    if ( tamper_active )
+                                    {
+                                        UseCase_Post( UC_TAMPER_DETECTED, af->srcAddr, zoneStatus, 0 );
+                                    }
+                                    else
+                                    {
+                                        UseCase_Post( UC_TAMPER_CLEARED, af->srcAddr, zoneStatus, 0 );
+                                    }
                                 }
                             }
                         }
@@ -204,6 +225,7 @@ void Siren_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
             g_sirens[g_numSirens].configured = false;
             g_sirens[g_numSirens].volume = 2;
             g_sirens[g_numSirens].mode = 1;
+            g_sirens[g_numSirens].isTampered = false;
             g_numSirens++;
             changed = true;
         }

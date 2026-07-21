@@ -25,6 +25,7 @@ typedef struct
     bool configured;    ///< True once CIE address has been written (setup done).
     uint8_t volume;     ///< Per-device volume level (0-3).
     uint8_t mode;       ///< Per-device warning mode (1-6).
+    bool isTampered;
 } SIREN_T;
 
 #define MAX_SIRENS 32   ///< Maximum sirens tracked.

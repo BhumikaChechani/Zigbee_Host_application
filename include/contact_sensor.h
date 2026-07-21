@@ -18,6 +18,7 @@ typedef struct
     int zoneId;
     bool configured;        ///< True once bind + CIE write succeeded (verified).
     bool isOpen;
+    bool isTampered;
     uint8_t setupRetries;   ///< Failed setup attempts (retry cap).
     double lastSetupAttempt;///< Timestamp of the last setup attempt (retry pacing).
     double lastStatusTime;  ///< Timestamp of the last zone status update received.

@@ -216,6 +216,10 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
         memcpy(g_contactSensors[g_numContactSensors].ieee, ieee, 8);
       }
       g_contactSensors[g_numContactSensors].configured = false;
+      g_contactSensors[g_numContactSensors].isOpen = false;
+      g_contactSensors[g_numContactSensors].isTampered = false;
+      g_contactSensors[g_numContactSensors].setupRetries = 0;
+      g_contactSensors[g_numContactSensors].lastSetupAttempt = 0.0;
       g_numContactSensors++;
       changed = true;
     }
@@ -410,6 +414,29 @@ void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
     UseCase_Post(UC_CONTACT_OPEN, shortAddr_, zoneStatus_, 0);
   } else {
     UseCase_Post(UC_CONTACT_CLOSED, shortAddr_, zoneStatus_, 0);
+  }
+
+  bool tamper_active = (zoneStatus_ & 0x0004) != 0; // Tamper bit
+
+  pthread_mutex_lock(&g_deviceMutex);
+  bool tamperChanged = false;
+  for (int i = 0; i < g_numContactSensors; i++) {
+    if (g_contactSensors[i].shortAddr == shortAddr_) {
+      if (g_contactSensors[i].isTampered != tamper_active) {
+        g_contactSensors[i].isTampered = tamper_active;
+        tamperChanged = true;
+      }
+      break;
+    }
+  }
+  pthread_mutex_unlock(&g_deviceMutex);
+
+  if (tamperChanged) {
+    if (tamper_active) {
+      UseCase_Post(UC_TAMPER_DETECTED, shortAddr_, zoneStatus_, 0);
+    } else {
+      UseCase_Post(UC_TAMPER_CLEARED, shortAddr_, 0, 0);
+    }
   }
 }
 

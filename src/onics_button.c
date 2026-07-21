@@ -325,6 +325,7 @@ void OnicsButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
             g_onicsButtons[g_numOnicsButtons].hasIeee = Device_GetDiscoveredIeee( shortAddr_, g_onicsButtons[g_numOnicsButtons].ieee );
             g_onicsButtons[g_numOnicsButtons].configured = false;
             g_onicsButtons[g_numOnicsButtons].isPanic = false;
+            g_onicsButtons[g_numOnicsButtons].isTampered = false;
             g_numOnicsButtons++;
             changed = true;
         }
@@ -516,19 +517,46 @@ void OnicsButton_HandleStatus( uint16_t shortAddr_, uint16_t zoneStatus_, uint8_
     }
     pthread_mutex_unlock( &g_deviceMutex );
 
-    if ( !stateChanged )
+    if ( stateChanged )
     {
-        LOG_DEBUG("-> Ignored redundant heartbeat status (alarm=%d)\n", alarm);
-        return;
+        if ( alarm )
+        {
+            UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_, 0 );
+        }
+        else
+        {
+            UseCase_Post( UC_PANIC_CLEAR, shortAddr_, zoneStatus_, 0 );
+        }
     }
 
-    if ( alarm )
+    bool tamper_active = ( zoneStatus_ & 0x0004 ) != 0; // Tamper bit
+
+    pthread_mutex_lock( &g_deviceMutex );
+    bool tamperChanged = false;
+    for ( int i = 0; i < g_numOnicsButtons; i++ )
     {
-        UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_, 0 );
+        if ( g_onicsButtons[i].shortAddr == shortAddr_ )
+        {
+            if ( g_onicsButtons[i].isTampered != tamper_active )
+            {
+                g_onicsButtons[i].isTampered = tamper_active;
+                tamperChanged = true;
+            }
+            break;
+        }
     }
-    else
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    if ( tamperChanged )
     {
-        UseCase_Post( UC_PANIC_CLEAR, shortAddr_, zoneStatus_, 0 );
+        if ( tamper_active )
+        {
+            UseCase_Post( UC_TAMPER_DETECTED, shortAddr_, zoneStatus_, 0 );
+        }
+        else
+        {
+            UseCase_Post( UC_TAMPER_CLEARED, shortAddr_, 0, 0 );
+        }
     }
 }
 

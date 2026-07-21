@@ -39,7 +39,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | :--- | :--- | :--- |
 | Tap glass gently (Vibration / Alarm 2) |  **FULL SIREN ALARM** (Police Panic / Mode 4) on all sirens. | Triggers Mode 4 sound. Sirens stop when vibration clears. |
 | Shake or tilt heavily (Movement / Alarm 1) |  **FULL SIREN ALARM** (Police Panic / Mode 4) on all sirens. | Critical breach / window broken. Triggers Mode 4 sound. Sirens stop when movement clears. |
-| Remove battery cover (Tamper switch) |  **FULL SIREN ALARM** on all sirens. | Protects device from being dismantled. |
+| Remove battery cover (Tamper switch) | **LOG ONLY** (TAMPER DETECTED). | Protects device from being dismantled. |
 | Type `env <addr>` in CLI |  Prints **Battery/Voltage** & **Temperature**. | **WAKEUP REQUIRED:** You must tap/vibrate the sensor right before hitting enter to wake its radio! |
 | Type `sensitivity <addr> <1-15>` |  Configures hardware sensitivity. | 1=Most sensitive, 15=Least sensitive (Default 10). |
 
@@ -48,7 +48,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ###  5. Frient Smart Siren (SIRZB-110)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Remove mounting backplate (Tamper switch) |  **FULL SIREN ALARM** (Mode 4). | Tests IAS Zone tamper alarm on wall removal. |
+| Remove mounting backplate (Tamper switch) | **LOG ONLY** (TAMPER DETECTED). | Tests IAS Zone tamper alarm on wall removal. |
 | Type `env <addr>` in CLI |  Prints **Battery/Voltage**. | Light / battery queries. |
 | Type `siren on <addr>` and hit Enter |  **FULL SIREN ALARM** on the specific siren. | Tests specific siren activation. |
 | Type `siren off <addr>` and hit Enter |  **SIREN STOPS** immediately. | Stops the specific siren. |
@@ -116,5 +116,5 @@ The table below lists all conditions that trigger or modify the sirens, along wi
 | **Vibration Sensor:** Movement cleared | Sirens OFF | **Mode 0 (Stop)** | Silence |
 | **Light Sensor:** Light ON | Sirens ON | **Mode 6 (Emergency Panic)** | Emergency Panic sound |
 | **Light Sensor:** Light OFF | Sirens OFF | **Mode 0 (Stop)** | Silence |
-| **Tamper:** Cover opened / Wall removed | Sirens ON | **Mode 4 (Police Panic)** | Police Panic sound (Applies to Contact, Vibration, Siren, Onics) |
-| **Tamper:** Cover closed | Sirens OFF | **Mode 0 (Stop)** | Silence |
+| **Tamper:** Cover opened / Wall removed | Logs `[SECURITY] TAMPER DETECTED` | - | Console log only |
+| **Tamper:** Cover closed | Logs `Tamper CLEARED` | - | Console log only |

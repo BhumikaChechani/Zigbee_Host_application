@@ -155,7 +155,7 @@ The system includes built-in safeguards to ensure network reliability:
   - Sleepy battery-powered devices (buttons, contact sensors) are marked **OFFLINE** if they miss their check-ins for >2 hours.
   - Active routers (sirens, occupancy sensors) are polled every 60 seconds and marked **OFFLINE** if they stop responding for >5 minutes.
   - The `[HEALTH]` logs will instantly warn the user of unreachable devices, and the system prevents sending commands to unreachable sirens.
-- **Hardware Tamper Detection**: Devices equipped with physical tamper switches (Frient Contact Sensors, Frient Vibration Sensors, Smart Sirens, and Onics Panic Buttons) are actively monitored. If the battery cover is opened or the device is ripped off the wall, the system instantly triggers a `[SECURITY] TAMPER DETECTED` alarm and fires all sirens at full volume.
+- **Hardware Tamper Detection**: Devices equipped with physical tamper switches (Frient Contact Sensors, Frient Vibration Sensors, Smart Sirens, and Onics Panic Buttons) are actively monitored. If the battery cover is opened or the device is ripped off the wall, the system instantly logs a `[SECURITY] TAMPER DETECTED` warning to the console.
 
 ### Adding a New Sensor
 The architecture is designed to scale easily:

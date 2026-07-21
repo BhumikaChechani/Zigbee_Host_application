@@ -463,6 +463,28 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     }
 }
 
+void Siren_TriggerAll( uint8_t mode_, uint8_t volume_, uint16_t durationSeconds_ )
+{
+    g_sirenActive = ( mode_ != 0 );
+
+    pthread_mutex_lock( &g_deviceMutex );
+    if ( g_numSirens == 0 )
+    {
+        pthread_mutex_unlock( &g_deviceMutex );
+        return;
+    }
+
+    int tempNum = g_numSirens;
+    SIREN_T tempSirens[MAX_SIRENS];
+    memcpy( tempSirens, g_sirens, sizeof( SIREN_T ) * g_numSirens );
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    for ( int i = 0; i < tempNum; i++ )
+    {
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode_, volume_, durationSeconds_ );
+    }
+}
+
 void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
 {
     (void)squawkMode_; // Unused for emulation

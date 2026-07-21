@@ -185,9 +185,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
           // was fast enough to trigger.
           history->count = 0;
           if (diff <= 3.0) {
-            LOG_EVENT("AQARA BTN", event_->srcAddr, "Press Count: 3 -> Siren ON\n");
+            LOG_EVENT("AQARA BTN", event_->srcAddr, "Press Count: 3 -> Siren ON (Mode 1: Burglar)\n");
 #if ENABLE_SIREN
-            Siren_ControlAll(1);
+            Siren_TriggerAll(1, 3, 240);
 #endif
           } else {
             LOG_DEBUG("[USECASE] 3 presses but window too wide (%.3fs > 3.0s) -> "
@@ -221,9 +221,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
     break;
   case UC_PANIC_SET:
-    LOG_EVENT("ONICS BTN", event_->srcAddr, "Press START -> Siren ON\n");
+    LOG_EVENT("ONICS BTN", event_->srcAddr, "Press START -> Siren ON (Mode 6: Panic)\n");
 #if ENABLE_SIREN
-    Siren_ControlAll(1);
+    Siren_TriggerAll(6, 3, 240);
 #endif
     break;
   case UC_PANIC_CLEAR:
@@ -245,9 +245,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     LOG_DEBUG("[USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
     if (isDoorOpen) {
-        LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence DETECTED in Zone %u (%u cm) -> Siren ON\n", zoneIdx, event_->val2);
+        LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence DETECTED in Zone %u (%u cm) -> Siren ON (Mode 5: Intrusion)\n", zoneIdx, event_->val2);
 #if ENABLE_SIREN
-        Siren_ControlAllDuration(1, 5); // 5 seconds
+        Siren_TriggerAll(5, 3, 5); // Mode 5, vol 3, 5 seconds
 #endif
     } else {
         LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence IGNORED in Zone %u (%u cm) -> Reason: Door is CLOSED -> Siren OFF\n", zoneIdx, event_->val2);
@@ -264,9 +264,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   }
   case UC_LIGHT_ON:
-    LOG_EVENT("OCCUPANCY", event_->srcAddr, "Light ON (Intensity %u) -> Siren ON\n", event_->raw);
+    LOG_EVENT("OCCUPANCY", event_->srcAddr, "Light ON (Intensity %u) -> Siren ON (Mode 6: Panic)\n", event_->raw);
 #if ENABLE_SIREN
-    Siren_ControlAll(1);
+    Siren_TriggerAll(6, 3, 240);
 #endif
     break;
   case UC_LIGHT_OFF:
@@ -290,9 +290,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   }
   case UC_VIBRATION_DETECTED:
-    LOG_EVENT("VIBRATION", event_->srcAddr, "Vibration DETECTED -> Siren ON\n");
+    LOG_EVENT("VIBRATION", event_->srcAddr, "Vibration DETECTED -> Siren ON (Mode 4: Police)\n");
 #if ENABLE_SIREN
-    Siren_ControlAll(1);
+    Siren_TriggerAll(4, 3, 240);
 #endif
     break;
   case UC_VIBRATION_CLEARED:
@@ -302,9 +302,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
     break;
   case UC_MOVEMENT_DETECTED:
-    LOG_EVENT("VIBRATION", event_->srcAddr, "Movement DETECTED -> Siren ON\n");
+    LOG_EVENT("VIBRATION", event_->srcAddr, "Movement DETECTED -> Siren ON (Mode 4: Police)\n");
 #if ENABLE_SIREN
-    Siren_ControlAll(1);
+    Siren_TriggerAll(4, 3, 240);
 #endif
     break;
   case UC_MOVEMENT_CLEARED:

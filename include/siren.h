@@ -100,8 +100,14 @@ void Siren_ControlAll( uint8_t warnMode_ );
 /// @param warnMode_ 0 = stop, non-zero = start.
 void Siren_Control( uint16_t shortAddr_, uint8_t warnMode_ );
 
-/// @brief Start or stop sirens for a specific duration in seconds.
+/// @brief Start or stop sirens for a specific duration in seconds using per-device config.
 void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ );
+
+/// @brief Explicitly trigger all sirens with a specific mode and volume.
+/// @param mode_ 0=stop, 1-6=start with mode.
+/// @param volume_ 0-3 volume level.
+/// @param durationSeconds_ duration.
+void Siren_TriggerAll( uint8_t mode_, uint8_t volume_, uint16_t durationSeconds_ );
 
 /// @brief Send a short Squawk/Chime to every registered siren.
 /// @param squawkMode_ e.g., 0=Armed, 1=Disarmed.

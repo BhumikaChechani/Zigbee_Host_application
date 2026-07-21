@@ -37,6 +37,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+int g_logLevel = LOG_LEVEL_INFO;
+
 #include <pthread.h>
 
 // Shared mutex protecting the global registries
@@ -46,8 +49,15 @@ pthread_mutex_t g_deviceMutex;
 // (run the program from its own folder).
 static const char DEVICES_FILE[] = "devices.txt";
 
+// Offline detection thresholds.
+// Only for ACTIVELY POLLED devices — battery sensors that are event-driven
+// are NEVER flagged offline just because they are quiet.
+// Occupancy: if we polled it but got NO reply within this window -> not responding.
+#define OCC_POLL_NO_REPLY_THRESHOLD  90.0  ///< 90s: occupancy polled but silent
+
 // Local (static) function declarations
 static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ ); ///< Route one AREQ frame.
+static void Main_CheckDeviceOfflineStatus( double now_ );         ///< Log offline/not-responding devices.
 
 
 void Device_AddDiscoveredIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
@@ -399,7 +409,7 @@ void Device_Load( void )
     }
 
     fclose( file );
-    printf( "📋 Loaded existing devices from devices.txt\n" );
+    LOG_INFO( "📋 Loaded existing devices from devices.txt\n" );
     pthread_mutex_unlock( &g_deviceMutex );
 }
 
@@ -465,59 +475,59 @@ int main( int argc, char *argv[] )
         }
     }
 
-    printf( "\n============================================================\n" );
-    printf( "  ZNP MT Host Controller for Siren & Button Integration (C Version)\n" );
-    printf( "  Port: %s  (Factory New: %s)\n", port, forceFactoryNew ? "YES" : "NO" );
-    printf( "============================================================\n\n" );
+    LOG_INFO( "\n============================================================\n" );
+    LOG_INFO( "  ZNP MT Host Controller for Siren & Button Integration (C Version)\n" );
+    LOG_INFO( "  Port: %s  (Factory New: %s)\n", port, forceFactoryNew ? "YES" : "NO" );
+    LOG_INFO( "============================================================\n\n" );
 
     if ( !ZNP_Init( port ) )
     {
-        printf( "❌ Failed to open serial port %s\n", port );
+        LOG_DEBUG( "❌ Failed to open serial port %s\n", port );
         return 1;
     }
 
     sleep( 1 );
 
     // 1. Ping coordinator
-    printf( "[1] SYS_PING...\n" );
+    LOG_INFO("[1] SYS_PING...\n");
     if ( !ZNP_SysPing() )
     {
-        printf( "❌ No response from ZNP. Check port and connections.\n" );
+        LOG_DEBUG( "❌ No response from ZNP. Check port and connections.\n" );
         ZNP_Close();
         return 1;
     }
-    printf( "  ✅ ZNP responsive\n\n" );
+    LOG_INFO( "  ✅ ZNP responsive\n\n" );
 
     // 2. Get device info
-    printf( "[2] UTIL_GET_DEVICE_INFO...\n" );
+    LOG_INFO("[2] UTIL_GET_DEVICE_INFO...\n");
     int state = ZNP_UtilGetDeviceInfo();
-    printf( "\n" );
+    LOG_DEBUG( "\n" );
 
     if ( state == 9 && !forceFactoryNew )
     {
-        printf( "  Coordinator already active — skipping startup.\n\n" );
+        LOG_DEBUG( "  Coordinator already active — skipping startup.\n\n" );
     }
     else
     {
         if ( forceFactoryNew )
         {
-            printf( "[3] Factory-new sequence (clear NV + write config)...\n" );
+            LOG_INFO("[3] Factory-new sequence (clear NV + write config)...\n");
             ZNP_FactoryNew();
-            printf( "\n" );
+            LOG_DEBUG( "\n" );
         }
         else
         {
-            printf( "[3] SYS_RESET_REQ (soft reset)...\n" );
+            LOG_INFO("[3] SYS_RESET_REQ (soft reset)...\n");
             ZNP_SysResetReq( false );
             sleep( 1 );
-            printf( "\n" );
+            LOG_DEBUG( "\n" );
         }
 
-        printf( "[4] ZDO_STARTUP_FROM_APP...\n" );
+        LOG_INFO("[4] ZDO_STARTUP_FROM_APP...\n");
         ZNP_ZdoStartupFromApp( 100 );
-        printf( "\n" );
+        LOG_DEBUG( "\n" );
 
-        printf( "[5] Waiting for coordinator state (state=9)...\n" );
+        LOG_INFO("[5] Waiting for coordinator state (state=9)...\n");
         bool active = false;
         double deadline = ZNP_GetCurrentTime() + 30.0;
         MT_FRAME_T rx;
@@ -529,10 +539,10 @@ int main( int argc, char *argv[] )
                 if ( rx.cmd0 == 0x45 && rx.cmd1 == 0xC0 && rx.len >= 1 )
                 {
                     uint8_t devState = rx.payload[0];
-                    printf( "  -> State: %d\n", devState );
+                    LOG_DEBUG( "  -> State: %d\n", devState );
                     if ( devState == 9 )
                     {
-                        printf( "  ✅ COORDINATOR ACTIVE!\n" );
+                        LOG_INFO( "  ✅ COORDINATOR ACTIVE!\n" );
                         active = true;
                         break;
                     }
@@ -544,16 +554,16 @@ int main( int argc, char *argv[] )
                 }
             }
         }
-        printf( "\n" );
+        LOG_DEBUG( "\n" );
 
         if ( !active )
         {
-            printf( "[5b] Re-checking device info...\n" );
+            LOG_DEBUG( "[5b] Re-checking device info...\n" );
             state = ZNP_UtilGetDeviceInfo();
-            printf( "\n" );
+            LOG_DEBUG( "\n" );
             if ( state != 9 )
             {
-                printf( "❌ Coordinator did not start.\n" );
+                LOG_DEBUG( "❌ Coordinator did not start.\n" );
                 ZNP_Close();
                 return 1;
             }
@@ -565,7 +575,7 @@ int main( int argc, char *argv[] )
     // won't route those reports to us (and devices won't bind for reporting to a
     // cluster the coordinator doesn't advertise). 0xFCC0 = Aqara manufacturer
     // cluster (occupancy/presence attr 0x0142), 0x0012 = Multistate Input.
-    printf( "[5.5] Registering Application Endpoint and ZDO Callbacks...\n" );
+    LOG_INFO("[5.5] Registering Application Endpoint and ZDO Callbacks...\n");
     uint16_t inClusters[8] = { 0x0000, 0x0003, 0x0004, 0x0005, 0x0006, 0x0406, 0xFCC0, 0x0012 };
     uint16_t outClusters[7] = { 0x0500, 0x0502, 0x0406, 0xFCC0, 0x0402, 0x0405, 0x0400 };
     ZNP_AfRegister( 8, 0x0104, 0x0007, 1, 0, 8, inClusters, 7, outClusters );
@@ -575,7 +585,7 @@ int main( int argc, char *argv[] )
     ZNP_ZdoMsgCbRegister( 0x8005 ); // Active_EP_rsp
     ZNP_ZdoMsgCbRegister( 0x8006 ); // Match_desc_rsp
     ZNP_ZdoMsgCbRegister( 0x0013 ); // Device_annce
-    printf( "\n" );
+    LOG_DEBUG( "\n" );
 
     // Turn Red LED OFF initially
 
@@ -584,17 +594,17 @@ int main( int argc, char *argv[] )
     // kicking any joiner that does not upgrade its TC link key within a few
     // seconds; many Aqara sensors never do, so they rejoin endlessly. Allowing
     // them to stay on the global key lets them settle on the network.
-    printf( "[5.7] Relaxing Trust Center key-exchange policy...\n" );
+    LOG_INFO("[5.7] Relaxing Trust Center key-exchange policy...\n");
     ZNP_BdbSetTcRequireKeyExchange( false );
-    printf( "\n" );
+    LOG_DEBUG( "\n" );
 
     // 6. Open permit join
-    printf( "[6] Opening permit join (all methods)...\n" );
+    LOG_INFO("[6] Opening permit join (all methods)...\n");
     ZNP_PermitJoin( PERMIT_JOIN_DURATION );
-    printf( "\n" );
+    LOG_DEBUG( "\n" );
 
     // 7. Discover existing devices
-    printf( "[7] Discovering existing devices in the network...\n" );
+    LOG_INFO("[7] Discovering existing devices in the network...\n");
     uint16_t sirenIn = 0x0502;
     ZNP_ZdoMatchDescReq( 0xFFFD, 0x0104, 1, &sirenIn, 0, NULL );
     uint16_t btnIn = 0x0500;
@@ -603,7 +613,7 @@ int main( int argc, char *argv[] )
     ZNP_ZdoMatchDescReq( 0xFFFD, 0x0104, 0, NULL, 1, &btnOut );
     uint16_t occIn = 0x0406;
     ZNP_ZdoMatchDescReq( 0xFFFD, 0x0104, 1, &occIn, 0, NULL );
-    printf( "\n" );
+    LOG_DEBUG( "\n" );
 
     // Start the use-case thread and one worker thread per sensor. From here on
     // the main loop only routes frames; all sensor device I/O and the siren
@@ -631,8 +641,8 @@ int main( int argc, char *argv[] )
     // Start CLI thread
     Cli_Start();
 
-    printf( "✅ Coordinator is active. Permit join is OPEN (%ds).\n", PERMIT_JOIN_DURATION );
-    printf( "   Enter CLI commands (type 'help' for info). Press Ctrl+C to exit.\n\n" );
+    LOG_INFO("✅ Coordinator is active. Permit join is OPEN (%ds).\n", PERMIT_JOIN_DURATION );
+    LOG_INFO("   Enter CLI commands (type 'help' for info). Press Ctrl+C to exit.\n\n");
 
     double lastRefresh = ZNP_GetCurrentTime();
     MT_FRAME_T eventFrame;
@@ -649,9 +659,17 @@ int main( int argc, char *argv[] )
         double now = ZNP_GetCurrentTime();
         if ( now - lastRefresh > PERMIT_JOIN_REFRESH )
         {
-            printf( "\n[Auto-Refresh] Re-opening permit join...\n" );
+            LOG_DEBUG( "\n[Auto-Refresh] Re-opening permit join...\n" );
             ZNP_PermitJoin( PERMIT_JOIN_DURATION );
             lastRefresh = now;
+        }
+
+        // Offline watchdog: scan all devices every 60s
+        static double lastOfflineCheck = 0;
+        if ( now - lastOfflineCheck >= 60.0 )
+        {
+            lastOfflineCheck = now;
+            Main_CheckDeviceOfflineStatus( now );
         }
 
 #if ENABLE_VIBRATION_SENSOR
@@ -663,6 +681,62 @@ int main( int argc, char *argv[] )
 
     ZNP_Close();
     return 0;
+}
+
+///
+/// @brief  Check if actively-polled devices are failing to respond to polls.
+///
+/// DESIGN INTENT:
+///   - Battery-powered EVENT-DRIVEN sensors (buttons, contact, vibration) are
+///     NEVER flagged here. They only transmit when something happens (a press,
+///     door open, vibration). Silence is normal and expected for hours or days.
+///     These can only be checked via an explicit CLI 'discover <addr>' command.
+///
+///   - The OCCUPANCY sensor is actively polled every ~3 seconds. If we have
+///     sent polls but got NO reply for OCC_POLL_NO_REPLY_THRESHOLD seconds,
+///     that means it was supposed to respond (we asked it) but didn't.
+///     Only in that case do we log "NOT RESPONDING".
+///
+///   - The SIREN is mains-powered. When the siren watchdog thread tries to
+///     send a warning and gets MAC_NO_ACK, that is logged immediately by the
+///     siren module itself. No passive check needed here.
+///
+/// @param  now_  Current timestamp in seconds.
+/// @return None.
+///
+static void Main_CheckDeviceOfflineStatus( double now_ )
+{
+#if ENABLE_AQARA_OCCUPANCY
+    // Occupancy: compare lastPolled vs lastSeen.
+    // If we polled it (lastPolled > 0) and the last reply is older than the
+    // poll timestamp by more than OCC_POLL_NO_REPLY_THRESHOLD, the sensor
+    // was asked to respond but stayed silent.
+    pthread_mutex_lock( &g_deviceMutex );
+    for ( int i = 0; i < g_numAqaraOccupancies; i++ )
+    {
+        double lastPolled = g_aqaraOccupancies[i].lastPolled;
+        double lastSeen   = g_aqaraOccupancies[i].lastSeen;
+        if ( lastPolled > 0 &&
+             lastPolled > lastSeen &&
+             ( now_ - lastPolled ) > OCC_POLL_NO_REPLY_THRESHOLD )
+        {
+            LOG_DEBUG( "\n\U000026a0\ufe0f  [NOT RESPONDING] Occupancy Sensor 0x%04X: "
+                    "polled %.0fs ago but NO reply received! "
+                    "(last seen %.0fs ago) — radar may be frozen, check power/range.\n",
+                    g_aqaraOccupancies[i].shortAddr,
+                    now_ - lastPolled,
+                    now_ - lastSeen );
+        }
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
+#else
+    (void)now_;
+#endif
+    // NOTE: Buttons, Contact Sensor, Vibration Sensor are intentionally
+    // NOT checked here. They are sleepy event-driven devices. Not hearing
+    // from them for hours is perfectly normal behaviour. They will show
+    // their last-seen age in the 'status' command for manual inspection.
+    // Use 'discover <addr>' or 'env <addr>' from the CLI to actively probe them.
 }
 
 // ---------------------------------------------------------------------------
@@ -692,12 +766,12 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         uint8_t ieeeBytes[8];
         memcpy( ieeeBytes, &frame_->payload[4], 8 );
 
-        printf( "\n✨ [JOIN] New device joined: short=0x%04X, IEEE=", nwkAddr );
+        LOG_DEBUG( "\n✨ [JOIN] New device joined: short=0x%04X, IEEE=", nwkAddr );
         for ( int i = 7; i >= 0; i-- )
         {
-            printf( "%02x", ieeeBytes[i] );
+            LOG_DEBUG( "%02x", ieeeBytes[i] );
         }
-        printf( "\n" );
+        LOG_DEBUG( "\n" );
 
         Device_AddDiscoveredIeee( nwkAddr, ieeeBytes );
 
@@ -722,7 +796,16 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         if ( frame_->len >= 1 )
         {
             uint8_t currentState = frame_->payload[0];
-            printf( "\n🔄 [STATE] Coordinator state change: %d\n", currentState );
+            LOG_DEBUG( "\n🔄 [STATE] Coordinator state change: %d\n", currentState );
+        }
+    }
+    // 1.6 ZDO Leave Indication (cmd0: 0x45, cmd1: 0xCB)
+    else if ( frame_->cmd0 == 0x45 && frame_->cmd1 == 0xCB )
+    {
+        if ( frame_->len >= 10 )
+        {
+            uint16_t shortAddr = frame_->payload[0] | ( frame_->payload[1] << 8 );
+            LOG_DEBUG( "\n⚠️  [LEAVE] Device 0x%04X intentionally left the network (User Reset or Leave Request)!\n", shortAddr );
         }
     }
     // 2. ZDO Response/Callback Parser (0x45 0xFF, 0x45 0x81, 0x45 0x86)
@@ -840,7 +923,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         // Join trigger via MSG_CB (cluster 0x0013)
         if ( clusterId == 0x0013 )
         {
-            printf( "\n✨ [JOIN via MSG_CB] Device announced: short=0x%04X\n", srcAddr );
+            LOG_DEBUG( "\n✨ [JOIN via MSG_CB] Device announced: short=0x%04X\n", srcAddr );
             if ( asdu != NULL && asduLen >= 10 )
             {
                 uint16_t annceShort = asdu[0] | ( asdu[1] << 8 );
@@ -868,7 +951,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                 {
                     // Hand the (slow) rebind sequence to the Onics worker thread;
                     // blocking here would stall the dispatcher and drop AF frames.
-                    printf( " [Onics] Known button re-announced post-reset. Queueing rebind...\n" );
+                    LOG_DEBUG( " [Onics] Known button re-announced post-reset. Queueing rebind...\n" );
                     OnicsButton_PostRebind( srcAddr );
                 }
 #endif
@@ -879,12 +962,12 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             uint8_t ieee[8];
             if ( Device_GetDiscoveredIeee( shortAddr, ieee ) )
             {
-                printf( " ZDO IEEE Rsp: short=0x%04X -> IEEE=", shortAddr );
+                LOG_DEBUG( " ZDO IEEE Rsp: short=0x%04X -> IEEE=", shortAddr );
                 for ( int i = 7; i >= 0; i-- )
                 {
-                    printf( "%02x", ieee[i] );
+                    LOG_DEBUG( "%02x", ieee[i] );
                 }
-                printf( "\n" );
+                LOG_DEBUG( "\n" );
 
                 // Update modules with the resolved IEEE address
 #if ENABLE_SIREN
@@ -906,17 +989,17 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         }
         else if ( clusterId == 0x8005 && status == 0 )
         {
-            printf( " ZDO Active EPs Rsp: short=0x%04X, EPs=[", shortAddr );
+            LOG_DEBUG( " ZDO Active EPs Rsp: short=0x%04X, EPs=[", shortAddr );
             bool hasEp23 = false;
             for ( int i = 0; i < matchCount; i++ )
             {
-                printf( "%d%s", matchList[i], ( i == matchCount - 1 ) ? "" : ", " );
+                LOG_DEBUG( "%d%s", matchList[i], ( i == matchCount - 1 ) ? "" : ", " );
                 if ( matchList[i] == 0x23 )
                 {
                     hasEp23 = true;
                 }
             }
-            printf( "]\n" );
+            LOG_DEBUG( "]\n" );
             for ( int i = 0; i < matchCount; i++ )
             {
                 ZNP_QuerySimpleDesc( shortAddr, matchList[i] );
@@ -929,7 +1012,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             {
                 // Repeating the bind is safe and ensures reliability, but it must
                 // run on the Onics worker thread, not the dispatcher.
-                printf( " [Onics] EP 0x23 detected in Active EPs. Queueing rebind...\n" );
+                LOG_DEBUG( " [Onics] EP 0x23 detected in Active EPs. Queueing rebind...\n" );
                 OnicsButton_PostRebind( shortAddr );
             }
 #endif
@@ -974,18 +1057,18 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                     }
                 }
 
-                printf( " 📋 Device 0x%04X ep 0x%02X Profile=0x%04X DevID=0x%04X InClusters=[",
+                LOG_DEBUG( " 📋 Device 0x%04X ep 0x%02X Profile=0x%04X DevID=0x%04X InClusters=[",
                         shortAddr, ep, profileId, deviceId );
                 for ( int i = 0; i < numInCls; i++ )
                 {
-                    printf( "0x%04X%s", inCls[i], ( i == numInCls - 1 ) ? "" : ", " );
+                    LOG_DEBUG( "0x%04X%s", inCls[i], ( i == numInCls - 1 ) ? "" : ", " );
                 }
-                printf( "] OutClusters=[" );
+                LOG_DEBUG( "] OutClusters=[" );
                 for ( int i = 0; i < numOutCls; i++ )
                 {
-                    printf( "0x%04X%s", outCls[i], ( i == numOutCls - 1 ) ? "" : ", " );
+                    LOG_DEBUG( "0x%04X%s", outCls[i], ( i == numOutCls - 1 ) ? "" : ", " );
                 }
-                printf( "]\n" );
+                LOG_DEBUG( "]\n" );
 
                 if ( profileId == 0x0104 )
                 {
@@ -1008,7 +1091,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #if ENABLE_SIREN
                     else if ( Siren_IsKnown( shortAddr ) )
                     {
-                        printf( " 0x%04X already known as a siren - skipping button classification for ep 0x%02X\n",
+                        LOG_DEBUG( " 0x%04X already known as a siren - skipping button classification for ep 0x%02X\n",
                                 shortAddr, ep );
                     }
 #endif
@@ -1129,12 +1212,12 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         }
         else if ( clusterId == 0x8006 && status == 0 )
         {
-            printf( " ZDO Match Desc Rsp: short=0x%04X, endpoints=[", shortAddr );
+            LOG_DEBUG( " ZDO Match Desc Rsp: short=0x%04X, endpoints=[", shortAddr );
             for ( int i = 0; i < matchCount; i++ )
             {
-                printf( "%d%s", matchList[i], ( i == matchCount - 1 ) ? "" : ", " );
+                LOG_DEBUG( "%d%s", matchList[i], ( i == matchCount - 1 ) ? "" : ", " );
             }
-            printf( "]\n" );
+            LOG_DEBUG( "]\n" );
             for ( int i = 0; i < matchCount; i++ )
             {
                 ZNP_QuerySimpleDesc( shortAddr, matchList[i] );
@@ -1161,7 +1244,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 
         if ( af.clusterId != 0xFCC0 && af.clusterId != 0x0400 && af.clusterId != 0x0406 && af.clusterId != 0x0500 )
         {
-            printf( "\n📩 [MSG] Incoming AF Msg: src=0x%04X ep=0x%02X cluster=0x%04X len=%d\n",
+            LOG_DEBUG( "\n📩 [MSG] Incoming AF Msg: src=0x%04X ep=0x%02X cluster=0x%04X len=%d\n",
                     af.srcAddr, af.srcEp, af.clusterId, af.dataLen );
         }
 
@@ -1195,7 +1278,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             }
             else
             {
-                printf(" ❓ Unknown device 0x%04X sent AF message on cluster 0x%04X. Requesting Active EPs...\n", af.srcAddr, af.clusterId);
+                LOG_DEBUG(" ❓ Unknown device 0x%04X sent AF message on cluster 0x%04X. Requesting Active EPs...\n", af.srcAddr, af.clusterId);
                 ZNP_ZdoActiveEpReq( af.srcAddr );
             }
         }

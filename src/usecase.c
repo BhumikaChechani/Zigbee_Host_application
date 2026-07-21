@@ -136,7 +136,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     if (history != NULL) {
       double elapsed = now - history->lastEventTime;
       if (elapsed < 0.10) {
-        printf("[USECASE] Debouncing Aqara 0x%04X press (elapsed = %.3fs) -> "
+        LOG_DEBUG("[USECASE] Debouncing Aqara 0x%04X press (elapsed = %.3fs) -> "
                "ignoring\n",
                event_->srcAddr, elapsed);
         return;
@@ -144,7 +144,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
       history->lastEventTime = now;
 
       if (g_sirenActive) {
-        printf("[USECASE] Aqara 0x%04X pressed while siren is active -> "
+        LOG_DEBUG("[USECASE] Aqara 0x%04X pressed while siren is active -> "
                "turning sirens OFF\n",
                event_->srcAddr);
 #if ENABLE_SIREN
@@ -157,7 +157,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
         if (history->count > 0) {
           double gapSinceLastPress = now - history->pressTimes[history->count - 1];
           if (gapSinceLastPress > MAX_PRESS_INTERVAL_S) {
-            printf("[USECASE] Aqara 0x%04X: gap since last press = %.3fs > %.1fs -> "
+            LOG_DEBUG("[USECASE] Aqara 0x%04X: gap since last press = %.3fs > %.1fs -> "
                    "clearing press history\n",
                    event_->srcAddr, gapSinceLastPress, MAX_PRESS_INTERVAL_S);
             history->count = 0;
@@ -170,29 +170,29 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
           history->count++;
         }
 
-        printf("[USECASE] Aqara 0x%04X pressed (count=%d)\n", event_->srcAddr,
+        LOG_DEBUG("[USECASE] Aqara 0x%04X pressed (count=%d)\n", event_->srcAddr,
                history->count);
         for (int i = 0; i < history->count; i++) {
-          printf("  - Press %d: %.3f\n", i + 1, history->pressTimes[i]);
+          LOG_DEBUG("  - Press %d: %.3f\n", i + 1, history->pressTimes[i]);
         }
 
         if (history->count == 3) {
           double diff = history->pressTimes[2] - history->pressTimes[0];
-          printf("[USECASE] Aqara 0x%04X: 3 presses in %.3fs\n",
+          LOG_DEBUG("[USECASE] Aqara 0x%04X: 3 presses in %.3fs\n",
                  event_->srcAddr, diff);
           // Always reset after a complete 3-press window so the next
           // sequence starts fresh — regardless of whether the window
           // was fast enough to trigger.
           history->count = 0;
           if (diff <= 3.0) {
-            printf("[USECASE] 3 presses in <= 3.0s -> turning sirens ON (Burglar / FULL CAPACITY)\n");
+            LOG_INFO("Aqara Button 0x%04X - Button Press (START), Count: 3 - Siren (ON), Mode: 1 (Burglar)\n", event_->srcAddr);
 #if ENABLE_SIREN
             Siren_SetMode(1);   // Mode 1 = Burglar
             Siren_SetVolume(3); // Ensure max capacity
             Siren_ControlAll(1);
 #endif
           } else {
-            printf("[USECASE] 3 presses but window too wide (%.3fs > 3.0s) -> "
+            LOG_DEBUG("[USECASE] 3 presses but window too wide (%.3fs > 3.0s) -> "
                    "ignoring\n", diff);
           }
         }
@@ -204,33 +204,32 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 
   switch (event_->type) {
   case UC_BUTTON_ON:
-    printf("[USECASE] ON from 0x%04X -> sirens ON\n", event_->srcAddr);
+    LOG_INFO("Button 0x%04X - Button Press (START), Count: 1 - Siren (ON)\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_ControlAll(1);
 #endif
     break;
   case UC_BUTTON_OFF:
-    printf("[USECASE] OFF from 0x%04X -> sirens OFF\n", event_->srcAddr);
+    LOG_INFO("Button 0x%04X - Button Press (STOP), Count: 1 - Siren (OFF)\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
     break;
   case UC_BUTTON_TOGGLE:
-    printf("[USECASE] TOGGLE from 0x%04X -> sirens %s\n", event_->srcAddr,
+    LOG_DEBUG("[USECASE] TOGGLE from 0x%04X -> sirens %s\n", event_->srcAddr,
            g_sirenActive ? "OFF" : "ON");
 #if ENABLE_SIREN
     Siren_ControlAll(g_sirenActive ? 0 : 1);
 #endif
     break;
   case UC_PANIC_SET:
-    printf("[USECASE] PANIC (0x%04X, status=0x%04X) -> sirens ON\n",
-           event_->srcAddr, event_->raw);
+    LOG_INFO("Onics Button 0x%04X - Button Press (START), Count: 1 - Siren (ON), Mode: Panic\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_ControlAll(1);
 #endif
     break;
   case UC_PANIC_CLEAR:
-    printf("[USECASE] panic cleared (0x%04X) -> sirens OFF\n", event_->srcAddr);
+    LOG_INFO("Onics Button 0x%04X - Button Press (STOP), Count: 1 - Siren (OFF)\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
@@ -245,19 +244,19 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     ContactSensor_RefreshIfStale(30.0);
 #endif
     bool isDoorOpen = IsDoorOpenForZone(zoneIdx);
-    printf("🚶 [USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
+    LOG_DEBUG("🚶 [USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
     if (isDoorOpen) {
-        printf("[USECASE] Door is open & presence detected -> sounding siren for 5 seconds (Mode 5)\n");
+        LOG_INFO("Aqara Occupancy 0x%04X - Presence (DETECTED) in Zone %u (Distance: %u cm) - Siren (ON), Mode: 5 (Intrusion)\n", event_->srcAddr, zoneIdx, event_->val2);
 #if ENABLE_SIREN
         Siren_SetMode(5);
         Siren_ControlAllDuration(1, 5); // 5 seconds
 #endif
     } else {
-        printf("[USECASE] Door is closed -> ignoring presence detection in Zone %u\n", zoneIdx);
+        LOG_INFO("Aqara Occupancy 0x%04X - Presence (IGNORED) in Zone %u (Distance: %u cm) - Reason: Door is CLOSED - Siren (OFF)\n", event_->srcAddr, zoneIdx, event_->val2);
     }
 #else
-    printf(
+    LOG_DEBUG(
         "🚶 [USECASE] Person detected in zone 0x%04X (index %u)\n",
         event_->srcAddr, event_->raw);
 #endif
@@ -265,59 +264,58 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   }
   case UC_OCCUPANCY_CLEARED: {
     uint8_t zoneIdx = (uint8_t)event_->raw;
-    printf("💨 [USECASE] Occupancy cleared in zone 0x%04X (index %u)\n",
-           event_->srcAddr, zoneIdx);
+    LOG_INFO("Aqara Occupancy 0x%04X - Presence (CLEARED) in Zone %u - Siren (OFF)\n", event_->srcAddr, zoneIdx);
     break;
   }
   case UC_LIGHT_ON:
-    printf("☀️ [USECASE] Light turned ON -> sirens ON (Emergency Panic)\n");
+    LOG_INFO("Aqara Occupancy 0x%04X - Light Sensor (ON), Intensity: %u - Siren (ON), Mode: 6 (Panic)\n", event_->srcAddr, event_->raw);
 #if ENABLE_SIREN
     Siren_SetMode(6);
     Siren_ControlAll(1);
 #endif
     break;
   case UC_LIGHT_OFF:
-    printf("🌙 [USECASE] Light turned OFF -> sirens OFF\n");
+    LOG_INFO("Aqara Occupancy 0x%04X - Light Sensor (OFF), Intensity: %u - Siren (OFF)\n", event_->srcAddr, event_->raw);
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
     break;
   case UC_CONTACT_OPEN: {
-    printf("🚪 [USECASE] Contact Sensor OPENED -> Siren Beep 2 times\n");
+    LOG_INFO("Contact Sensor 0x%04X - Door State (OPEN) - Siren (BEEP), Count: 2\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_PostBeep(2);
 #endif
     break;
   }
   case UC_CONTACT_CLOSED: {
-    printf("🚪 [USECASE] Contact Sensor CLOSED -> Siren Beep 1 time\n");
+    LOG_INFO("Contact Sensor 0x%04X - Door State (CLOSED) - Siren (BEEP), Count: 1\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_PostBeep(1);
 #endif
     break;
   }
   case UC_VIBRATION_DETECTED:
-    printf("🔴 📳 [USECASE] Vibration Sensor (Alarm 2) ALARM -> sirens ON (Police Panic)\n");
+    LOG_INFO("Vibration Sensor 0x%04X - Vibration (DETECTED) - Siren (ON), Mode: 4 (Police)\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_SetMode(4);
     Siren_ControlAll(1);
 #endif
     break;
   case UC_VIBRATION_CLEARED:
-    printf("🟢 📴 [USECASE] Vibration Sensor (Alarm 2) CLEARED -> sirens OFF\n");
+    LOG_INFO("Vibration Sensor 0x%04X - Vibration (CLEARED) - Siren (OFF)\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
     break;
   case UC_MOVEMENT_DETECTED:
-    printf("🔴 🫨 [USECASE] Movement/Tilt Sensor (Alarm 1) ALARM -> sirens ON (Police Panic)\n");
+    LOG_INFO("Vibration Sensor 0x%04X - Movement (DETECTED) - Siren (ON), Mode: 4 (Police)\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_SetMode(4);
     Siren_ControlAll(1);
 #endif
     break;
   case UC_MOVEMENT_CLEARED:
-    printf("🟢 🧍 [USECASE] Movement/Tilt Sensor (Alarm 1) CLEARED -> sirens OFF\n");
+    LOG_INFO("Vibration Sensor 0x%04X - Movement (CLEARED) - Siren (OFF)\n", event_->srcAddr);
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
@@ -350,7 +348,7 @@ void UseCase_Start(void) {
   pthread_create(&s_useCaseThread, NULL, UseCase_Thread, NULL);
 }
 
-void UseCase_Post(UC_EVT_TYPE_T type_, uint16_t srcAddr_, uint16_t raw_) {
+void UseCase_Post(UC_EVT_TYPE_T type_, uint16_t srcAddr_, uint16_t raw_, uint32_t val2_) {
   UC_EVT_T *event = (UC_EVT_T *)malloc(sizeof(UC_EVT_T));
   if (event == NULL) {
     return;
@@ -358,5 +356,6 @@ void UseCase_Post(UC_EVT_TYPE_T type_, uint16_t srcAddr_, uint16_t raw_) {
   event->type = type_;
   event->srcAddr = srcAddr_;
   event->raw = raw_;
+  event->val2 = val2_;
   MsgQueue_Push(&s_useCaseInbox, event);
 }

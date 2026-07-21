@@ -47,7 +47,7 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
         // button clicks. However, we only care about the IAS Zone (0x0500) panic 
         // alarms that the device emits simultaneously.
         // We unconditionally ignore these toggles to avoid double-triggering.
-        printf( "👉 [ONICS BUTTON] Ignored On/Off toggle (cmd=0x%02X) - relying purely on IAS Panic alarm\n", cmdId );
+        LOG_DEBUG( "👉 [ONICS BUTTON] Ignored On/Off toggle (cmd=0x%02X) - relying purely on IAS Panic alarm\n", cmdId );
     }
     else if ( af_->clusterId == 0x0500 )
     {
@@ -81,7 +81,7 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
             if ( zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00 )
             {
                 uint8_t bat = zcl[4]; // Unit is 100 mV
-                printf( "🔋 Onics Button 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0 );
+                LOG_DEBUG( "🔋 Onics Button 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0 );
             }
         }
     }
@@ -94,12 +94,12 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
             if ( cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00 )
             {
                 int16_t temp = (int16_t)( zcl[4] | ( zcl[5] << 8 ) );
-                printf( "🌡️ Onics Button 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0 );
+                LOG_DEBUG( "🌡️ Onics Button 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0 );
             }
             else if ( cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00 )
             {
                 int16_t temp = (int16_t)( zcl[3] | ( zcl[4] << 8 ) );
-                printf( "🌡️ Onics Button 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0 );
+                LOG_DEBUG( "🌡️ Onics Button 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0 );
             }
         }
     }
@@ -117,24 +117,24 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
                 if ( status == 0x00 && zclLen >= 5 )
                 {
                     uint8_t dataType = zcl[3];
-                    printf( "🔍 [DIAGNOSTIC] Onics 0x%04X attr 0x8000: ZCL data type=0x%02X, value bytes:",
+                    LOG_DEBUG( "🔍 [DIAGNOSTIC] Onics 0x%04X attr 0x8000: ZCL data type=0x%02X, value bytes:",
                             af_->srcAddr, dataType );
                     for ( int i = 4; i < zclLen; i++ )
                     {
-                        printf( " 0x%02X", zcl[i] );
+                        LOG_DEBUG( " 0x%02X", zcl[i] );
                     }
-                    printf( "\n" );
+                    LOG_DEBUG( "\n" );
                     if ( zclLen >= 6 )
                     {
                         uint16_t val = (uint16_t)(zcl[4] | (zcl[5] << 8));
-                        printf( "   -> Current value: 0x%04X (%s)\n", val,
+                        LOG_DEBUG( "   -> Current value: 0x%04X (%s)\n", val,
                                 val == 0xFFFF ? "IAS_ZONE_DISABLED" :
                                 val == 0x002C ? "PERSONAL_EMERGENCY_DEVICE" : "other" );
                     }
                 }
                 else
                 {
-                    printf( "🔍 [DIAGNOSTIC] Onics 0x%04X attr 0x8000 read failed (status=0x%02X)\n",
+                    LOG_DEBUG( "🔍 [DIAGNOSTIC] Onics 0x%04X attr 0x8000 read failed (status=0x%02X)\n",
                             af_->srcAddr, status );
                 }
             }
@@ -149,9 +149,9 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
                 // SBTZB-110 sends a 1-byte payload (0x00) on success.
                 // The device WILL reset immediately after this to apply the panic mode change.
                 // Steps 3 & 4 will be triggered once the device re-pairs with EP 0x23 visible.
-                printf( "✅ Onics Button 0x%04X Panic mode activation SUCCESS!\n", af_->srcAddr );
-                printf( "   -> EP 0x23 (IAS Zone Panic) is now unlocked in hardware.\n" );
-                printf( "   -> Device will reset to apply mode change. Binding EP 0x23 now...\n" );
+                LOG_DEBUG( "✅ Onics Button 0x%04X Panic mode activation SUCCESS!\n", af_->srcAddr );
+                LOG_DEBUG( "   -> EP 0x23 (IAS Zone Panic) is now unlocked in hardware.\n" );
+                LOG_DEBUG( "   -> Device will reset to apply mode change. Binding EP 0x23 now...\n" );
 
                 // Step 3: Bind IAS Zone cluster (0x0500) on the newly unlocked EP 0x23.
                 pthread_mutex_lock( &g_deviceMutex );
@@ -174,16 +174,16 @@ static void OnicsButton_HandleAf( const AF_MSG_T *af_ )
                     usleep( 500000 );
                     // Step 4: Write coordinator's IEEE to IAS_CIE_Address (0x0010) on EP 0x23.
                     ZNP_WriteCieAddress( af_->srcAddr, 0x23, 0x14 );
-                    printf( "   -> CIE Address written to EP 0x23. Waiting for Zone Enroll Request...\n" );
+                    LOG_DEBUG( "   -> CIE Address written to EP 0x23. Waiting for Zone Enroll Request...\n" );
                 }
                 else
                 {
-                    printf( "   ⚠️  IEEE not yet known - will retry on re-pair.\n" );
+                    LOG_DEBUG( "   ⚠️  IEEE not yet known - will retry on re-pair.\n" );
                 }
             }
             else if ( zclLen >= 3 && zcl[0] != 0x00 )
             {
-                printf( "❌ Onics Button 0x%04X Panic activation FAILED (attr=0x%02X%02X, status=0x%02X)\n",
+                LOG_DEBUG( "❌ Onics Button 0x%04X Panic activation FAILED (attr=0x%02X%02X, status=0x%02X)\n",
                         af_->srcAddr, zcl[2], zcl[1], zcl[0] );
             }
         }
@@ -284,11 +284,11 @@ void OnicsButton_Rebind( uint16_t shortAddr_ )
     uint8_t ieee[8];
     if ( !Device_GetDiscoveredIeee( shortAddr_, ieee ) )
     {
-        printf( " [Onics] Rebind for 0x%04X skipped - IEEE unknown yet.\n", shortAddr_ );
+        LOG_DEBUG( " [Onics] Rebind for 0x%04X skipped - IEEE unknown yet.\n", shortAddr_ );
         return;
     }
 
-    printf( " [Onics] Re-establishing bindings for button 0x%04X...\n", shortAddr_ );
+    LOG_DEBUG( " [Onics] Re-establishing bindings for button 0x%04X...\n", shortAddr_ );
     // Re-bind On/Off (0x0006) on EP 0x20 so it keeps sending clicks,
     // and re-bind IAS Zone (0x0500) on EP 0x23 + rewrite the CIE address.
     ZNP_ZdoBindReq( shortAddr_, ieee, 0x20, 0x0006, g_coordinatorIeee, 8 );
@@ -316,7 +316,8 @@ void OnicsButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     {
         if ( g_numOnicsButtons < MAX_ONICS_BUTTONS )
         {
-            printf( " Onics Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_DEBUG( " Onics Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_INFO("Onics Button 0x%04X - Network Join\n", shortAddr_);
             g_onicsButtons[g_numOnicsButtons].shortAddr = shortAddr_;
             g_onicsButtons[g_numOnicsButtons].endpoint = endpoint_;
             g_onicsButtons[g_numOnicsButtons].lastSeen = ZNP_GetCurrentTime();
@@ -422,7 +423,7 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     {
         pthread_mutex_unlock( &g_deviceMutex );
         // Request IEEE; the response re-triggers setup via UpdateIeee.
-        printf( "Onics button 0x%04X missing IEEE - requesting...\n", shortAddr_ );
+        LOG_DEBUG( "Onics button 0x%04X missing IEEE - requesting...\n", shortAddr_ );
         uint8_t reqPay[4] = { shortAddr_ & 0xFF, ( shortAddr_ >> 8 ) & 0xFF, 0x01, 0x00 };
         ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 );
         return;
@@ -434,7 +435,7 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     g_onicsButtons[idx].configured = true;
     pthread_mutex_unlock( &g_deviceMutex );
 
-    printf( "Configuring Onics SBTZB-110 button 0x%04X...\n", shortAddr_ );
+    LOG_DEBUG( "Configuring Onics SBTZB-110 button 0x%04X...\n", shortAddr_ );
 
     // Per SBTZB-110 Technical Manual Sections 3.3 & 4.2.3.2:
     // Step 1: Bind On/Off cluster (0x0006) on EP 0x20.
@@ -456,12 +457,12 @@ void OnicsButton_Setup( uint16_t shortAddr_ )
     // trigger a re-discovery to find EP 0x23, bind its 0x0500 cluster, and
     // write the CIE address so Zone Enroll Request can proceed.
 
-    printf( "Configuration sent to Onics button 0x%04X!\n", shortAddr_ );
+    LOG_DEBUG( "Configuration sent to Onics button 0x%04X!\n", shortAddr_ );
 }
 
 void OnicsButton_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSeq_, uint16_t zoneType_ )
 {
-    printf( "   -> Zone Enroll Request from Onics 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_ );
+    LOG_DEBUG( "   -> Zone Enroll Request from Onics 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_ );
     uint8_t zoneId = g_nextZoneId++;
 
     pthread_mutex_lock( &g_deviceMutex );
@@ -483,17 +484,17 @@ void OnicsButton_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t t
 // siren policy). The button module never drives the siren directly.
 void OnicsButton_HandleStatus( uint16_t shortAddr_, uint16_t zoneStatus_, uint8_t zoneId_ )
 {
-    printf( "   -> Zone Status Change from Onics 0x%04X: zone_status=0x%04X, zone_id=%d\n",
+    LOG_DEBUG( "   -> Zone Status Change from Onics 0x%04X: zone_status=0x%04X, zone_id=%d\n",
             shortAddr_, zoneStatus_, zoneId_ );
 
     bool alarm = ( zoneStatus_ & 0x0003 ) != 0;
     if ( alarm )
     {
-        UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_ );
+        UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_, 0 );
     }
     else
     {
-        UseCase_Post( UC_PANIC_CLEAR, shortAddr_, zoneStatus_ );
+        UseCase_Post( UC_PANIC_CLEAR, shortAddr_, zoneStatus_, 0 );
     }
 }
 
@@ -572,7 +573,7 @@ void OnicsButton_DiscoverAllActiveEp( void )
 
 void OnicsButton_ReadEnvironment( uint16_t shortAddr_ )
 {
-    printf( "Requesting Environment Data (Battery) from Onics Button 0x%04X...\n", shortAddr_ );
+    LOG_DEBUG( "Requesting Environment Data (Battery) from Onics Button 0x%04X...\n", shortAddr_ );
     
     // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 0x20
     uint8_t zclFrameBat[5];

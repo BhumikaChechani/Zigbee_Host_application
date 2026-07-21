@@ -84,7 +84,7 @@ void EventQueue_Push( EVENT_QUEUE_T *queue_, const MT_FRAME_T *frame_ )
     {
         static unsigned long s_dropCount = 0;
         s_dropCount++;
-        printf( "⚠️ Event queue overflow, dropping packet cmd0=0x%02X cmd1=0x%02X (total dropped: %lu)\n",
+        LOG_DEBUG( "⚠️ Event queue overflow, dropping packet cmd0=0x%02X cmd1=0x%02X (total dropped: %lu)\n",
                 frame_->cmd0, frame_->cmd1, s_dropCount );
     }
     pthread_mutex_unlock( &queue_->mutex );
@@ -379,7 +379,7 @@ static void *ZNP_ReaderThread( void *arg_ )
             {
                 continue; // interrupted by a signal, not a real error
             }
-            printf( "❌ [SERIAL] poll() failed (%s) - reader thread exiting; ZNP link lost\n",
+            LOG_DEBUG( "❌ [SERIAL] poll() failed (%s) - reader thread exiting; ZNP link lost\n",
                     strerror( errno ) );
             break;
         }
@@ -395,7 +395,7 @@ static void *ZNP_ReaderThread( void *arg_ )
             {
                 continue;
             }
-            printf( "❌ [SERIAL] read() error (%s) - reader thread exiting; ZNP link lost\n",
+            LOG_DEBUG( "❌ [SERIAL] read() error (%s) - reader thread exiting; ZNP link lost\n",
                     strerror( errno ) );
             break;
         }
@@ -404,7 +404,7 @@ static void *ZNP_ReaderThread( void *arg_ )
             // EOF: the serial device went away (unplugged / USB re-enumerated on
             // a reset). Nothing more will ever arrive on this fd, so the app
             // would appear frozen - make that visible instead of hanging silently.
-            printf( "❌ [SERIAL] EOF on serial port - device disconnected; reader thread exiting\n" );
+            LOG_DEBUG( "❌ [SERIAL] EOF on serial port - device disconnected; reader thread exiting\n" );
             break;
         }
 
@@ -529,12 +529,12 @@ bool ZNP_SysResetReq( bool hard_ )
     txBuf[4] = resetType;
     txBuf[5] = ZNP_CalcFcs( 1, 0x41, 0x09, payload );
 
-    printf( "  TX [SYS_RESET_REQ type=%d (%s)]: ", resetType, hard_ ? "hard" : "soft" );
+    LOG_DEBUG( "  TX [SYS_RESET_REQ type=%d (%s)]: ", resetType, hard_ ? "hard" : "soft" );
     for ( int i = 0; i < 6; i++ )
     {
-        printf( "%02x", txBuf[i] );
+        LOG_DEBUG( "%02x", txBuf[i] );
     }
-    printf( "\n" );
+    LOG_DEBUG( "\n" );
 
     // NOTE: Do NOT call tcflush(TCIFLUSH) here. The CC1352P7 sends
     // SYS_RESET_IND within a few milliseconds of receiving the reset command.
@@ -546,7 +546,7 @@ bool ZNP_SysResetReq( bool hard_ )
     }
     tcdrain( s_serialFd ); // Ensure all bytes are transmitted before waiting
 
-    printf( "  Waiting for SYS_RESET_IND...\n" );
+    LOG_DEBUG( "  Waiting for SYS_RESET_IND...\n" );
     // Use 8 seconds; the CC1352P7 can take up to 5 s to erase+reboot after a
     // CLEAR_CONFIG wipe, especially on first boot from a clean chip.
     double deadline = ZNP_GetCurrentTime() + 8.0;
@@ -557,18 +557,18 @@ bool ZNP_SysResetReq( bool hard_ )
         {
             if ( rx.cmd0 == 0x41 && rx.cmd1 == 0x80 )
             {
-                printf( "  -> SYS_RESET_IND: " );
+                LOG_DEBUG( "  -> SYS_RESET_IND: " );
                 for ( int i = 0; i < rx.len; i++ )
                 {
-                    printf( "%02x", rx.payload[i] );
+                    LOG_DEBUG( "%02x", rx.payload[i] );
                 }
-                printf( "\n" );
+                LOG_DEBUG( "\n" );
                 return true;
             }
             // Discard non-reset events while waiting for the reset indication
         }
     }
-    printf( "  No SYS_RESET_IND received\n" );
+    LOG_DEBUG( "  No SYS_RESET_IND received\n" );
     return false;
 }
 
@@ -587,16 +587,16 @@ int ZNP_UtilGetDeviceInfo( void )
             uint8_t devState = rx.payload[12];
             uint8_t numAssoc = rx.payload[13];
 
-            printf( "  IEEE: " );
+            LOG_DEBUG( "  IEEE: " );
             for ( int i = 7; i >= 0; i-- )
             {
-                printf( "%02x", g_coordinatorIeee[i] );
+                LOG_DEBUG( "%02x", g_coordinatorIeee[i] );
             }
-            printf( "\n" );
-            printf( "  Short Addr: 0x%04X\n", shortAddr );
-            printf( "  Dev Type:   0x%02X\n", devType );
-            printf( "  Dev State:  %d  (9=Coordinator)\n", devState );
-            printf( "  Associated: %d device(s)\n", numAssoc );
+            LOG_DEBUG( "\n" );
+            LOG_DEBUG( "  Short Addr: 0x%04X\n", shortAddr );
+            LOG_DEBUG( "  Dev Type:   0x%02X\n", devType );
+            LOG_DEBUG( "  Dev State:  %d  (9=Coordinator)\n", devState );
+            LOG_DEBUG( "  Associated: %d device(s)\n", numAssoc );
             return devState;
         }
     }
@@ -628,7 +628,7 @@ int ZNP_ZdoStartupFromApp( uint16_t startDelayMs_ )
             {
                 label = "Leave and retry";
             }
-            printf( "  StartMode: %d (%s)\n", mode, label );
+            LOG_DEBUG( "  StartMode: %d (%s)\n", mode, label );
             return mode;
         }
     }
@@ -689,25 +689,25 @@ bool ZNP_WriteConfiguration( uint8_t cfgId_, const uint8_t *value_, uint8_t len_
 
     bool match = readOk && ( readLen == len_ ) && ( memcmp( readback, value_, len_ ) == 0 );
 
-    printf( "  NV_WRITE id=0x%02X value=", cfgId_ );
+    LOG_DEBUG( "  NV_WRITE id=0x%02X value=", cfgId_ );
     for ( int i = 0; i < len_; i++ )
     {
-        printf( "%02X", value_[i] );
+        LOG_DEBUG( "%02X", value_[i] );
     }
-    printf( " write=%s ", ok ? "✅" : "❌" );
+    LOG_DEBUG( " write=%s ", ok ? "✅" : "❌" );
 
     if ( readOk )
     {
-        printf( "readback=" );
+        LOG_DEBUG( "readback=" );
         for ( int i = 0; i < readLen; i++ )
         {
-            printf( "%02X", readback[i] );
+            LOG_DEBUG( "%02X", readback[i] );
         }
-        printf( " %s\n", match ? "✅" : "❌" );
+        LOG_DEBUG( " %s\n", match ? "✅" : "❌" );
     }
     else
     {
-        printf( "readback=None ❌\n" );
+        LOG_DEBUG( "readback=None ❌\n" );
     }
 
     if ( cfgId_ == ZCD_NV_PRECFGKEY && ok )
@@ -728,47 +728,47 @@ bool ZNP_FactoryNew( void )
     // it early (before the reset fires), the wipe flag is gone and the chip
     // boots with stale NV data, causing the state-8->0 loop.
     // -----------------------------------------------------------------------
-    printf( "[FN-1] Set STARTUP_OPTION = CLEAR_CONFIG | CLEAR_STATE...\n" );
+    LOG_DEBUG( "[FN-1] Set STARTUP_OPTION = CLEAR_CONFIG | CLEAR_STATE...\n" );
     uint8_t opt = STARTOPT_CLEAR_CONFIG | STARTOPT_CLEAR_STATE;
     ZNP_WriteConfiguration( ZCD_NV_STARTUP_OPTION, &opt, 1 );
 
-    printf( "[FN-2] SYS_RESET_REQ to trigger NV wipe...\n" );
+    LOG_DEBUG( "[FN-2] SYS_RESET_REQ to trigger NV wipe...\n" );
     bool resetOk = ZNP_SysResetReq( false );
     if ( !resetOk )
     {
-        printf( "  Soft reset unconfirmed - escalating to hard reset...\n" );
+        LOG_DEBUG( "  Soft reset unconfirmed - escalating to hard reset...\n" );
         resetOk = ZNP_SysResetReq( true );
     }
     if ( resetOk )
     {
         // Give the chip time to finish erasing NV before we talk to it again
-        printf( "  Reset confirmed. Waiting 2s for NV erase to complete...\n" );
+        LOG_DEBUG( "  Reset confirmed. Waiting 2s for NV erase to complete...\n" );
         sleep( 2 );
     }
     else
     {
-        printf( "  ⚠️  Both resets unconfirmed. Proceeding anyway after 3s delay...\n" );
+        LOG_DEBUG( "  ⚠️  Both resets unconfirmed. Proceeding anyway after 3s delay...\n" );
         sleep( 3 );
     }
 
     // -----------------------------------------------------------------------
     // Phase 2: Write all configuration items onto the now-clean NV.
     // -----------------------------------------------------------------------
-    printf( "[FN-3] Re-set STARTUP_OPTION = 0 (don't wipe on subsequent boots)\n" );
+    LOG_DEBUG( "[FN-3] Re-set STARTUP_OPTION = 0 (don't wipe on subsequent boots)\n" );
     opt = 0;
     ZNP_WriteConfiguration( ZCD_NV_STARTUP_OPTION, &opt, 1 );
 
-    printf( "[FN-4] Logical type = Coordinator (0x00)\n" );
+    LOG_DEBUG( "[FN-4] Logical type = Coordinator (0x00)\n" );
     uint8_t type = 0x00;
     ZNP_WriteConfiguration( ZCD_NV_LOGICAL_TYPE, &type, 1 );
 
-    printf( "[FN-5] PAN ID = 0x%04X\n", NETWORK_PAN_ID );
+    LOG_DEBUG( "[FN-5] PAN ID = 0x%04X\n", NETWORK_PAN_ID );
     uint8_t pan[2];
     pan[0] = NETWORK_PAN_ID & 0xFF;
     pan[1] = ( NETWORK_PAN_ID >> 8 ) & 0xFF;
     ZNP_WriteConfiguration( ZCD_NV_PANID, pan, 2 );
 
-    printf( "[FN-6] Channel list = ch %d only (0x%08X)\n", NETWORK_CHANNEL, 1 << NETWORK_CHANNEL );
+    LOG_DEBUG( "[FN-6] Channel list = ch %d only (0x%08X)\n", NETWORK_CHANNEL, 1 << NETWORK_CHANNEL );
     uint32_t chan = 1 << NETWORK_CHANNEL;
     uint8_t chanBytes[4];
     chanBytes[0] = chan & 0xFF;
@@ -777,7 +777,7 @@ bool ZNP_FactoryNew( void )
     chanBytes[3] = ( chan >> 24 ) & 0xFF;
     ZNP_WriteConfiguration( ZCD_NV_CHANLIST, chanBytes, 4 );
 
-    printf( "[FN-7] Pre-configured key = %s\n", NETWORK_TC_LINK_KEY_HEX );
+    LOG_DEBUG( "[FN-7] Pre-configured key = %s\n", NETWORK_TC_LINK_KEY_HEX );
     uint8_t key[16];
     for ( int i = 0; i < 16; i++ )
     {
@@ -785,32 +785,32 @@ bool ZNP_FactoryNew( void )
     }
     ZNP_WriteConfiguration( ZCD_NV_PRECFGKEY, key, 16 );
 
-    printf( "[FN-8] PRECFGKEYS_ENABLE = 0 (TC link key joining)\n" );
+    LOG_DEBUG( "[FN-8] PRECFGKEYS_ENABLE = 0 (TC link key joining)\n" );
     uint8_t preCfg = 0;
     ZNP_WriteConfiguration( ZCD_NV_PRECFGKEYS_ENABLE, &preCfg, 1 );
 
-    printf( "[FN-9] ZDO_DIRECT_CB = 1 (so we receive STATE_CHANGE_IND)\n" );
+    LOG_DEBUG( "[FN-9] ZDO_DIRECT_CB = 1 (so we receive STATE_CHANGE_IND)\n" );
     uint8_t cb = 1;
     ZNP_WriteConfiguration( ZCD_NV_ZDO_DIRECT_CB, &cb, 1 );
 
     // -----------------------------------------------------------------------
     // Phase 3: Final reset to load all the freshly-written configuration.
     // -----------------------------------------------------------------------
-    printf( "[FN-10] SYS_RESET_REQ to apply written configurations...\n" );
+    LOG_DEBUG( "[FN-10] SYS_RESET_REQ to apply written configurations...\n" );
     resetOk = ZNP_SysResetReq( false );
     if ( !resetOk )
     {
-        printf( "  Soft reset unconfirmed - escalating to hard reset...\n" );
+        LOG_DEBUG( "  Soft reset unconfirmed - escalating to hard reset...\n" );
         resetOk = ZNP_SysResetReq( true );
     }
     if ( resetOk )
     {
-        printf( "  Reset confirmed. Waiting 2s for startup...\n" );
+        LOG_DEBUG( "  Reset confirmed. Waiting 2s for startup...\n" );
         sleep( 2 );
     }
     else
     {
-        printf( "  ⚠️  Final reset unconfirmed. Proceeding after 3s delay...\n" );
+        LOG_DEBUG( "  ⚠️  Final reset unconfirmed. Proceeding after 3s delay...\n" );
         sleep( 3 );
     }
     return true;
@@ -818,7 +818,7 @@ bool ZNP_FactoryNew( void )
 
 bool ZNP_BdbSetTcRequireKeyExchange( bool require_ )
 {
-    printf( "  [BDB] Set TC require key exchange = %s\n", require_ ? "TRUE" : "FALSE" );
+    LOG_DEBUG( "  [BDB] Set TC require key exchange = %s\n", require_ ? "TRUE" : "FALSE" );
     uint8_t payload[1];
     payload[0] = require_ ? 0x01 : 0x00;
 
@@ -826,10 +826,10 @@ bool ZNP_BdbSetTcRequireKeyExchange( bool require_ )
     if ( ZNP_Sreq( 0x2F, 0x09, payload, 1, &rx, 3000 ) )
     {
         uint8_t status = rx.len >= 1 ? rx.payload[0] : 0xFF;
-        printf( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
+        LOG_DEBUG( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
         return status == 0;
     }
-    printf( "    ❌ no response\n" );
+    LOG_DEBUG( "    ❌ no response\n" );
     return false;
 }
 
@@ -838,7 +838,7 @@ bool ZNP_PermitJoin( uint8_t duration_ )
     bool ok = false;
     MT_FRAME_T rx;
 
-    printf( "  [PJ-1] ZDO_MGMT_PERMIT_JOIN_REQ → coordinator (0x0000), %ds\n", duration_ );
+    LOG_DEBUG( "  [PJ-1] ZDO_MGMT_PERMIT_JOIN_REQ → coordinator (0x0000), %ds\n", duration_ );
     uint8_t payload[5];
     payload[0] = 0x02;
     payload[1] = 0x00;
@@ -848,11 +848,11 @@ bool ZNP_PermitJoin( uint8_t duration_ )
     if ( ZNP_Sreq( 0x25, 0x36, payload, 5, &rx, 3000 ) )
     {
         uint8_t status = rx.len >= 1 ? rx.payload[0] : 0xFF;
-        printf( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
+        LOG_DEBUG( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
         ok = ok || ( status == 0 );
     }
 
-    printf( "  [PJ-2] ZDO_MGMT_PERMIT_JOIN_REQ → broadcast (0xFFFC), %ds\n", duration_ );
+    LOG_DEBUG( "  [PJ-2] ZDO_MGMT_PERMIT_JOIN_REQ → broadcast (0xFFFC), %ds\n", duration_ );
     payload[0] = 0x0F;
     payload[1] = 0xFC;
     payload[2] = 0xFF;
@@ -861,11 +861,11 @@ bool ZNP_PermitJoin( uint8_t duration_ )
     if ( ZNP_Sreq( 0x25, 0x36, payload, 5, &rx, 3000 ) )
     {
         uint8_t status = rx.len >= 1 ? rx.payload[0] : 0xFF;
-        printf( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
+        LOG_DEBUG( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
         ok = ok || ( status == 0 );
     }
 
-    printf( "  [PJ-3] ZB_PERMIT_JOINING_REQ, %ds\n", duration_ );
+    LOG_DEBUG( "  [PJ-3] ZB_PERMIT_JOINING_REQ, %ds\n", duration_ );
     uint8_t zbPay[3];
     zbPay[0] = 0xFC;
     zbPay[1] = 0xFF;
@@ -873,16 +873,16 @@ bool ZNP_PermitJoin( uint8_t duration_ )
     if ( ZNP_Sreq( 0x26, 0x08, zbPay, 3, &rx, 3000 ) )
     {
         uint8_t status = rx.len >= 1 ? rx.payload[0] : 0xFF;
-        printf( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
+        LOG_DEBUG( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
     }
 
-    printf( "  [PJ-4] BDB_START_COMMISSIONING (Network Steering)\n" );
+    LOG_DEBUG( "  [PJ-4] BDB_START_COMMISSIONING (Network Steering)\n" );
     uint8_t bdbPay[1];
     bdbPay[0] = 0x02; // Network Steering
     if ( ZNP_Sreq( 0x2F, 0x05, bdbPay, 1, &rx, 3000 ) )
     {
         uint8_t status = rx.len >= 1 ? rx.payload[0] : 0xFF;
-        printf( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
+        LOG_DEBUG( "    status=%d %s\n", status, status == 0 ? "✅" : "❌" );
         ok = ok || ( status == 0 );
     }
 
@@ -919,31 +919,31 @@ bool ZNP_AfRegister( uint8_t endpoint_, uint16_t profileId_, uint16_t deviceId_,
         payload[idx++] = ( outClusters_[i] >> 8 ) & 0xFF;
     }
 
-    printf( "Registering endpoint %d...\n", endpoint_ );
+    LOG_DEBUG( "Registering endpoint %d...\n", endpoint_ );
     MT_FRAME_T rx;
     if ( ZNP_Sreq( 0x24, 0x00, payload, idx, &rx, 3000 ) )
     {
         if ( rx.len >= 1 && rx.payload[0] == 0 )
         {
-            printf( "  Endpoint %d registered successfully!\n", endpoint_ );
+            LOG_DEBUG( "  Endpoint %d registered successfully!\n", endpoint_ );
             return true;
         }
         else
         {
-            printf( "  Failed to register endpoint %d. Status=%d\n",
+            LOG_DEBUG( "  Failed to register endpoint %d. Status=%d\n",
                     endpoint_, rx.len >= 1 ? rx.payload[0] : -1 );
         }
     }
     else
     {
-        printf( "  Failed to register endpoint %d. Status=TIMEOUT\n", endpoint_ );
+        LOG_DEBUG( "  Failed to register endpoint %d. Status=TIMEOUT\n", endpoint_ );
     }
     return false;
 }
 
 bool ZNP_ZdoMsgCbRegister( uint16_t clusterId_ )
 {
-    printf( "Registering ZDO callback for cluster 0x%04X...\n", clusterId_ );
+    LOG_DEBUG( "Registering ZDO callback for cluster 0x%04X...\n", clusterId_ );
     uint8_t payload[2];
     payload[0] = clusterId_ & 0xFF;
     payload[1] = ( clusterId_ >> 8 ) & 0xFF;
@@ -1058,7 +1058,7 @@ bool ZNP_ZdoMatchDescReq( uint16_t shortAddr_, uint16_t profileId_,
 
 bool ZNP_ZdoActiveEpReq( uint16_t shortAddr_ )
 {
-    printf( " Sending Active EP Request to 0x%04X...\n", shortAddr_ );
+    LOG_DEBUG( " Sending Active EP Request to 0x%04X...\n", shortAddr_ );
     uint8_t payload[4];
     payload[0] = shortAddr_ & 0xFF;
     payload[1] = ( shortAddr_ >> 8 ) & 0xFF;
@@ -1076,9 +1076,36 @@ bool ZNP_ZdoActiveEpReq( uint16_t shortAddr_ )
     return false;
 }
 
+bool ZNP_ZdoMgmtLeaveReq( uint16_t shortAddr_, const uint8_t *extAddr_, bool removeChildren_, bool rejoin_ )
+{
+    LOG_DEBUG( " Sending Mgmt Leave Request to 0x%04X...\n", shortAddr_ );
+    uint8_t payload[11];
+    payload[0] = shortAddr_ & 0xFF;
+    payload[1] = ( shortAddr_ >> 8 ) & 0xFF;
+    if ( extAddr_ != NULL ) {
+        memcpy( &payload[2], extAddr_, 8 );
+    } else {
+        memset( &payload[2], 0, 8 );
+    }
+    uint8_t options = 0;
+    if ( rejoin_ ) options |= 0x01;
+    if ( removeChildren_ ) options |= 0x02;
+    payload[10] = options;
+
+    MT_FRAME_T rx;
+    if ( ZNP_Sreq( 0x25, 0x34, payload, 11, &rx, 3000 ) )
+    {
+        if ( rx.len >= 1 && rx.payload[0] == 0 )
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool ZNP_QuerySimpleDesc( uint16_t shortAddr_, uint8_t endpoint_ )
 {
-    printf( " Sending Simple Desc Request to 0x%04X ep 0x%02X...\n", shortAddr_, endpoint_ );
+    LOG_DEBUG( " Sending Simple Desc Request to 0x%04X ep 0x%02X...\n", shortAddr_, endpoint_ );
     uint8_t payload[5];
     payload[0] = shortAddr_ & 0xFF;
     payload[1] = ( shortAddr_ >> 8 ) & 0xFF;
@@ -1100,7 +1127,7 @@ bool ZNP_QuerySimpleDesc( uint16_t shortAddr_, uint8_t endpoint_ )
 bool ZNP_ZdoBindReq( uint16_t buttonShortAddr_, const uint8_t *buttonIeee_, uint8_t srcEndpoint_,
                      uint16_t clusterId_, const uint8_t *coordIeee_, uint8_t coordEndpoint_ )
 {
-    printf( "Sending ZDO Bind Request to button 0x%04X...\n", buttonShortAddr_ );
+    LOG_DEBUG( "Sending ZDO Bind Request to button 0x%04X...\n", buttonShortAddr_ );
     uint8_t payload[25];
     int idx = 0;
 
@@ -1134,7 +1161,7 @@ bool ZNP_ZdoBindReq( uint16_t buttonShortAddr_, const uint8_t *buttonIeee_, uint
 
 bool ZNP_WriteCieAddress( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_, uint8_t transId_ )
 {
-    printf( "Writing CIE Address to button 0x%04X...\n", buttonShortAddr_ );
+    LOG_DEBUG( "Writing CIE Address to button 0x%04X...\n", buttonShortAddr_ );
 
     uint8_t zclPayload[11];
     zclPayload[0] = 0x10;
@@ -1154,7 +1181,7 @@ bool ZNP_WriteCieAddress( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_, ui
 
 bool ZNP_SendButtonActivation( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_, uint8_t transId_ )
 {
-    printf( "Sending Onics panic activation to button 0x%04X (attr=0x8000, Uint16=0x21, value=0x002C=PERSONAL_EMERGENCY_DEVICE)...\n", buttonShortAddr_ );
+    LOG_DEBUG( "Sending Onics panic activation to button 0x%04X (attr=0x8000, Uint16=0x21, value=0x002C=PERSONAL_EMERGENCY_DEVICE)...\n", buttonShortAddr_ );
 
     // Per SBTZB-110 Technical Manual Section 4.2.3.2 + hardware diagnostic:
     //   Attribute 0x8000 (IAS Zone Activation, mfr=0x1015) on cluster 0x000F (Binary Input):
@@ -1186,7 +1213,7 @@ bool ZNP_SendButtonActivation( uint16_t buttonShortAddr_, uint8_t buttonEndpoint
 bool ZNP_SendZoneEnrollResponse( uint16_t buttonShortAddr_, uint8_t buttonEndpoint_,
                                  uint8_t transId_, uint8_t zoneId_ )
 {
-    printf( "Sending Zone Enroll Response to button 0x%04X...\n", buttonShortAddr_ );
+    LOG_DEBUG( "Sending Zone Enroll Response to button 0x%04X...\n", buttonShortAddr_ );
 
     uint8_t zclFrame[5];
     zclFrame[0] = 0x11;
@@ -1203,7 +1230,7 @@ bool ZNP_SendSirenWarning( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uin
                            uint8_t warnMode_, uint8_t volume_, uint16_t duration_ )
 {
     const char *modeStr = ( warnMode_ != 0 ) ? "START" : "STOP";
-    printf( "Sending Siren %s to siren 0x%04X ep=0x%02X...\n", modeStr, sirenShortAddr_, sirenEndpoint_ );
+    LOG_DEBUG( "Sending Siren %s to siren 0x%04X ep=0x%02X...\n", modeStr, sirenShortAddr_, sirenEndpoint_ );
 
     uint8_t modeLevel = ( ( warnMode_ & 0x0F ) << 4 ) | (volume_ & 0x03);
     uint8_t zclFrame[8];
@@ -1224,7 +1251,7 @@ bool ZNP_SendSirenWarning( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uin
 bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint8_t transId_,
                           uint8_t squawkMode_, uint8_t volume_ )
 {
-    printf( "Sending Siren SQUAWK to siren 0x%04X ep=0x%02X...\n", sirenShortAddr_, sirenEndpoint_ );
+    LOG_DEBUG( "Sending Siren SQUAWK to siren 0x%04X ep=0x%02X...\n", sirenShortAddr_, sirenEndpoint_ );
 
     // Bits 4-7: Squawk Mode (0=System is armed)
     // Bit 3: Strobe (0)
@@ -1247,7 +1274,7 @@ bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint
 bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t endpoint_, uint16_t clusterId_,
                              uint8_t transId_, uint8_t cmdId_, uint8_t status_)
 {
-    printf("Sending Default Response to 0x%04X ep=0x%02X cluster=0x%04X cmd=0x%02X status=0x%02X...\n",
+    LOG_DEBUG("Sending Default Response to 0x%04X ep=0x%02X cluster=0x%04X cmd=0x%02X status=0x%02X...\n",
            shortAddr_, endpoint_, clusterId_, cmdId_, status_);
 
     uint8_t zclFrame[5];

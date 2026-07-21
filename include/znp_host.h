@@ -14,6 +14,16 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+
+#define LOG_LEVEL_DEBUG 0
+#define LOG_LEVEL_INFO  1
+
+extern int g_logLevel;
+
+#define LOG_DEBUG(...) do { if (g_logLevel <= LOG_LEVEL_DEBUG) { printf(__VA_ARGS__); } } while(0)
+#define LOG_INFO(...)  do { if (g_logLevel <= LOG_LEVEL_INFO)  { printf(__VA_ARGS__); } } while(0)
+
 
 #define PORT_DEFAULT "/dev/ttyACM0" ///< Default serial device if none is given.
 #define PERMIT_JOIN_DURATION 0xFE   ///< Permit-join window, 254 seconds.
@@ -330,6 +340,16 @@ bool ZNP_ZdoMatchDescReq(uint16_t shortAddr_, uint16_t profileId_,
 /// @return true if the request was accepted.
 ///
 bool ZNP_ZdoActiveEpReq(uint16_t shortAddr_);
+
+///
+/// @brief  ZDO_MGMT_LEAVE_REQ - tell a device to leave the network.
+/// @param  shortAddr_      Target device network address.
+/// @param  extAddr_        Optional IEEE address of the device to remove (NULL to use shortAddr only).
+/// @param  removeChildren_ True to remove children as well.
+/// @param  rejoin_         True to instruct the device to rejoin immediately.
+/// @return true if the request was accepted.
+///
+bool ZNP_ZdoMgmtLeaveReq(uint16_t shortAddr_, const uint8_t *extAddr_, bool removeChildren_, bool rejoin_);
 
 ///
 /// @brief  ZDO_SIMPLE_DESC_REQ - fetch one endpoint's descriptor (clusters).

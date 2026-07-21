@@ -58,7 +58,7 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
           if (g_contactSensors[i].shortAddr == af_->srcAddr) {
             double now = ZNP_GetCurrentTime();
             if (g_contactSensors[i].isOpen != open) {
-              printf("🚪 Contact Sensor 0x%04X state corrected by refresh: %s "
+              LOG_DEBUG("🚪 Contact Sensor 0x%04X state corrected by refresh: %s "
                      "(a change notification was missed)\n",
                      af_->srcAddr, open ? "OPEN" : "CLOSED");
               if (open)
@@ -78,7 +78,7 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Success
         uint8_t bat = zcl[4]; // Unit is 100 mV
-        printf("🔋 Contact Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
+        LOG_DEBUG("🔋 Contact Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
       }
     }
   } else if (af_->clusterId == 0x0402) { // Temperature Measurement
@@ -87,10 +87,10 @@ static void ContactSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Read Resp Success
         int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
-        printf("🌡️ Contact Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_DEBUG("🌡️ Contact Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
       } else if (cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00) { // Report
         int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
-        printf("🌡️ Contact Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_DEBUG("🌡️ Contact Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
       }
     }
   }
@@ -204,8 +204,9 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   bool isRejoin = false;
   if (idx == -1) {
     if (g_numContactSensors < MAX_CONTACT_SENSORS) {
-      printf(" Contact Sensor discovered: short=0x%04X, ep=0x%02X\n",
+      LOG_DEBUG(" Contact Sensor discovered: short=0x%04X, ep=0x%02X\n",
              shortAddr_, endpoint_);
+      LOG_INFO("Contact Sensor 0x%04X - Network Join\n", shortAddr_);
       g_contactSensors[g_numContactSensors].shortAddr = shortAddr_;
       g_contactSensors[g_numContactSensors].endpoint = endpoint_;
       g_contactSensors[g_numContactSensors].lastSeen = ZNP_GetCurrentTime();
@@ -220,8 +221,9 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     }
   } else {
     if (g_contactSensors[idx].shortAddr != shortAddr_) {
-      printf(" Contact Sensor 0x%04X rejoined as 0x%04X (same IEEE) - reusing entry\n",
+      LOG_DEBUG(" Contact Sensor 0x%04X rejoined as 0x%04X (same IEEE) - reusing entry\n",
              g_contactSensors[idx].shortAddr, shortAddr_);
+      LOG_INFO("Contact Sensor 0x%04X - Network Rejoin\n", shortAddr_);
       g_contactSensors[idx].shortAddr = shortAddr_;
       isRejoin = true;
       changed = true;
@@ -299,7 +301,7 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
   }
   if (!g_contactSensors[idx].hasIeee) {
     pthread_mutex_unlock(&g_deviceMutex);
-    printf("Contact sensor 0x%04X missing IEEE - requesting...\n", shortAddr_);
+    LOG_DEBUG("Contact sensor 0x%04X missing IEEE - requesting...\n", shortAddr_);
     uint8_t reqPay[4] = {shortAddr_ & 0xFF, (shortAddr_ >> 8) & 0xFF, 0x01,
                          0x00};
     ZNP_Sreq(0x25, 0x01, reqPay, 4, NULL, 3000);
@@ -312,7 +314,7 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
   g_contactSensors[idx].lastSetupAttempt = ZNP_GetCurrentTime();
   pthread_mutex_unlock(&g_deviceMutex);
 
-  printf("Configuring Contact Sensor 0x%04X...\n", shortAddr_);
+  LOG_DEBUG("Configuring Contact Sensor 0x%04X...\n", shortAddr_);
 
   // 1. Bind IAS Zone cluster (0x0500)
   bool bindOk = ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0500,
@@ -337,7 +339,7 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
         g_contactSensors[i].setupRetries = 0;
       } else {
         g_contactSensors[i].setupRetries++;
-        printf("Contact Sensor 0x%04X setup FAILED (bind=%s cie=%s, attempt %u) - will retry\n",
+        LOG_DEBUG("Contact Sensor 0x%04X setup FAILED (bind=%s cie=%s, attempt %u) - will retry\n",
                shortAddr_, bindOk ? "OK" : "FAIL", cieOk ? "OK" : "FAIL",
                g_contactSensors[i].setupRetries);
       }
@@ -347,13 +349,13 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
   pthread_mutex_unlock(&g_deviceMutex);
 
   if (bindOk && cieOk) {
-    printf("Configuration sent to Contact Sensor 0x%04X!\n", shortAddr_);
+    LOG_DEBUG("Configuration sent to Contact Sensor 0x%04X!\n", shortAddr_);
   }
 }
 
 void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
                                 uint8_t transSeq_, uint16_t zoneType_) {
-  printf("   -> Zone Enroll Request from Contact Sensor 0x%04X, "
+  LOG_DEBUG("   -> Zone Enroll Request from Contact Sensor 0x%04X, "
          "zone_type=0x%04X\n",
          shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
@@ -373,7 +375,7 @@ void ContactSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_,
 
 void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
                                 uint8_t zoneId_) {
-  printf("   -> Zone Status Change from Contact Sensor 0x%04X: "
+  LOG_DEBUG("   -> Zone Status Change from Contact Sensor 0x%04X: "
          "zone_status=0x%04X, zone_id=%d\n",
          shortAddr_, zoneStatus_, zoneId_);
 
@@ -392,9 +394,9 @@ void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
   pthread_mutex_unlock(&g_deviceMutex);
 
   if (open) {
-    UseCase_Post(UC_CONTACT_OPEN, shortAddr_, zoneStatus_);
+    UseCase_Post(UC_CONTACT_OPEN, shortAddr_, zoneStatus_, 0);
   } else {
-    UseCase_Post(UC_CONTACT_CLOSED, shortAddr_, zoneStatus_);
+    UseCase_Post(UC_CONTACT_CLOSED, shortAddr_, zoneStatus_, 0);
   }
 }
 
@@ -450,7 +452,7 @@ void ContactSensor_UpdateSeen(uint16_t shortAddr_) {
   }
   pthread_mutex_unlock(&g_deviceMutex);
   if (retrySetup) {
-    printf("Contact Sensor 0x%04X is awake and unconfigured - retrying setup\n", shortAddr_);
+    LOG_DEBUG("Contact Sensor 0x%04X is awake and unconfigured - retrying setup\n", shortAddr_);
     ContactSensor_PostAssign(shortAddr_);
   }
 }
@@ -504,7 +506,7 @@ void ContactSensor_RefreshIfStale(double maxAgeSeconds_) {
 }
 
 void ContactSensor_ReadEnvironment(uint16_t shortAddr_) {
-  printf("Requesting Environment Data (Battery & Temp) from Contact Sensor 0x%04X...\n", shortAddr_);
+  LOG_DEBUG("Requesting Environment Data (Battery & Temp) from Contact Sensor 0x%04X...\n", shortAddr_);
   
   // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 1
   uint8_t zclFrameBat[5];

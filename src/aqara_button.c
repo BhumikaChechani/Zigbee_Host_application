@@ -127,7 +127,8 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     {
         if ( g_numAqaraButtons < MAX_AQARA_BUTTONS )
         {
-            printf( " Aqara Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_DEBUG( " Aqara Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_INFO("Aqara Button 0x%04X - Network Join\n", shortAddr_);
             g_aqaraButtons[g_numAqaraButtons].shortAddr = shortAddr_;
             g_aqaraButtons[g_numAqaraButtons].endpoint = endpoint_;
             g_aqaraButtons[g_numAqaraButtons].lastSeen = ZNP_GetCurrentTime();
@@ -233,7 +234,7 @@ void AqaraButton_Setup( uint16_t shortAddr_ )
     {
         pthread_mutex_unlock( &g_deviceMutex );
         // Request IEEE; the response re-triggers setup via UpdateIeee.
-        printf( "Aqara button 0x%04X missing IEEE - requesting...\n", shortAddr_ );
+        LOG_DEBUG( "Aqara button 0x%04X missing IEEE - requesting...\n", shortAddr_ );
         uint8_t reqPay[4] = { shortAddr_ & 0xFF, ( shortAddr_ >> 8 ) & 0xFF, 0x01, 0x00 };
         ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 );
         return;
@@ -245,29 +246,29 @@ void AqaraButton_Setup( uint16_t shortAddr_ )
     g_aqaraButtons[idx].configured = true;
     pthread_mutex_unlock( &g_deviceMutex );
 
-    printf( "Configuring Aqara button 0x%04X...\n", shortAddr_ );
+    LOG_DEBUG( "Configuring Aqara button 0x%04X...\n", shortAddr_ );
 
     // Bind On/Off cluster output (0x0006) to coordinator endpoint 8.
     ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
-    printf( "Configuration sent to Aqara button 0x%04X!\n", shortAddr_ );
+    LOG_DEBUG( "Configuration sent to Aqara button 0x%04X!\n", shortAddr_ );
 }
 
 // Parse a press and forward it to the use-case layer. The button module does
 // NOT drive the siren itself - that policy lives in usecase.c.
 void AqaraButton_HandleCommand( uint16_t shortAddr_, uint8_t cmdId_ )
 {
-    printf( "👉 [AQARA BUTTON] Command received: cmd_id=0x%02X from src=0x%04X\n", cmdId_, shortAddr_ );
+    LOG_DEBUG( "👉 [AQARA BUTTON] Command received: cmd_id=0x%02X from src=0x%04X\n", cmdId_, shortAddr_ );
     if ( cmdId_ == 0x01 ) // On
     {
-        UseCase_Post( UC_BUTTON_ON, shortAddr_, cmdId_ );
+        UseCase_Post( UC_BUTTON_ON, shortAddr_, cmdId_, 0 );
     }
     else if ( cmdId_ == 0x00 ) // Off
     {
-        UseCase_Post( UC_BUTTON_OFF, shortAddr_, cmdId_ );
+        UseCase_Post( UC_BUTTON_OFF, shortAddr_, cmdId_, 0 );
     }
     else if ( cmdId_ == 0x02 ) // Toggle
     {
-        UseCase_Post( UC_BUTTON_TOGGLE, shortAddr_, cmdId_ );
+        UseCase_Post( UC_BUTTON_TOGGLE, shortAddr_, cmdId_, 0 );
     }
 }
 

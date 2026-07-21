@@ -66,6 +66,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  forcesetup <addr>              - Force re-bind and config payload to sensor\n" );
         printf( "  onicsdelay <addr> <ms>         - Write ButtonPressActionDelay (attr 0x8001)\n" );
         printf( "  lightthreshold [value]         - Set or show light threshold for Aqara Occupancy\n" );
+        printf( "  remove <addr>                  - Send a ZDO Leave Request to forcefully remove a device\n" );
         printf( "  exit                           - Quit application\n\n" );
     }
     else if ( strcmp( base, "status" ) == 0 )
@@ -399,6 +400,27 @@ static void Cli_HandleCommand( const char *cmd_ )
         }
         printf( "Opening permit join for %d seconds...\n", duration );
         ZNP_PermitJoin( duration );
+    }
+    else if ( strcmp( base, "remove" ) == 0 )
+    {
+        if ( numParts >= 2 )
+        {
+            uint16_t addr = (uint16_t)strtol( parts[1], NULL, 16 );
+            uint8_t ieee[8];
+            bool hasIeee = Device_GetDiscoveredIeee( addr, ieee );
+            if (hasIeee) {
+                printf( "Sending network leave request to 0x%04X (IEEE: %02X%02X%02X%02X%02X%02X%02X%02X)...\n", addr,
+                        ieee[7], ieee[6], ieee[5], ieee[4], ieee[3], ieee[2], ieee[1], ieee[0] );
+            } else {
+                printf( "Sending network leave request to 0x%04X (No IEEE known, using short address only)...\n", addr );
+            }
+            ZNP_ZdoMgmtLeaveReq( addr, hasIeee ? ieee : NULL, false, false );
+            printf( "Note: To fully clear from memory, you may still need to delete its line from devices.txt and restart.\n" );
+        }
+        else
+        {
+            printf( "Usage: remove <shortAddr>\n" );
+        }
     }
     else if ( strcmp( base, "exit" ) == 0 || strcmp( base, "quit" ) == 0 )
     {

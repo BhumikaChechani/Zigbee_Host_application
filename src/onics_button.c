@@ -324,6 +324,7 @@ void OnicsButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
             g_onicsButtons[g_numOnicsButtons].zoneId = -1;
             g_onicsButtons[g_numOnicsButtons].hasIeee = Device_GetDiscoveredIeee( shortAddr_, g_onicsButtons[g_numOnicsButtons].ieee );
             g_onicsButtons[g_numOnicsButtons].configured = false;
+            g_onicsButtons[g_numOnicsButtons].isPanic = false;
             g_numOnicsButtons++;
             changed = true;
         }
@@ -488,6 +489,29 @@ void OnicsButton_HandleStatus( uint16_t shortAddr_, uint16_t zoneStatus_, uint8_
             shortAddr_, zoneStatus_, zoneId_ );
 
     bool alarm = ( zoneStatus_ & 0x0003 ) != 0;
+    
+    pthread_mutex_lock( &g_deviceMutex );
+    bool stateChanged = false;
+    for ( int i = 0; i < g_numOnicsButtons; i++ )
+    {
+        if ( g_onicsButtons[i].shortAddr == shortAddr_ )
+        {
+            if ( g_onicsButtons[i].isPanic != alarm )
+            {
+                g_onicsButtons[i].isPanic = alarm;
+                stateChanged = true;
+            }
+            break;
+        }
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    if ( !stateChanged )
+    {
+        LOG_DEBUG("-> Ignored redundant heartbeat status (alarm=%d)\n", alarm);
+        return;
+    }
+
     if ( alarm )
     {
         UseCase_Post( UC_PANIC_SET, shortAddr_, zoneStatus_, 0 );

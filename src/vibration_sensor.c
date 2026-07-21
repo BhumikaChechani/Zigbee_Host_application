@@ -156,6 +156,7 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_vibrationSensors[g_numVibrationSensors].lastVibrationTime = 0.0;
       g_vibrationSensors[g_numVibrationSensors].isMoving = false;
       g_vibrationSensors[g_numVibrationSensors].lastMovementTime = 0.0;
+      g_vibrationSensors[g_numVibrationSensors].isTampered = false;
       g_vibrationSensors[g_numVibrationSensors].sensitivity = 10;
       g_numVibrationSensors++;
       changed = true;
@@ -330,6 +331,21 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
       if (g_vibrationSensors[idx].isVibrating) {
         g_vibrationSensors[idx].isVibrating = false;
         UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, 0, 0);
+      }
+    }
+
+    bool tamper_active = ((zoneStatus_ & 0x0004) != 0); // Tamper bit
+
+    // Handle Tamper (Alarm 3)
+    if (tamper_active) {
+      if (!g_vibrationSensors[idx].isTampered) {
+        g_vibrationSensors[idx].isTampered = true;
+        UseCase_Post(UC_TAMPER_DETECTED, shortAddr_, zoneStatus_, 0);
+      }
+    } else {
+      if (g_vibrationSensors[idx].isTampered) {
+        g_vibrationSensors[idx].isTampered = false;
+        UseCase_Post(UC_TAMPER_CLEARED, shortAddr_, 0, 0);
       }
     }
   }

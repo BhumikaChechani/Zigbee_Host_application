@@ -313,6 +313,18 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     Siren_ControlAll(0);
 #endif
     break;
+  case UC_TAMPER_DETECTED:
+    LOG_EVENT("SECURITY", event_->srcAddr, "\033[1;31mTAMPER DETECTED (Cover Opened)\033[0m\n");
+#if ENABLE_SIREN
+    Siren_TriggerAll(4, 240);
+#endif
+    break;
+  case UC_TAMPER_CLEARED:
+    LOG_EVENT("SECURITY", event_->srcAddr, "Tamper CLEARED (Cover Closed)\n");
+#if ENABLE_SIREN
+    Siren_ControlAll(0);
+#endif
+    break;
   case UC_DEVICE_OFFLINE:
     LOG_EVENT("HEALTH", event_->srcAddr, "\033[1;31mDevice OFFLINE (Unreachable)\033[0m\n");
     break;

@@ -22,6 +22,7 @@ typedef struct
     bool isMoving;
     double lastMovementTime;
     uint16_t lastZoneStatus;
+    bool isTampered;
     uint8_t sensitivity;
 } VIBRATION_SENSOR_T;
 

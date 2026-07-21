@@ -116,8 +116,6 @@ static void *Siren_Thread( void *arg_ )
     return NULL;
 }
 
-static uint8_t s_sirenVolume = 2; // high by default
-static uint8_t s_sirenMode = 1;   // burglar by default
 static uint8_t s_sirenSeq = 0;    // transaction sequence number (atomic: multiple threads send)
 
 static uint8_t Siren_NextSeq( void )
@@ -125,43 +123,13 @@ static uint8_t Siren_NextSeq( void )
     return __atomic_add_fetch( &s_sirenSeq, 1, __ATOMIC_RELAXED );
 }
 
-static const char SIREN_CONFIG_FILE[] = "siren_config.txt";
-
-static void Siren_LoadConfig(void)
-{
-    FILE *f = fopen(SIREN_CONFIG_FILE, "r");
-    if (f)
-    {
-        int v, m;
-        int parsed = fscanf(f, "%d %d", &v, &m);
-        if (parsed >= 1)
-        {
-            if (v >= 0 && v <= 3) s_sirenVolume = (uint8_t)v;
-        }
-        if (parsed >= 2)
-        {
-            if (m >= 1 && m <= 6) s_sirenMode = (uint8_t)m;
-        }
-        fclose(f);
-    }
-}
-
-static void Siren_SaveConfig(void)
-{
-    FILE *f = fopen(SIREN_CONFIG_FILE, "w");
-    if (f)
-    {
-        fprintf(f, "%d %d\n", s_sirenVolume, s_sirenMode);
-        fclose(f);
-    }
-}
 
 void Siren_Init( void )
 {
     memset( g_sirens, 0, sizeof( g_sirens ) );
     g_numSirens = 0;
     MsgQueue_Init( &s_sirenInbox );
-    Siren_LoadConfig();
+    
 }
 
 void Siren_Start( void )
@@ -234,6 +202,8 @@ void Siren_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
             g_sirens[g_numSirens].lastSeen = ZNP_GetCurrentTime();
             g_sirens[g_numSirens].hasIeee = Device_GetDiscoveredIeee( shortAddr_, g_sirens[g_numSirens].ieee );
             g_sirens[g_numSirens].configured = false;
+            g_sirens[g_numSirens].volume = 2;
+            g_sirens[g_numSirens].mode = 1;
             g_numSirens++;
             changed = true;
         }
@@ -376,35 +346,97 @@ void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSe
     ZNP_SendZoneEnrollResponse( shortAddr_, endpoint_, transSeq_, zoneId );
 }
 
-void Siren_SetVolume( uint8_t volume_ )
+void Siren_SetVolume( uint16_t shortAddr_, uint8_t volume_ )
 {
     if (volume_ > 3) volume_ = 3;
-    s_sirenVolume = volume_;
-    Siren_SaveConfig();
-    printf("SUCCESS: Siren global volume set to %d (0=low, 1=medium, 2=high, 3=very high).\n", volume_);
+    pthread_mutex_lock(&g_deviceMutex);
+    bool found = false;
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            g_sirens[i].volume = volume_;
+            found = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (found) {
+        Device_Save();
+        printf("SUCCESS: Siren 0x%04X volume set to %d (0=low, 1=medium, 2=high, 3=very high).\n", shortAddr_, volume_);
+    } else {
+        printf("ERROR: Siren 0x%04X not found.\n", shortAddr_);
+    }
 }
 
-uint8_t Siren_GetVolume( void )
+uint8_t Siren_GetVolume( uint16_t shortAddr_ )
 {
-    return s_sirenVolume;
+    uint8_t vol = 2; // default
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            vol = g_sirens[i].volume;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    return vol;
 }
 
-void Siren_SetMode( uint8_t mode_ )
+void Siren_SetMode( uint16_t shortAddr_, uint8_t mode_ )
 {
     if (mode_ < 1 || mode_ > 6) mode_ = 1;
-    s_sirenMode = mode_;
-    Siren_SaveConfig();
-    printf("SUCCESS: Siren global mode set to %d.\n", mode_);
+    pthread_mutex_lock(&g_deviceMutex);
+    bool found = false;
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            g_sirens[i].mode = mode_;
+            found = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (found) {
+        Device_Save();
+        printf("SUCCESS: Siren 0x%04X mode set to %d.\n", shortAddr_, mode_);
+    } else {
+        printf("ERROR: Siren 0x%04X not found.\n", shortAddr_);
+    }
 }
 
-uint8_t Siren_GetMode( void )
+uint8_t Siren_GetMode( uint16_t shortAddr_ )
 {
-    return s_sirenMode;
+    uint8_t mode = 1; // default
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            mode = g_sirens[i].mode;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    return mode;
 }
 
 void Siren_ControlAll( uint8_t warnMode_ )
 {
     Siren_ControlAllDuration( warnMode_, 240 ); // default to 240 seconds
+}
+
+void Siren_Control( uint16_t shortAddr_, uint8_t warnMode_ )
+{
+    g_sirenActive = ( warnMode_ != 0 );
+    pthread_mutex_lock( &g_deviceMutex );
+    for ( int i = 0; i < g_numSirens; i++ )
+    {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            uint8_t mode = (warnMode_ != 0) ? g_sirens[i].mode : 0;
+            uint8_t ep = g_sirens[i].endpoint;
+            uint8_t vol = g_sirens[i].volume;
+            pthread_mutex_unlock( &g_deviceMutex );
+            ZNP_SendSirenWarning( shortAddr_, ep, Siren_NextSeq(), mode, vol, 240 );
+            return;
+        }
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
 }
 
 void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
@@ -426,8 +458,8 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        uint8_t mode = (warnMode_ != 0) ? s_sirenMode : 0;
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode, s_sirenVolume, durationSeconds_ );
+        uint8_t mode = (warnMode_ != 0) ? tempSirens[i].mode : 0;
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode, tempSirens[i].volume, durationSeconds_ );
     }
 }
 
@@ -455,7 +487,7 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
         // ignore the native Squawk command (0x01) unless armed by a separate security panel.
         // The industry-standard workaround (used by Z2M/Home Assistant) is to emulate the chirp 
         // using the highly reliable Start Warning (0x00) command for a 1-second duration.
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), s_sirenMode, squawkLevel_, 1 );
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), tempSirens[i].mode, squawkLevel_, 1 );
     }
 }
 

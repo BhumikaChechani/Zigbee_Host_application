@@ -170,7 +170,7 @@ void Device_Save( void )
         {
             fprintf( file, "%02X", g_sirens[i].ieee[j] );
         }
-        fprintf( file, " %d %d\n", g_sirens[i].hasIeee ? 1 : 0, g_sirens[i].zoneId );
+        fprintf( file, " %d %d %u %u\n", g_sirens[i].hasIeee ? 1 : 0, g_sirens[i].zoneId, g_sirens[i].volume, g_sirens[i].mode );
     }
 #endif
 
@@ -278,7 +278,9 @@ void Device_Load( void )
 #if ENABLE_SIREN
         else if ( strcmp( type, "siren" ) == 0 )
         {
-            int items = fscanf( file, "%u %u", &hasIeee, &zoneId );
+            uint32_t vol = 2;
+            uint32_t mod = 1;
+            int items = fscanf( file, "%u %u %u %u", &hasIeee, &zoneId, &vol, &mod );
             if ( items == 1 )
             {
                 zoneId = 0;
@@ -291,6 +293,8 @@ void Device_Load( void )
                 g_sirens[g_numSirens].hasIeee = ( hasIeee != 0 );
                 memcpy( g_sirens[g_numSirens].ieee, ieee, 8 );
                 g_sirens[g_numSirens].zoneId = zoneId;
+                g_sirens[g_numSirens].volume = vol;
+                g_sirens[g_numSirens].mode = mod;
                 g_sirens[g_numSirens].configured = true;
                 g_numSirens++;
                 Device_AddDiscoveredIeee( shortAddr, ieee );

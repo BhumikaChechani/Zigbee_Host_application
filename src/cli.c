@@ -46,13 +46,13 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  status                         - Print system and device status\n" );
         printf( "  permit [seconds]               - Open network for joining (default 60s)\n" );
         printf( "  discover [addr]                - Trigger endpoint/cluster discovery\n" );
-        printf( "  siren on                       - Turn all sirens ON\n" );
-        printf( "  siren off                      - Turn all sirens OFF\n" );
-        printf( "  siren vol <0-3>                - Set siren volume globally (0=low, 3=very high)\n" );
-        printf( "  siren mode <1-6>               - Set siren sound mode globally\n" );
-        printf( "                                   * 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic\n" );
-        printf( "  siren test <addr> [mode]       - Test siren warning directly\n" );
+        printf( "  siren test <addr> [mode]       - Briefly test a siren (mode 1-6)\n" );
         printf( "  siren stop <addr>              - Stop a specific siren\n" );
+        printf( "  siren on <addr>                - Turn a specific siren ON\n" );
+        printf( "  siren off <addr>               - Turn a specific siren OFF\n" );
+        printf( "  siren vol <addr> <0-3>         - Set a specific siren's volume\n" );
+        printf( "  siren mode <addr> <1-6>        - Set a specific siren's warning mode\n" );
+        printf( "                                   * 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic\n" );
         printf( "\n--- Sensor Configuration ---\n" );
         printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
         printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren\n" );
@@ -96,88 +96,81 @@ static void Cli_HandleCommand( const char *cmd_ )
     }
     else if ( strcmp( base, "siren" ) == 0 )
     {
-        if ( numParts < 2 )
+        if ( numParts < 3 )
         {
-            printf( "Usage: siren [on|off|test|vol]\n" );
+            printf( "Usage: siren [test|stop|on|off|vol|mode] <addr> [args...]\n" );
             return;
         }
-        if ( strcmp( parts[1], "on" ) == 0 )
-        {
-            printf( "Manually starting all sirens...\n" );
 #if ENABLE_SIREN
-            Siren_ControlAll( 1 );
-#endif
-        }
-        else if ( strcmp( parts[1], "off" ) == 0 )
+        char *sub = parts[1];
+        if ( strcmp( sub, "test" ) == 0 )
         {
-            printf( "Manually stopping all sirens...\n" );
-#if ENABLE_SIREN
-            Siren_ControlAll( 0 );
-#endif
-        }
-        else if ( strcmp( parts[1], "vol" ) == 0 )
-        {
-            if ( numParts < 3 )
-            {
-                printf( "Usage: siren vol <0-3> (0=low, 1=medium, 2=high, 3=very high)\n" );
-                return;
-            }
-            uint8_t vol = (uint8_t)strtoul( parts[2], NULL, 10 );
-#if ENABLE_SIREN
-            Siren_SetVolume( vol );
-#endif
-        }
-        else if ( strcmp( parts[1], "mode" ) == 0 )
-        {
-            if ( numParts < 3 )
-            {
-                printf( "Usage: siren mode <1-6> (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic)\n" );
-                return;
-            }
-            uint8_t mode = (uint8_t)strtoul( parts[2], NULL, 10 );
-#if ENABLE_SIREN
-            Siren_SetMode( mode );
-#endif
-        }
-        else if ( strcmp( parts[1], "test" ) == 0 )
-        {
-            if ( numParts < 3 )
-            {
-                printf( "Usage: siren test <addr_hex> [mode]\n" );
-                return;
-            }
-            uint16_t addr = (uint16_t)strtol( parts[2], NULL, 16 );
-            
-#if ENABLE_SIREN
+            uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
             uint8_t ep = Siren_GetEndpoint(addr);
-            if (ep == 0)
+            if ( ep == 0 )
             {
-                printf("Error: Siren 0x%04X is not registered. Run 'status' or trigger discovery.\n", addr);
-                return;
+                printf( "Siren 0x%04X not registered or not known.\n", addr );
             }
-            uint8_t testMode = (numParts >= 4) ? (uint8_t)strtol( parts[3], NULL, 10 ) : Siren_GetMode();
-            ZNP_SendSirenWarning( addr, ep, 0xBB, testMode, Siren_GetVolume(), 240 );
-#endif
+            else
+            {
+                uint8_t testMode = (numParts >= 4) ? (uint8_t)strtol( parts[3], NULL, 10 ) : Siren_GetMode(addr);
+                ZNP_SendSirenWarning( addr, ep, 0xBB, testMode, Siren_GetVolume(addr), 240 );
+                printf( "Sent warning test to 0x%04X (ep 0x%02X, mode %d)\n", addr, ep, testMode );
+            }
         }
-        else if ( strcmp( parts[1], "stop" ) == 0 )
+        else if ( strcmp( sub, "stop" ) == 0 )
         {
-            if ( numParts < 3 )
-            {
-                printf( "Usage: siren stop <addr_hex>\n" );
-                return;
-            }
-            uint16_t addr = (uint16_t)strtol( parts[2], NULL, 16 );
-            
-#if ENABLE_SIREN
+            uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
             uint8_t ep = Siren_GetEndpoint(addr);
-            if (ep == 0)
+            if ( ep == 0 )
             {
-                printf("Error: Siren 0x%04X is not registered. Run 'status' or trigger discovery.\n", addr);
-                return;
+                printf( "Siren 0x%04X not registered or not known.\n", addr );
             }
-            ZNP_SendSirenWarning( addr, ep, 0xBB, 0, Siren_GetVolume(), 240 );
-#endif
+            else
+            {
+                ZNP_SendSirenWarning( addr, ep, 0xBB, 0, Siren_GetVolume(addr), 240 );
+                printf( "Sent stop to 0x%04X (ep 0x%02X)\n", addr, ep );
+            }
         }
+        else if ( strcmp( sub, "on" ) == 0 )
+        {
+            uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+            Siren_Control( addr, 1 );
+            printf( "Sent ON command to Siren 0x%04X.\n", addr );
+        }
+        else if ( strcmp( sub, "off" ) == 0 )
+        {
+            uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+            Siren_Control( addr, 0 );
+            printf( "Sent OFF command to Siren 0x%04X.\n", addr );
+        }
+        else if ( strcmp( sub, "vol" ) == 0 )
+        {
+            if ( numParts >= 4 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                uint8_t v = (uint8_t)strtol( parts[3], NULL, 10 );
+                Siren_SetVolume( addr, v );
+            }
+            else
+            {
+                printf( "Usage: siren vol <addr> <0-3>\n" );
+            }
+        }
+        else if ( strcmp( sub, "mode" ) == 0 )
+        {
+            if ( numParts >= 4 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                uint8_t m = (uint8_t)strtol( parts[3], NULL, 10 );
+                Siren_SetMode( addr, m );
+            }
+            else
+            {
+                printf( "Usage: siren mode <addr> <1-6>\n" );
+            }
+        }
+#endif
     }
     else if ( strcmp( base, "zone" ) == 0 )
     {

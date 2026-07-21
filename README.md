@@ -146,6 +146,14 @@ Each sensor runs on its own background thread, and the central policy engine run
 
 *(Notice how the button never talks directly to the siren—everything goes through the `usecase.c` logic layer!)*
 
+### Security & Health Monitoring
+The system includes built-in safeguards to ensure network reliability:
+- **Active Health Watchdog**: A background thread actively tracks the `last_seen` timestamp of all registered devices. 
+  - Sleepy battery-powered devices (buttons, contact sensors) are marked **OFFLINE** if they miss their check-ins for >2 hours.
+  - Active routers (sirens, occupancy sensors) are polled every 60 seconds and marked **OFFLINE** if they stop responding for >5 minutes.
+  - The `[HEALTH]` logs will instantly warn the user of unreachable devices, and the system prevents sending commands to unreachable sirens.
+- **Hardware Tamper Detection**: Devices equipped with physical tamper switches (Frient Contact Sensors, Frient Vibration Sensors, Smart Sirens, and Onics Panic Buttons) are actively monitored. If the battery cover is opened or the device is ripped off the wall, the system instantly triggers a `[SECURITY] TAMPER DETECTED` alarm and fires all sirens at full volume.
+
 ### Adding a New Sensor
 The architecture is designed to scale easily:
 1. Create a `sensor_foo.c` and `sensor_foo.h` (copy an existing one like `aqara_button.c` as a template).

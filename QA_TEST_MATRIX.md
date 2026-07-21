@@ -19,6 +19,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | :--- | :--- | :--- |
 | Press the RED panic button | 🚨 **FULL SIREN ALARM** (Global Alarm Mode) on all sirens. | Tests IAS Zone panic activation mapping. |
 | Long press the RED panic button | 🔇 **ALL SIRENS STOP** (Panic Cleared). | Tests IAS Zone panic clear mapping (Long press clears panic). |
+| Remove battery cover (Tamper) | 🚨 **FULL SIREN ALARM** (Mode 4). | Tests IAS Zone tamper alarm on cover open. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Tests generic sensor health data. |
 
 ---
@@ -28,6 +29,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | :--- | :--- | :--- |
 | Move magnet away (Open Door) | 🔔 **DOUBLE BEEP** (2 fast chirps) in Burglar mode. Sets zone door state to **OPEN**. | Beeps use Burglar mode (Mode 1) with 100ms ON time and 300ms gap. |
 | Bring magnet close (Close Door) | 🔔 **SINGLE BEEP** (1 fast chirp) in Burglar mode. Sets zone door state to **CLOSED**. | Beep uses Burglar mode (Mode 1) with 100ms ON time. |
+| Remove battery cover (Tamper) | 🚨 **FULL SIREN ALARM** (Mode 4). | Tests IAS Zone tamper alarm on cover open. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage** & **Temperature**. | Tests generic sensor health data. |
 
 ---
@@ -46,7 +48,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 ### 🚨 5. Frient Smart Siren (SIRZB-110)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
-| Remove mounting backplate (Tamper switch) | Tamper switch is ignored, no logs or alarms. | **DISABLED FOR DEMO:** Tamper monitoring is completely disabled in code to avoid handling distraction. |
+| Remove mounting backplate (Tamper switch) | 🚨 **FULL SIREN ALARM** (Mode 4). | Tests IAS Zone tamper alarm on wall removal. |
 | Type `env <addr>` in CLI | 📊 Prints **Battery/Voltage**. | Light / battery queries. |
 | Type `siren on` and hit Enter | 🚨 **FULL SIREN ALARM** on all sirens. | Tests global siren activation. |
 | Type `siren off` and hit Enter | 🔇 **ALL SIRENS STOP** immediately. | Stops the global test. |
@@ -87,6 +89,8 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Type `permit [seconds]` | 🔓 Opens the Zigbee network for pairing. | Default is 60s if not specified. |
 | Type `discover <addr>` | 🔍 Discovers device endpoints and clusters. | Forces Zigbee active endpoint discovery. |
 | Type `forcesetup <addr>` | ⚙️ Re-runs initial configuration binding. | Fixes devices that didn't set up correctly. |
+| Disconnect Siren/Occupancy (Wait 5 min) | 🔴 `[HEALTH] Device OFFLINE` | Tests the router active watchdog timeout. |
+| Remove Sensor Battery (Wait 2 hours) | 🔴 `[HEALTH] Device OFFLINE` | Tests the sleepy sensor watchdog timeout. |
 
 ---
 
@@ -110,3 +114,5 @@ The table below lists all conditions that trigger or modify the sirens, along wi
 | **Vibration Sensor:** Movement cleared | Sirens OFF | **Mode 0 (Stop)** | Silence |
 | **Light Sensor:** Light ON | Sirens ON | **Mode 6 (Emergency Panic)** | Emergency Panic sound |
 | **Light Sensor:** Light OFF | Sirens OFF | **Mode 0 (Stop)** | Silence |
+| **Tamper:** Cover opened / Wall removed | Sirens ON | **Mode 4 (Police Panic)** | Police Panic sound (Applies to Contact, Vibration, Siren, Onics) |
+| **Tamper:** Cover closed | Sirens OFF | **Mode 0 (Stop)** | Silence |

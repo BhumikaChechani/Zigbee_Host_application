@@ -380,7 +380,8 @@ void Siren_SetVolume( uint8_t volume_ )
 {
     if (volume_ > 3) volume_ = 3;
     s_sirenVolume = volume_;
-        Siren_SaveConfig();
+    Siren_SaveConfig();
+    printf("SUCCESS: Siren global volume set to %d (0=low, 1=medium, 2=high, 3=very high).\n", volume_);
 }
 
 uint8_t Siren_GetVolume( void )
@@ -392,7 +393,8 @@ void Siren_SetMode( uint8_t mode_ )
 {
     if (mode_ < 1 || mode_ > 6) mode_ = 1;
     s_sirenMode = mode_;
-        Siren_SaveConfig();
+    Siren_SaveConfig();
+    printf("SUCCESS: Siren global mode set to %d.\n", mode_);
 }
 
 uint8_t Siren_GetMode( void )

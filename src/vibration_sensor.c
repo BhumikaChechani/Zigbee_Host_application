@@ -408,7 +408,7 @@ void VibrationSensor_PollAll(void) {
 }
 
 void VibrationSensor_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
-  LOG_DEBUG("Configuring Vibration Sensor 0x%04X sensitivity to level %d...\n", shortAddr_, level_);
+  printf("SUCCESS: Vibration Sensor 0x%04X sensitivity set to level %d.\n", shortAddr_, level_);
   
   pthread_mutex_lock(&g_deviceMutex);
   for (int i = 0; i < g_numVibrationSensors; i++) {

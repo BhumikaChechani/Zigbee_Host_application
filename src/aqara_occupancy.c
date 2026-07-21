@@ -888,9 +888,7 @@ void AqaraOccupancy_SpatialLearning(uint16_t shortAddr_) {
   uint8_t f[9] = {0x04, 0x5F, 0x11, 0x30, 0x02, 0x57, 0x01, 0x20, 0x01};
   ZNP_AfDataRequestExt(0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, 0x31,
                        0x00, 0x1E, f, 9);
-  LOG_DEBUG("[OCC] AI Spatial Learning triggered on 0x%04X - keep room EMPTY for "
-         "30s\n",
-         shortAddr_);
+  printf("SUCCESS: Triggering AI Spatial Learning on Aqara Occupancy 0x%04X... (Keep room empty for 30s)\n", shortAddr_);
 }
 
 ///
@@ -899,7 +897,7 @@ void AqaraOccupancy_SpatialLearning(uint16_t shortAddr_) {
 ///
 void AqaraOccupancy_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
   if (level_ < 1 || level_ > 3) {
-    LOG_DEBUG("Sensitivity: 1=low 2=medium 3=high\n");
+    printf("ERROR: Invalid sensitivity level. (1=low, 2=medium, 3=high)\n");
     return;
   }
 
@@ -917,9 +915,7 @@ void AqaraOccupancy_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
   uint8_t f[9] = {0x04, 0x5F, 0x11, 0x32, 0x02, 0x0C, 0x01, 0x20, level_};
   ZNP_AfDataRequestExt(0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, 0x33,
                        0x00, 0x1E, f, 9);
-  LOG_DEBUG("Configuring Aqara Occupancy Sensor 0x%04X sensitivity to level %d "
-         "(%s)...\n",
-         shortAddr_, level_, labels[level_]);
+  printf("SUCCESS: Aqara Occupancy 0x%04X sensitivity set to level %d (%s).\n", shortAddr_, level_, labels[level_]);
 }
 
 void AqaraOccupancy_ReadEnvironment(uint16_t shortAddr_) {
@@ -1101,7 +1097,7 @@ void AqaraOccupancy_HandleDistance(uint16_t shortAddr_, uint32_t cm_) {
 void AqaraOccupancy_SetZone(uint16_t shortAddr_, int zoneIdx_, uint32_t minCm_,
                             uint32_t maxCm_) {
   if (zoneIdx_ < 0 || zoneIdx_ >= MAX_OCCUPANCY_ZONES) {
-    printf("❌ ERROR: Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
+    printf("ERROR: Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
            MAX_OCCUPANCY_ZONES - 1);
     return;
   }
@@ -1118,7 +1114,7 @@ void AqaraOccupancy_SetZone(uint16_t shortAddr_, int zoneIdx_, uint32_t minCm_,
     g_aqaraOccupancies[idx].zones[zoneIdx_].isActive = true;
     g_aqaraOccupancies[idx].zones[zoneIdx_].minCm = minCm_;
     g_aqaraOccupancies[idx].zones[zoneIdx_].maxCm = maxCm_;
-    printf("✅ SUCCESS: Aqara Occupancy 0x%04X Zone %d set to %u - %u cm.\n", shortAddr_,
+    printf("SUCCESS: Aqara Occupancy 0x%04X Zone %d set to %u - %u cm.\n", shortAddr_,
            zoneIdx_, minCm_, maxCm_);
     Device_Save();
     // Zone boundaries enforced in software (EvaluatePresenceLogic + distance
@@ -1129,13 +1125,13 @@ void AqaraOccupancy_SetZone(uint16_t shortAddr_, int zoneIdx_, uint32_t minCm_,
     return;
   }
   pthread_mutex_unlock(&g_deviceMutex);
-  printf("❌ ERROR: Aqara Occupancy 0x%04X not found.\n", shortAddr_);
+  printf("ERROR: Aqara Occupancy 0x%04X not found.\n", shortAddr_);
   EvaluatePresenceLogic(shortAddr_);
 }
 
 void AqaraOccupancy_DeleteZone(uint16_t shortAddr_, int zoneIdx_) {
   if (zoneIdx_ < 0 || zoneIdx_ >= MAX_OCCUPANCY_ZONES) {
-    printf("❌ ERROR: Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
+    printf("ERROR: Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
            MAX_OCCUPANCY_ZONES - 1);
     return;
   }
@@ -1156,7 +1152,7 @@ void AqaraOccupancy_DeleteZone(uint16_t shortAddr_, int zoneIdx_) {
   if (idx != -1) {
     g_aqaraOccupancies[idx].zones[zoneIdx_].isActive = false;
     g_aqaraOccupancies[idx].zones[zoneIdx_].occupied = false;
-    printf("✅ SUCCESS: Aqara Occupancy 0x%04X Zone %d deleted.\n", shortAddr_, zoneIdx_);
+    printf("SUCCESS: Aqara Occupancy 0x%04X Zone %d deleted.\n", shortAddr_, zoneIdx_);
     Device_Save();
     pthread_mutex_unlock(&g_deviceMutex);
     return;

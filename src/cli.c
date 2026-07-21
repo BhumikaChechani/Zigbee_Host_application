@@ -2,6 +2,12 @@
 #include "znp_host.h"
 #include "config.h"
 
+#include "aqara_button.h"
+#include "aqara_occupancy.h"
+#include "contact_sensor.h"
+#include "vibration_sensor.h"
+#include "logger.h"
+
 #if ENABLE_SIREN
 #include "siren.h"
 #endif

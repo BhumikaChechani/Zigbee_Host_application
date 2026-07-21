@@ -1107,7 +1107,7 @@ void AqaraOccupancy_HandleDistance(uint16_t shortAddr_, uint32_t cm_) {
 void AqaraOccupancy_SetZone(uint16_t shortAddr_, int zoneIdx_, uint32_t minCm_,
                             uint32_t maxCm_) {
   if (zoneIdx_ < 0 || zoneIdx_ >= MAX_OCCUPANCY_ZONES) {
-    LOG_DEBUG("Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
+    printf("❌ ERROR: Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
            MAX_OCCUPANCY_ZONES - 1);
     return;
   }
@@ -1124,7 +1124,7 @@ void AqaraOccupancy_SetZone(uint16_t shortAddr_, int zoneIdx_, uint32_t minCm_,
     g_aqaraOccupancies[idx].zones[zoneIdx_].isActive = true;
     g_aqaraOccupancies[idx].zones[zoneIdx_].minCm = minCm_;
     g_aqaraOccupancies[idx].zones[zoneIdx_].maxCm = maxCm_;
-    LOG_DEBUG("Aqara Occupancy 0x%04X zone %d set to %u - %u cm.\n", shortAddr_,
+    printf("✅ SUCCESS: Aqara Occupancy 0x%04X Zone %d set to %u - %u cm.\n", shortAddr_,
            zoneIdx_, minCm_, maxCm_);
     Device_Save();
     // Zone boundaries enforced in software (EvaluatePresenceLogic + distance
@@ -1135,12 +1135,13 @@ void AqaraOccupancy_SetZone(uint16_t shortAddr_, int zoneIdx_, uint32_t minCm_,
     return;
   }
   pthread_mutex_unlock(&g_deviceMutex);
+  printf("❌ ERROR: Aqara Occupancy 0x%04X not found.\n", shortAddr_);
   EvaluatePresenceLogic(shortAddr_);
 }
 
 void AqaraOccupancy_DeleteZone(uint16_t shortAddr_, int zoneIdx_) {
   if (zoneIdx_ < 0 || zoneIdx_ >= MAX_OCCUPANCY_ZONES) {
-    LOG_DEBUG("Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
+    printf("❌ ERROR: Invalid zone index %d (must be 0 to %d).\n", zoneIdx_,
            MAX_OCCUPANCY_ZONES - 1);
     return;
   }
@@ -1161,7 +1162,7 @@ void AqaraOccupancy_DeleteZone(uint16_t shortAddr_, int zoneIdx_) {
   if (idx != -1) {
     g_aqaraOccupancies[idx].zones[zoneIdx_].isActive = false;
     g_aqaraOccupancies[idx].zones[zoneIdx_].occupied = false;
-    LOG_DEBUG("Aqara Occupancy 0x%04X zone %d deleted.\n", shortAddr_, zoneIdx_);
+    printf("✅ SUCCESS: Aqara Occupancy 0x%04X Zone %d deleted.\n", shortAddr_, zoneIdx_);
     Device_Save();
     pthread_mutex_unlock(&g_deviceMutex);
     return;

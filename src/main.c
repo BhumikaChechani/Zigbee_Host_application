@@ -484,10 +484,10 @@ int main( int argc, char *argv[] )
         }
     }
 
-    LOG_INFO( "\n============================================================\n" );
-    LOG_INFO( "  ZNP MT Host Controller for Siren & Button Integration (C Version)\n" );
-    LOG_INFO( "  Port: %s  (Factory New: %s)\n", port, forceFactoryNew ? "YES" : "NO" );
-    LOG_INFO( "============================================================\n\n" );
+    printf( "\n============================================================\n" );
+    printf( "  ZNP MT Host Controller for Siren & Button Integration (C Version)\n" );
+    printf( "  Port: %s  (Factory New: %s)\n", port, forceFactoryNew ? "YES" : "NO" );
+    printf( "============================================================\n\n" );
 
     if ( !ZNP_Init( port ) )
     {

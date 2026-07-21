@@ -446,7 +446,10 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-                pthread_mutex_unlock( &g_deviceMutex );
+        if (warnMode_ != 0) {
+            printf("ERROR: Failed to trigger siren. No sirens registered in the network.\n");
+        }
+        pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
 
@@ -459,6 +462,11 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     for ( int i = 0; i < tempNum; i++ )
     {
         uint8_t mode = (warnMode_ != 0) ? tempSirens[i].mode : 0;
+        if (warnMode_ != 0) {
+            printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode, tempSirens[i].volume);
+        } else {
+            printf("SUCCESS: Siren 0x%04X turned OFF.\n", tempSirens[i].shortAddr);
+        }
         ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode, tempSirens[i].volume, durationSeconds_ );
     }
 }
@@ -470,6 +478,9 @@ void Siren_TriggerAll( uint8_t mode_, uint8_t volume_, uint16_t durationSeconds_
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
+        if (mode_ != 0) {
+            printf("ERROR: Failed to trigger siren. No sirens registered in the network.\n");
+        }
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
@@ -481,6 +492,11 @@ void Siren_TriggerAll( uint8_t mode_, uint8_t volume_, uint16_t durationSeconds_
 
     for ( int i = 0; i < tempNum; i++ )
     {
+        if (mode_ != 0) {
+            printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode_, volume_);
+        } else {
+            printf("SUCCESS: Siren 0x%04X turned OFF.\n", tempSirens[i].shortAddr);
+        }
         ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode_, volume_, durationSeconds_ );
     }
 }

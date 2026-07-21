@@ -170,6 +170,10 @@ static void Cli_HandleCommand( const char *cmd_ )
                 printf( "Usage: siren mode <addr> <1-6>\n" );
             }
         }
+        else
+        {
+            printf( "ERROR: Unknown siren command '%s'. Type 'help' for usage.\n", sub );
+        }
 #endif
     }
     else if ( strcmp( base, "zone" ) == 0 )

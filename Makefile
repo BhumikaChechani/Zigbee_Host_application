@@ -17,7 +17,10 @@ LDFLAGS   = -pthread
 SRC_DIR   = src
 BUILD_DIR = build
 BIN_DIR   = bin
-TARGET    = $(BIN_DIR)/znp_host_c
+
+# Extract the firmware version from config.h
+APP_VERSION := $(shell grep -oP '^\#define\s+APP_VERSION\s+"\K[^"]+' include/config.h)
+TARGET    = $(BIN_DIR)/znp_host_c_v$(APP_VERSION)
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))

@@ -532,8 +532,16 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   if (changed) {
     Device_Save();
   }
+  // For an already-configured sensor with the SAME short address (not a rejoin)
+  // still call PostAssign so AqaraOccupancy_Setup can skip setup (it returns
+  // early if configured==true) but remain silent about it — no log spam.
   if (!(isRejoin && alreadyConfigured)) {
+    if (!isRejoin && alreadyConfigured) {
+      LOG_DEBUG("[OCC] 0x%04X already configured, re-discover skipped full setup.\n", shortAddr_);
+    }
     AqaraOccupancy_PostAssign(shortAddr_);
+  } else {
+    LOG_DEBUG("[OCC] 0x%04X rejoin of already-configured device - skipping setup flood.\n", shortAddr_);
   }
 }
 

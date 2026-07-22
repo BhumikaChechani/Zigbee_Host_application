@@ -366,7 +366,7 @@ void ContactSensor_Setup(uint16_t shortAddr_) {
   pthread_mutex_unlock(&g_deviceMutex);
 
   if (bindOk && cieOk) {
-    LOG_DEBUG("Configuration sent to Contact Sensor 0x%04X!\n", shortAddr_);
+    LOG_EVENT("CONTACT", shortAddr_, "Setup OK (bind+CIE done, zone events active)\n");
   }
 }
 

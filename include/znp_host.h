@@ -472,5 +472,6 @@ void Device_Remove( uint16_t shortAddr_ );
 
 /// @brief Check if a device is currently marked OFFLINE by the health watchdog.
 bool Device_IsOffline( uint16_t shortAddr_ );
+const char* Device_GetName( uint16_t shortAddr_ );
 
 #endif // ZNP_HOST_H

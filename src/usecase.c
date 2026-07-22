@@ -314,16 +314,16 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
     break;
   case UC_TAMPER_DETECTED:
-    LOG_EVENT("SECURITY", event_->srcAddr, "\033[1;31mTAMPER DETECTED (Cover Opened)\033[0m\n");
+    LOG_EVENT("SECURITY", event_->srcAddr, "\033[1;31m(%s) TAMPER DETECTED (Cover Opened)\033[0m\n", Device_GetName(event_->srcAddr));
     break;
   case UC_TAMPER_CLEARED:
-    LOG_EVENT("SECURITY", event_->srcAddr, "Tamper CLEARED (Cover Closed)\n");
+    LOG_EVENT("SECURITY", event_->srcAddr, "(%s) Tamper CLEARED (Cover Closed)\n", Device_GetName(event_->srcAddr));
     break;
   case UC_DEVICE_OFFLINE:
-    LOG_EVENT("HEALTH", event_->srcAddr, "\033[1;31mDevice OFFLINE (Unreachable)\033[0m\n");
+    LOG_EVENT("HEALTH", event_->srcAddr, "\033[1;31m(%s) Device OFFLINE (Unreachable)\033[0m\n", Device_GetName(event_->srcAddr));
     break;
   case UC_DEVICE_ONLINE:
-    LOG_EVENT("HEALTH", event_->srcAddr, "\033[1;32mDevice Reconnected (ONLINE)\033[0m\n");
+    LOG_EVENT("HEALTH", event_->srcAddr, "\033[1;32m(%s) Device Reconnected (ONLINE)\033[0m\n", Device_GetName(event_->srcAddr));
     break;
   default:
     break;

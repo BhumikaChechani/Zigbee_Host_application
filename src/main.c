@@ -707,6 +707,29 @@ bool Device_IsOffline( uint16_t addr_ )
     return false;
 }
 
+const char* Device_GetName( uint16_t addr_ )
+{
+#if ENABLE_SIREN
+    if ( Siren_IsKnown( addr_ ) ) return "Siren";
+#endif
+#if ENABLE_AQARA_BUTTON
+    if ( AqaraButton_IsKnown( addr_ ) ) return "Aqara Button";
+#endif
+#if ENABLE_ONICS_BUTTON
+    if ( OnicsButton_IsKnown( addr_ ) ) return "Onics Button";
+#endif
+#if ENABLE_CONTACT_SENSOR
+    if ( ContactSensor_IsKnown( addr_ ) ) return "Contact Sensor";
+#endif
+#if ENABLE_VIBRATION_SENSOR
+    if ( VibrationSensor_IsKnown( addr_ ) ) return "Vibration Sensor";
+#endif
+#if ENABLE_AQARA_OCCUPANCY
+    if ( AqaraOccupancy_IsKnown( addr_ ) ) return "Presence Sensor";
+#endif
+    return "Unknown Device";
+}
+
 static void Main_SetOffline( uint16_t addr_ )
 {
     if ( !Device_IsOffline( addr_ ) && s_numOfflineDevices < 256 )

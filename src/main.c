@@ -352,7 +352,9 @@ void Device_Load( void )
                 }
                 
                 uint32_t lightThresh = 18000; // default
-                fscanf( file, "%u", &lightThresh ); // ignore return since it might not be present
+                if (fscanf( file, "%u", &lightThresh ) != 1) {
+                    lightThresh = 18000;
+                }
                 
                 g_aqaraOccupancies[g_numAqaraOccupancies].shortAddr = shortAddr;
                 g_aqaraOccupancies[g_numAqaraOccupancies].endpoint = endpoint;

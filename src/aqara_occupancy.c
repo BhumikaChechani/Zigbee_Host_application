@@ -170,13 +170,11 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
         if (af_->clusterId == 0x0402 && attrId == 0x0000 && width == 2) {
           int16_t temp =
               (int16_t)(af_->data[offset] | (af_->data[offset + 1] << 8));
-          LOG_DEBUG("[OCC] Temperature from 0x%04X: %.2f °C\n", af_->srcAddr,
-                 temp / 100.0);
+          LOG_EVENT("OCCUPANCY", af_->srcAddr, "Temperature: %.2f °C\n", temp / 100.0);
         } else if (af_->clusterId == 0x0405 && attrId == 0x0000 && width == 2) {
           uint16_t hum =
               (uint16_t)(af_->data[offset] | (af_->data[offset + 1] << 8));
-          LOG_DEBUG("[OCC] Humidity from 0x%04X: %.2f %%\n", af_->srcAddr,
-                 hum / 100.0);
+          LOG_EVENT("OCCUPANCY", af_->srcAddr, "Humidity: %.2f %%\n", hum / 100.0);
         } else if (af_->clusterId == 0x0400 && attrId == 0x0000 && width == 2) {
           uint16_t light =
               (uint16_t)(af_->data[offset] | (af_->data[offset + 1] << 8));
@@ -956,7 +954,7 @@ void AqaraOccupancy_ReadEnvironment(uint16_t shortAddr_) {
 
   static uint8_t zclSeq = 50;
 
-  LOG_DEBUG("Fetching environment data from 0x%04X...\n", shortAddr_);
+  printf("Fetching environment data from 0x%04X...\n", shortAddr_);
 
   // Read Temperature (0x0402)
   uint8_t readTmpZcl[5] = {0x00, ++zclSeq, 0x00, 0x00, 0x00};

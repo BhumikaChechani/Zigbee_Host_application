@@ -67,7 +67,7 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Success
         uint8_t bat = zcl[4]; // Unit is 100 mV
-        LOG_DEBUG("Vibration Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
+        LOG_EVENT("VIBRATION", af_->srcAddr, "Battery Voltage: %.1f V\n", (float)bat / 10.0);
       }
     }
   } else if (af_->clusterId == 0x0402) { // Temperature Measurement
@@ -76,10 +76,10 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Read Resp Success
         int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
-        LOG_DEBUG("Vibration Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_EVENT("VIBRATION", af_->srcAddr, "Temperature: %.2f °C\n", (float)temp / 100.0);
       } else if (cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00) { // Report
         int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
-        LOG_DEBUG("Vibration Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_EVENT("VIBRATION", af_->srcAddr, "Temperature Report: %.2f °C\n", (float)temp / 100.0);
       }
     }
   }
@@ -462,7 +462,7 @@ void VibrationSensor_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
 }
 
 void VibrationSensor_ReadEnvironment(uint16_t shortAddr_) {
-  LOG_DEBUG("Requesting Environment Data (Battery & Temp) from Vibration Sensor 0x%04X...\n", shortAddr_);
+  printf("Requesting Environment Data (Battery & Temp) from Vibration Sensor 0x%04X...\n", shortAddr_);
   
   // Read Battery Voltage (Cluster 0x0001, Attr 0x0020) on EP 0x26
   uint8_t zclFrameBat[5];

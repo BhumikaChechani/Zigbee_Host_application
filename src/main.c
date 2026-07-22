@@ -488,6 +488,7 @@ int main( int argc, char *argv[] )
 
     printf( "\n============================================================\n" );
     printf( "  ZNP MT Host Controller for Siren & Button Integration (C Version)\n" );
+    printf( "  Firmware Version: v%s\n", APP_VERSION );
     printf( "  Port: %s  (Factory New: %s)\n", port, forceFactoryNew ? "YES" : "NO" );
     printf( "============================================================\n\n" );
 

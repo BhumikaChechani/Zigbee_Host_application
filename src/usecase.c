@@ -144,9 +144,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
       history->lastEventTime = now;
 
       if (g_sirenActive) {
-        LOG_DEBUG("[USECASE] Aqara 0x%04X pressed while siren is active -> "
-               "turning sirens OFF\n",
-               event_->srcAddr);
+        LOG_EVENT("AQARA BTN", event_->srcAddr, "Press Count: 1 (Siren STOP)\n");
 #if ENABLE_SIREN
         Siren_ControlAll(0);
 #endif

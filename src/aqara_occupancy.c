@@ -621,12 +621,26 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
     return;
   }
 
+  // Rate-limit setup: the FP300 is fragile and gets overwhelmed if we flood it
+  // with ZCL config commands immediately after every rejoin. Enforce a 60-second
+  // cooldown between setup attempts. On a new short address with no IEEE cache
+  // hit, this also prevents the "setup flood -> crash -> rejoin" loop.
+  double now = ZNP_GetCurrentTime();
+  double lastAttempt = g_aqaraOccupancies[idx].lastSetupAttempt;
+  if ( lastAttempt > 0 && (now - lastAttempt) < 60.0 ) {
+    pthread_mutex_unlock( &g_deviceMutex );
+    LOG_DEBUG("[OCC] 0x%04X setup cooldown active (%.1fs since last attempt) - skipping\n",
+           shortAddr_, now - lastAttempt);
+    return;
+  }
+
   uint8_t sensorIeee[8];
   uint8_t endpoint = g_aqaraOccupancies[idx].endpoint;
   memcpy(sensorIeee, g_aqaraOccupancies[idx].ieee, 8);
+  g_aqaraOccupancies[idx].lastSetupAttempt = now;
   pthread_mutex_unlock(&g_deviceMutex);
 
-  LOG_DEBUG("Configuring Aqara occupancy 0x%04X...\n", shortAddr_);
+  LOG_EVENT("OCCUPANCY", shortAddr_, "Running setup (bind + ZCL config)...\n");
 
   // -------------------------------------------------------------------------
   // STEP 1: Bind clusters so unsolicited reports reach the coordinator

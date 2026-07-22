@@ -36,6 +36,7 @@ typedef struct {
   uint16_t lastLightLevel; ///< Last reported raw light intensity level.
   uint16_t lightThreshold; ///< Per-device threshold for Day/Night detection.
   double lastPolled;  ///< Timestamp of the last outgoing poll (Read Attributes) sent to this device.
+  double lastSetupAttempt; ///< Timestamp of the last setup attempt (rate-limiter).
   OccupancyZone zones[MAX_OCCUPANCY_ZONES]; ///< Configured distance ranges.
 } AQARA_OCCUPANCY_T;
 

@@ -838,7 +838,7 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   }
   usleep(300000);
 
-  LOG_DEBUG("Configuration sent to Aqara occupancy 0x%04X!\n", shortAddr_);
+  LOG_EVENT("OCCUPANCY", shortAddr_, "Setup OK (bind+ZCL config done)\n");
 }
 
 ///

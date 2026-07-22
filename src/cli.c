@@ -391,7 +391,12 @@ static void Cli_HandleCommand( const char *cmd_ )
             }
 #endif
             if (!found) {
-                printf("Error: Device 0x%04X is not registered. (Is it a button? Some devices do not support environment queries)\n", addr);
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support environment queries.\n", addr, devName);
+                }
             }
         }
         else

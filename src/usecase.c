@@ -84,6 +84,9 @@ static pthread_t s_useCaseThread;  ///< The use-case worker thread handle.
 
 // Maximum allowed gap between consecutive presses in a 3-press sequence.
 // If the time since the last recorded press exceeds this, the history is reset.
+// The sequence must be: Press 1 -> Press 2 -> Press 3, all within 3.0 seconds
+// (measured from Press 1 to Press 3). If the user exceeds this total window,
+// the sequence is ignored. This allows normal single presses without triggering.
 #define MAX_PRESS_INTERVAL_S 5.0
 
 // Struct to keep track of the last 3 button press timestamps for each Aqara
@@ -135,9 +138,12 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     AqaraPressHistory *history = GetAqaraHistory(event_->srcAddr);
     if (history != NULL) {
       double elapsed = now - history->lastEventTime;
-      if (elapsed < 0.10) {
-        LOG_DEBUG("[USECASE] Debouncing Aqara 0x%04X press (elapsed = %.3fs) -> "
-               "ignoring\n",
+      if (elapsed < 0.15) {
+        // Hardware debounce: Aqara buttons can fire duplicate ZCL ON/OFF
+        // events within ~100ms for a single physical press. Reject anything
+        // faster than 150ms to avoid double-counting one press as two.
+        LOG_DEBUG("[USECASE] Debouncing Aqara 0x%04X press (elapsed = %.3fs < 0.15s) -> "
+               "ignoring duplicate\n",
                event_->srcAddr, elapsed);
         return;
       }
@@ -162,12 +168,18 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
           }
         }
 
-        // Record this press (max 3 slots; do NOT slide — reset after evaluation)
+        // Record this press (max 3 slots; reset after evaluation at count=3).
+        // Press 1: Starts the sequence window.
+        // Press 2: Second step within MAX_PRESS_INTERVAL_S of Press 1.
+        // Press 3: Final step. If total time (Press3 - Press1) <= 3.0s -> ALARM.
         if (history->count < 3) {
           history->pressTimes[history->count] = now;
           history->count++;
         }
 
+        // Log each intermediate press count so the user can see the sequence
+        // building in the console (e.g., count=1, count=2, count=3).
+        LOG_EVENT("AQARA BTN", event_->srcAddr, "Press Count: %d\n", history->count);
         LOG_DEBUG("[USECASE] Aqara 0x%04X pressed (count=%d)\n", event_->srcAddr,
                history->count);
         for (int i = 0; i < history->count; i++) {
@@ -183,13 +195,12 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
           // was fast enough to trigger.
           history->count = 0;
           if (diff <= 3.0) {
-            LOG_EVENT("AQARA BTN", event_->srcAddr, "Press Count: 3\n");
+            LOG_EVENT("AQARA BTN", event_->srcAddr, "3-Press Sequence COMPLETE (%.2fs) -> Siren ON\n", diff);
 #if ENABLE_SIREN
             Siren_TriggerAll(1, 240);
 #endif
           } else {
-            LOG_DEBUG("[USECASE] 3 presses but window too wide (%.3fs > 3.0s) -> "
-                   "ignoring\n", diff);
+            LOG_EVENT("AQARA BTN", event_->srcAddr, "3-Press Sequence TIMEOUT (%.2fs > 3.0s) -> Ignored\n", diff);
           }
         }
       }

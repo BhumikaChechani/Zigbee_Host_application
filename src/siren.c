@@ -604,22 +604,35 @@ void Siren_Beep( int count_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        printf("SUCCESS: Siren 0x%04X emitted BEEP (x%d).\n", tempSirens[i].shortAddr, count_);
+        if ( Device_IsOffline( tempSirens[i].shortAddr ) )
+        {
+            printf("\033[1;31mERROR: Siren 0x%04X is OFFLINE! Beep skipped.\033[0m\n", tempSirens[i].shortAddr);
+        }
+        else
+        {
+            printf("SUCCESS: Siren 0x%04X emitted BEEP (x%d).\n", tempSirens[i].shortAddr, count_);
+        }
     }
 
     for ( int c = 0; c < count_; c++ )
     {
         for ( int i = 0; i < tempNum; i++ )
         {
-            // Start warning (1 sec duration to turn it on immediately)
-            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), 1, 0, 1 ); // 1 = Burglar Mode
+            if ( !Device_IsOffline( tempSirens[i].shortAddr ) )
+            {
+                // Start warning (1 sec duration to turn it on immediately)
+                ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), 1, 0, 1 ); // 1 = Burglar Mode
+            }
         }
         usleep( 100000 ); // 100ms ON time (short beep)
 
         for ( int i = 0; i < tempNum; i++ )
         {
-            // Stop warning (mode = 0)
-            ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), 0, 0, 0 );
+            if ( !Device_IsOffline( tempSirens[i].shortAddr ) )
+            {
+                // Stop warning (mode = 0)
+                ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), 0, 0, 0 );
+            }
         }
         
         if ( c < count_ - 1 )

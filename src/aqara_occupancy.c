@@ -272,14 +272,13 @@ void AqaraOccupancy_PollAll(void) {
       }
       pthread_mutex_unlock( &g_deviceMutex );
       usleep(50000);
+      seq = __atomic_add_fetch(&zclSeq, 1, __ATOMIC_RELAXED);
+      uint8_t readLhtZcl[5] = {0x00, seq, 0x00, 0x00, 0x00};
+      // Poll Light
+      ZNP_AfDataRequestExt(0x02, addrs[i], eps[i], 0x0000, 8, 0x0400, seq, 0x00,
+                           0x1E, readLhtZcl, 5);
+      usleep(50000);
     }
-
-    seq = __atomic_add_fetch(&zclSeq, 1, __ATOMIC_RELAXED);
-    uint8_t readLhtZcl[5] = {0x00, seq, 0x00, 0x00, 0x00};
-    // Poll Light
-    ZNP_AfDataRequestExt(0x02, addrs[i], eps[i], 0x0000, 8, 0x0400, seq, 0x00,
-                         0x1E, readLhtZcl, 5);
-    usleep(50000);
   }
 }
 

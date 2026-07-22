@@ -79,20 +79,41 @@ static void *Siren_Thread( void *arg_ )
                             {
                                 uint16_t zoneStatus = zcl[0] | ( zcl[1] << 8 );
                                 uint8_t zoneId = ( zclLen >= 4 ) ? zcl[3] : 0;
-                                printf( "   -> Zone Status Change from Siren 0x%04X: zone_status=0x%04X, zone_id=%u\n",
+                                LOG_DEBUG("-> Zone Status Change from Siren 0x%04X: zone_status=0x%04X, zone_id=%u\n",
                                         af->srcAddr, zoneStatus, zoneId );
 
                                 // Send Default Response
                                 ZNP_SendDefaultResponse( af->srcAddr, af->srcEp, 0x0500, af->data[hdrLen - 2], 0x00, 0x00 );
 
                                 // Bit 2 is Tamper
-                                if ( zoneStatus & 0x0004 )
+                                bool tamper_active = ( zoneStatus & 0x0004 ) != 0;
+                                
+                                pthread_mutex_lock( &g_deviceMutex );
+                                bool tamperChanged = false;
+                                for ( int i = 0; i < g_numSirens; i++ )
                                 {
-                                    UseCase_Post( UC_TAMPER_DETECTED, af->srcAddr, zoneStatus );
+                                    if ( g_sirens[i].shortAddr == af->srcAddr )
+                                    {
+                                        if ( g_sirens[i].isTampered != tamper_active )
+                                        {
+                                            g_sirens[i].isTampered = tamper_active;
+                                            tamperChanged = true;
+                                        }
+                                        break;
+                                    }
                                 }
-                                else
+                                pthread_mutex_unlock( &g_deviceMutex );
+
+                                if ( tamperChanged )
                                 {
-                                    UseCase_Post( UC_TAMPER_CLEARED, af->srcAddr, zoneStatus );
+                                    if ( tamper_active )
+                                    {
+                                        UseCase_Post( UC_TAMPER_DETECTED, af->srcAddr, zoneStatus, 0 );
+                                    }
+                                    else
+                                    {
+                                        UseCase_Post( UC_TAMPER_CLEARED, af->srcAddr, zoneStatus, 0 );
+                                    }
                                 }
                             }
                         }
@@ -104,7 +125,7 @@ static void *Siren_Thread( void *arg_ )
                             if ( zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00 )
                             {
                                 uint8_t bat = zcl[4]; // Unit is 100 mV
-                                printf("🔋 Siren 0x%04X Battery Voltage: %.1f V\n", af->srcAddr, (float)bat / 10.0);
+                                LOG_DEBUG("Siren 0x%04X Battery Voltage: %.1f V\n", af->srcAddr, (float)bat / 10.0);
                             }
                         }
                     }
@@ -116,8 +137,6 @@ static void *Siren_Thread( void *arg_ )
     return NULL;
 }
 
-static uint8_t s_sirenVolume = 2; // high by default
-static uint8_t s_sirenMode = 1;   // burglar by default
 static uint8_t s_sirenSeq = 0;    // transaction sequence number (atomic: multiple threads send)
 
 static uint8_t Siren_NextSeq( void )
@@ -125,43 +144,13 @@ static uint8_t Siren_NextSeq( void )
     return __atomic_add_fetch( &s_sirenSeq, 1, __ATOMIC_RELAXED );
 }
 
-static const char SIREN_CONFIG_FILE[] = "siren_config.txt";
-
-static void Siren_LoadConfig(void)
-{
-    FILE *f = fopen(SIREN_CONFIG_FILE, "r");
-    if (f)
-    {
-        int v, m;
-        int parsed = fscanf(f, "%d %d", &v, &m);
-        if (parsed >= 1)
-        {
-            if (v >= 0 && v <= 3) s_sirenVolume = (uint8_t)v;
-        }
-        if (parsed >= 2)
-        {
-            if (m >= 1 && m <= 6) s_sirenMode = (uint8_t)m;
-        }
-        fclose(f);
-    }
-}
-
-static void Siren_SaveConfig(void)
-{
-    FILE *f = fopen(SIREN_CONFIG_FILE, "w");
-    if (f)
-    {
-        fprintf(f, "%d %d\n", s_sirenVolume, s_sirenMode);
-        fclose(f);
-    }
-}
 
 void Siren_Init( void )
 {
     memset( g_sirens, 0, sizeof( g_sirens ) );
     g_numSirens = 0;
     MsgQueue_Init( &s_sirenInbox );
-    Siren_LoadConfig();
+    
 }
 
 void Siren_Start( void )
@@ -227,12 +216,16 @@ void Siren_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     {
         if ( g_numSirens < MAX_SIRENS )
         {
-            printf( " Siren discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_DEBUG("Siren discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_EVENT("SIREN", shortAddr_, "Network Join\n");
             g_sirens[g_numSirens].shortAddr = shortAddr_;
             g_sirens[g_numSirens].endpoint = endpoint_;
             g_sirens[g_numSirens].lastSeen = ZNP_GetCurrentTime();
             g_sirens[g_numSirens].hasIeee = Device_GetDiscoveredIeee( shortAddr_, g_sirens[g_numSirens].ieee );
             g_sirens[g_numSirens].configured = false;
+            g_sirens[g_numSirens].volume = 2;
+            g_sirens[g_numSirens].mode = 1;
+            g_sirens[g_numSirens].isTampered = false;
             g_numSirens++;
             changed = true;
         }
@@ -268,12 +261,14 @@ void Siren_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
 {
     bool found = false;
     pthread_mutex_lock( &g_deviceMutex );
+    int targetIdx = -1;
     for ( int i = 0; i < g_numSirens; i++ )
     {
         if ( g_sirens[i].shortAddr == shortAddr_ )
         {
             memcpy( g_sirens[i].ieee, ieee_, 8 );
             g_sirens[i].hasIeee = true;
+            targetIdx = i;
             found = true;
             break;
         }
@@ -287,11 +282,21 @@ void Siren_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
             if ( g_sirens[i].shortAddr != shortAddr_ && g_sirens[i].hasIeee &&
                  memcmp( g_sirens[i].ieee, ieee_, 8 ) == 0 )
             {
+                // Preserve configuration from the old (now stale) entry
+                g_sirens[targetIdx].zoneId = g_sirens[i].zoneId;
+                g_sirens[targetIdx].configured = g_sirens[i].configured;
+                g_sirens[targetIdx].volume = g_sirens[i].volume;
+                g_sirens[targetIdx].mode = g_sirens[i].mode;
+
                 for ( int j = i; j < g_numSirens - 1; j++ )
                 {
                     g_sirens[j] = g_sirens[j + 1];
                 }
                 g_numSirens--;
+
+                if (targetIdx > i) {
+                    targetIdx--;
+                }
             }
         }
     }
@@ -343,21 +348,21 @@ void Siren_Setup( uint16_t shortAddr_ )
     if ( !hasIeee )
     {
         // Ask for the IEEE; the IEEE response re-triggers setup via UpdateIeee.
-        printf( "Siren 0x%04X missing IEEE - requesting...\n", shortAddr_ );
+        LOG_DEBUG( "Siren 0x%04X missing IEEE - requesting...\n", shortAddr_ );
         uint8_t reqPay[4] = { shortAddr_ & 0xFF, ( shortAddr_ >> 8 ) & 0xFF, 0x01, 0x00 };
         ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 );
         return;
     }
 
-    printf( "Configuring siren 0x%04X...\n", shortAddr_ );
+    LOG_DEBUG( "Configuring siren 0x%04X...\n", shortAddr_ );
     // Write coordinator's IEEE to the siren's IAS_CIE_Address attribute (0x0010).
     ZNP_WriteCieAddress( shortAddr_, endpoint, 0x14 );
-    printf( "Configuration sent to siren 0x%04X!\n", shortAddr_ );
+    LOG_DEBUG( "Configuration sent to siren 0x%04X!\n", shortAddr_ );
 }
 
 void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSeq_, uint16_t zoneType_ )
 {
-    printf( "   -> Zone Enroll Request from Siren 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_ );
+    LOG_DEBUG("-> Zone Enroll Request from Siren 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_ );
     uint8_t zoneId = g_nextZoneId++;
 
     pthread_mutex_lock( &g_deviceMutex );
@@ -375,35 +380,104 @@ void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSe
     ZNP_SendZoneEnrollResponse( shortAddr_, endpoint_, transSeq_, zoneId );
 }
 
-void Siren_SetVolume( uint8_t volume_ )
+void Siren_SetVolume( uint16_t shortAddr_, uint8_t volume_ )
 {
     if (volume_ > 3) volume_ = 3;
-    s_sirenVolume = volume_;
-    printf( "Siren global volume set to %d (0=low, 1=medium, 2=high, 3=very high)\n", volume_ );
-    Siren_SaveConfig();
+    pthread_mutex_lock(&g_deviceMutex);
+    bool found = false;
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            g_sirens[i].volume = volume_;
+            found = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (found) {
+        Device_Save();
+        printf("SUCCESS: Siren 0x%04X volume set to %d (0=low, 1=medium, 2=high, 3=very high).\n", shortAddr_, volume_);
+    } else {
+        printf("ERROR: Siren 0x%04X not found.\n", shortAddr_);
+    }
 }
 
-uint8_t Siren_GetVolume( void )
+uint8_t Siren_GetVolume( uint16_t shortAddr_ )
 {
-    return s_sirenVolume;
+    uint8_t vol = 2; // default
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            vol = g_sirens[i].volume;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    return vol;
 }
 
-void Siren_SetMode( uint8_t mode_ )
+void Siren_SetMode( uint16_t shortAddr_, uint8_t mode_ )
 {
     if (mode_ < 1 || mode_ > 6) mode_ = 1;
-    s_sirenMode = mode_;
-    printf( "Siren global mode set to %d\n", mode_ );
-    Siren_SaveConfig();
+    pthread_mutex_lock(&g_deviceMutex);
+    bool found = false;
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            g_sirens[i].mode = mode_;
+            found = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (found) {
+        Device_Save();
+        printf("SUCCESS: Siren 0x%04X mode set to %d.\n", shortAddr_, mode_);
+    } else {
+        printf("ERROR: Siren 0x%04X not found.\n", shortAddr_);
+    }
 }
 
-uint8_t Siren_GetMode( void )
+uint8_t Siren_GetMode( uint16_t shortAddr_ )
 {
-    return s_sirenMode;
+    uint8_t mode = 1; // default
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numSirens; i++) {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            mode = g_sirens[i].mode;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    return mode;
 }
 
 void Siren_ControlAll( uint8_t warnMode_ )
 {
     Siren_ControlAllDuration( warnMode_, 240 ); // default to 240 seconds
+}
+
+void Siren_Control( uint16_t shortAddr_, uint8_t warnMode_ )
+{
+    g_sirenActive = ( warnMode_ != 0 );
+    pthread_mutex_lock( &g_deviceMutex );
+    for ( int i = 0; i < g_numSirens; i++ )
+    {
+        if (g_sirens[i].shortAddr == shortAddr_) {
+            uint8_t mode = (warnMode_ != 0) ? g_sirens[i].mode : 0;
+            uint8_t ep = g_sirens[i].endpoint;
+            uint8_t vol = g_sirens[i].volume;
+            pthread_mutex_unlock( &g_deviceMutex );
+            
+            if ( Device_IsOffline( shortAddr_ ) )
+            {
+                printf("\033[1;31mERROR: Siren 0x%04X is OFFLINE! Trigger skipped.\033[0m\n", shortAddr_);
+                return;
+            }
+            
+            ZNP_SendSirenWarning( shortAddr_, ep, Siren_NextSeq(), mode, vol, 240 );
+            return;
+        }
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
 }
 
 void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
@@ -413,7 +487,9 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-        printf( "⚠️ No sirens registered yet.\n" );
+        if (warnMode_ != 0) {
+            printf("ERROR: Failed to trigger siren. No sirens registered in the network.\n");
+        }
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
@@ -426,19 +502,33 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        uint8_t mode = (warnMode_ != 0) ? s_sirenMode : 0;
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode, s_sirenVolume, durationSeconds_ );
+        uint8_t mode = (warnMode_ != 0) ? tempSirens[i].mode : 0;
+        
+        if ( Device_IsOffline( tempSirens[i].shortAddr ) )
+        {
+            printf("\033[1;31mERROR: Siren 0x%04X is OFFLINE! Trigger skipped.\033[0m\n", tempSirens[i].shortAddr);
+            continue;
+        }
+
+        if (warnMode_ != 0) {
+            printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode, tempSirens[i].volume);
+        } else {
+            printf("SUCCESS: Siren 0x%04X turned OFF.\n", tempSirens[i].shortAddr);
+        }
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode, tempSirens[i].volume, durationSeconds_ );
     }
 }
 
-void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
+void Siren_TriggerAll( uint8_t mode_, uint16_t durationSeconds_ )
 {
-    (void)squawkMode_; // Unused for emulation
+    g_sirenActive = ( mode_ != 0 );
 
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-        printf( "⚠️ No sirens registered yet.\n" );
+        if (mode_ != 0) {
+            printf("ERROR: Failed to trigger siren. No sirens registered in the network.\n");
+        }
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
@@ -450,13 +540,51 @@ void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
 
     for ( int i = 0; i < tempNum; i++ )
     {
-        // ⚠️ HARDWARE FIRMWARE BUG ⚠️
+        if ( Device_IsOffline( tempSirens[i].shortAddr ) )
+        {
+            printf("\033[1;31mERROR: Siren 0x%04X is OFFLINE! Trigger skipped.\033[0m\n", tempSirens[i].shortAddr);
+            continue;
+        }
+        
+        if (mode_ != 0) {
+            printf("SUCCESS: Siren 0x%04X triggered ON (Mode %d, Vol %d).\n", tempSirens[i].shortAddr, mode_, tempSirens[i].volume);
+        } else {
+            printf("SUCCESS: Siren 0x%04X turned OFF.\n", tempSirens[i].shortAddr);
+        }
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), mode_, tempSirens[i].volume, durationSeconds_ );
+    }
+}
+
+void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ )
+{
+    (void)squawkMode_; // Unused for emulation
+
+    pthread_mutex_lock( &g_deviceMutex );
+    if ( g_numSirens == 0 )
+    {
+                pthread_mutex_unlock( &g_deviceMutex );
+        return;
+    }
+
+    int tempNum = g_numSirens;
+    SIREN_T tempSirens[MAX_SIRENS];
+    memcpy( tempSirens, g_sirens, sizeof( SIREN_T ) * g_numSirens );
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    for ( int i = 0; i < tempNum; i++ )
+    {
+        if ( Device_IsOffline( tempSirens[i].shortAddr ) )
+        {
+            continue;
+        }
+        
+        //  HARDWARE FIRMWARE BUG 
         // Even when formatted byte-for-byte perfectly according to the ZCL spec and Develco docs
         // (endpoint 1, strobe 0, mode 1, level 0), newer Frient SIRZB-110 firmwares completely 
         // ignore the native Squawk command (0x01) unless armed by a separate security panel.
         // The industry-standard workaround (used by Z2M/Home Assistant) is to emulate the chirp 
         // using the highly reliable Start Warning (0x00) command for a 1-second duration.
-        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), s_sirenMode, squawkLevel_, 1 );
+        ZNP_SendSirenWarning( tempSirens[i].shortAddr, tempSirens[i].endpoint, Siren_NextSeq(), tempSirens[i].mode, squawkLevel_, 1 );
     }
 }
 
@@ -465,6 +593,7 @@ void Siren_Beep( int count_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
+        printf("ERROR: Failed to trigger siren beep. No sirens registered in the network.\n");
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }
@@ -472,6 +601,11 @@ void Siren_Beep( int count_ )
     SIREN_T tempSirens[MAX_SIRENS];
     memcpy( tempSirens, g_sirens, sizeof( SIREN_T ) * g_numSirens );
     pthread_mutex_unlock( &g_deviceMutex );
+
+    for ( int i = 0; i < tempNum; i++ )
+    {
+        printf("SUCCESS: Siren 0x%04X emitted BEEP (x%d).\n", tempSirens[i].shortAddr, count_);
+    }
 
     for ( int c = 0; c < count_; c++ )
     {
@@ -540,15 +674,51 @@ uint8_t Siren_GetEndpoint( uint16_t shortAddr_ )
     return ep;
 }
 
+void Siren_PollAll( void )
+{
+    pthread_mutex_lock( &g_deviceMutex );
+    int num = g_numSirens;
+    uint16_t addrs[MAX_SIRENS];
+    uint8_t eps[MAX_SIRENS];
+    for ( int i = 0; i < num; i++ )
+    {
+        if ( !g_sirens[i].configured ) continue;
+        addrs[i] = g_sirens[i].shortAddr;
+        eps[i] = g_sirens[i].endpoint;
+    }
+    pthread_mutex_unlock( &g_deviceMutex );
+
+    if ( num == 0 ) return;
+
+    // Poll every 60 seconds (called from a loop that yields 5ms, so ~12000 ticks)
+    // Actually, we can just use a timestamp
+    static double lastPollTime = 0;
+    double now = ZNP_GetCurrentTime();
+    if ( now - lastPollTime < 60.0 )
+    {
+        return;
+    }
+    lastPollTime = now;
+
+    static uint8_t seq = 200;
+    for ( int i = 0; i < num; i++ )
+    {
+        // Read Basic Cluster (0x0000), ZCLVersion (0x0000) just to keep it alive
+        uint8_t readZcl[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+        ZNP_AfDataRequestExt( 0x02, addrs[i], eps[i], 0x0000, 8, 0x0000, seq, 0x00, 30, readZcl, 5 );
+        usleep( 50000 );
+    }
+}
+
 void Siren_ReadEnvironment( uint16_t shortAddr_ )
 {
     uint8_t ep = Siren_GetEndpoint(shortAddr_);
     if (ep == 0) {
-        printf("Error: Siren 0x%04X is not registered. Cannot read environment.\n", shortAddr_);
+        LOG_ERROR("Error: Siren 0x%04X is not registered. Cannot read environment.\n", shortAddr_);
         return;
     }
 
-    printf("Requesting Environment Data (Battery) from Siren 0x%04X on EP 0x%02X...\n", shortAddr_, ep);
+    LOG_DEBUG("Requesting Environment Data (Battery) from Siren 0x%04X on EP 0x%02X...\n", shortAddr_, ep);
   
     // Read Battery Voltage (Cluster 0x0001, Attr 0x0020)
     uint8_t zclFrameBat[5];

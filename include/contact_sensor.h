@@ -18,6 +18,7 @@ typedef struct
     int zoneId;
     bool configured;        ///< True once bind + CIE write succeeded (verified).
     bool isOpen;
+    bool isTampered;
     uint8_t setupRetries;   ///< Failed setup attempts (retry cap).
     double lastSetupAttempt;///< Timestamp of the last setup attempt (retry pacing).
     double lastStatusTime;  ///< Timestamp of the last zone status update received.
@@ -39,6 +40,7 @@ void ContactSensor_PrintStatus( void );
 bool ContactSensor_IsKnown( uint16_t shortAddr_ );
 void ContactSensor_UpdateSeen( uint16_t shortAddr_ );
 void ContactSensor_DiscoverAllActiveEp( void );
+void ContactSensor_PostAssign( uint16_t shortAddr_ );
 void ContactSensor_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ );
 void ContactSensor_ReadEnvironment( uint16_t shortAddr_ );
 

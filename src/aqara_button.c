@@ -127,7 +127,8 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     {
         if ( g_numAqaraButtons < MAX_AQARA_BUTTONS )
         {
-            printf( " Aqara Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_DEBUG("Aqara Button discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_EVENT("AQARA BTN", shortAddr_, "Network Join\n");
             g_aqaraButtons[g_numAqaraButtons].shortAddr = shortAddr_;
             g_aqaraButtons[g_numAqaraButtons].endpoint = endpoint_;
             g_aqaraButtons[g_numAqaraButtons].lastSeen = ZNP_GetCurrentTime();
@@ -167,12 +168,14 @@ void AqaraButton_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
 {
     bool found = false;
     pthread_mutex_lock( &g_deviceMutex );
+    int targetIdx = -1;
     for ( int i = 0; i < g_numAqaraButtons; i++ )
     {
         if ( g_aqaraButtons[i].shortAddr == shortAddr_ )
         {
             memcpy( g_aqaraButtons[i].ieee, ieee_, 8 );
             g_aqaraButtons[i].hasIeee = true;
+            targetIdx = i;
             found = true;
             break;
         }
@@ -187,11 +190,18 @@ void AqaraButton_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
             if ( g_aqaraButtons[i].shortAddr != shortAddr_ && g_aqaraButtons[i].hasIeee &&
                  memcmp( g_aqaraButtons[i].ieee, ieee_, 8 ) == 0 )
             {
+                // Preserve configuration from the old (now stale) entry
+                g_aqaraButtons[targetIdx].configured = g_aqaraButtons[i].configured;
+
                 for ( int j = i; j < g_numAqaraButtons - 1; j++ )
                 {
                     g_aqaraButtons[j] = g_aqaraButtons[j + 1];
                 }
                 g_numAqaraButtons--;
+
+                if (targetIdx > i) {
+                    targetIdx--;
+                }
             }
         }
     }
@@ -233,7 +243,7 @@ void AqaraButton_Setup( uint16_t shortAddr_ )
     {
         pthread_mutex_unlock( &g_deviceMutex );
         // Request IEEE; the response re-triggers setup via UpdateIeee.
-        printf( "Aqara button 0x%04X missing IEEE - requesting...\n", shortAddr_ );
+        LOG_DEBUG( "Aqara button 0x%04X missing IEEE - requesting...\n", shortAddr_ );
         uint8_t reqPay[4] = { shortAddr_ & 0xFF, ( shortAddr_ >> 8 ) & 0xFF, 0x01, 0x00 };
         ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 );
         return;
@@ -245,29 +255,29 @@ void AqaraButton_Setup( uint16_t shortAddr_ )
     g_aqaraButtons[idx].configured = true;
     pthread_mutex_unlock( &g_deviceMutex );
 
-    printf( "Configuring Aqara button 0x%04X...\n", shortAddr_ );
+    LOG_DEBUG( "Configuring Aqara button 0x%04X...\n", shortAddr_ );
 
     // Bind On/Off cluster output (0x0006) to coordinator endpoint 8.
     ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
-    printf( "Configuration sent to Aqara button 0x%04X!\n", shortAddr_ );
+    LOG_DEBUG( "Configuration sent to Aqara button 0x%04X!\n", shortAddr_ );
 }
 
 // Parse a press and forward it to the use-case layer. The button module does
 // NOT drive the siren itself - that policy lives in usecase.c.
 void AqaraButton_HandleCommand( uint16_t shortAddr_, uint8_t cmdId_ )
 {
-    printf( "👉 [AQARA BUTTON] Command received: cmd_id=0x%02X from src=0x%04X\n", cmdId_, shortAddr_ );
+    LOG_DEBUG("[AQARA BUTTON] Command received: cmd_id=0x%02X from src=0x%04X\n", cmdId_, shortAddr_ );
     if ( cmdId_ == 0x01 ) // On
     {
-        UseCase_Post( UC_BUTTON_ON, shortAddr_, cmdId_ );
+        UseCase_Post( UC_BUTTON_ON, shortAddr_, cmdId_, 0 );
     }
     else if ( cmdId_ == 0x00 ) // Off
     {
-        UseCase_Post( UC_BUTTON_OFF, shortAddr_, cmdId_ );
+        UseCase_Post( UC_BUTTON_OFF, shortAddr_, cmdId_, 0 );
     }
     else if ( cmdId_ == 0x02 ) // Toggle
     {
-        UseCase_Post( UC_BUTTON_TOGGLE, shortAddr_, cmdId_ );
+        UseCase_Post( UC_BUTTON_TOGGLE, shortAddr_, cmdId_, 0 );
     }
 }
 

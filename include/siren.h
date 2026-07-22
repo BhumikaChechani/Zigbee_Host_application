@@ -23,6 +23,9 @@ typedef struct
     bool hasIeee;       ///< True once @ref ieee is known.
     uint8_t zoneId;     ///< IAS zone id assigned to the siren's tamper zone.
     bool configured;    ///< True once CIE address has been written (setup done).
+    uint8_t volume;     ///< Per-device volume level (0-3).
+    uint8_t mode;       ///< Per-device warning mode (1-6).
+    bool isTampered;
 } SIREN_T;
 
 #define MAX_SIRENS 32   ///< Maximum sirens tracked.
@@ -93,17 +96,28 @@ void Siren_HandleEnroll( uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSe
 ///
 void Siren_ControlAll( uint8_t warnMode_ );
 
-/// @brief Start or stop sirens for a specific duration in seconds.
+/// @brief Start or stop a specific siren.
+/// @param shortAddr_ Siren network address.
+/// @param warnMode_ 0 = stop, non-zero = start.
+void Siren_Control( uint16_t shortAddr_, uint8_t warnMode_ );
+
+/// @brief Start or stop sirens for a specific duration in seconds using per-device config.
 void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ );
+
+/// @brief Explicitly trigger all sirens with a specific mode, using their configured volume.
+/// @param mode_ 0=stop, 1-6=start with mode.
+/// @param durationSeconds_ duration.
+void Siren_TriggerAll( uint8_t mode_, uint16_t durationSeconds_ );
 
 /// @brief Send a short Squawk/Chime to every registered siren.
 /// @param squawkMode_ e.g., 0=Armed, 1=Disarmed.
 /// @param squawkLevel_ e.g., 0=Low, 1=Medium, 2=High, 3=Very High.
 void Siren_ControlSquawk( uint8_t squawkMode_, uint8_t squawkLevel_ );
 
-/// @brief Set the global siren volume.
+/// @brief Set a specific siren's volume.
+/// @param shortAddr_ Siren network address.
 /// @param volume_ 0=low, 1=medium, 2=high, 3=very high.
-void Siren_SetVolume( uint8_t volume_ );
+void Siren_SetVolume( uint16_t shortAddr_, uint8_t volume_ );
 
 /// @brief Emulate a specific number of short beeps by rapidly toggling Start Warning.
 /// @param count_ Number of beeps.
@@ -115,21 +129,27 @@ void Siren_Beep( int count_ );
 /// @param  count_ Number of beeps.
 void Siren_PostBeep( int count_ );
 
-/// @brief Get the global siren volume.
+/// @brief Get the volume for a specific siren.
+/// @param shortAddr_ Siren network address.
 /// @return Current volume level.
-uint8_t Siren_GetVolume( void );
+uint8_t Siren_GetVolume( uint16_t shortAddr_ );
 
-/// @brief Set the global siren mode.
+/// @brief Set a specific siren's mode.
+/// @param shortAddr_ Siren network address.
 /// @param mode_ 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic
-void Siren_SetMode( uint8_t mode_ );
+void Siren_SetMode( uint16_t shortAddr_, uint8_t mode_ );
 
-/// @brief Get the global siren mode.
+/// @brief Get the mode for a specific siren.
+/// @param shortAddr_ Siren network address.
 /// @return Current mode level.
-uint8_t Siren_GetMode( void );
+uint8_t Siren_GetMode( uint16_t shortAddr_ );
 
-/// @brief Read environment data (battery, temp) from a specific siren.
-/// @param shortAddr_ Target network address.
+/// @brief Retrieve the firmware version and manufacturer strings from a siren.
+/// @param shortAddr_ The network address of the target siren.
 void Siren_ReadEnvironment( uint16_t shortAddr_ );
+
+/// @brief Poll all active sirens to keep them marked online in the watchdog.
+void Siren_PollAll( void );
 
 /// @brief  Print the registered sirens (for the CLI 'status' command).
 /// @return None.

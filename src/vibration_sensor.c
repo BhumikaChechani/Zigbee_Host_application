@@ -52,22 +52,22 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
     // We just print the payload so the user can see it's not hardcoded!
     const uint8_t *zcl = &af_->data[hdrLen];
     int zclLen = af_->dataLen - hdrLen;
-    printf("   -> [Aqara Vibration Action] from 0x%04X, cluster 0x0012: ", af_->srcAddr);
-    for (int i = 0; i < zclLen; i++) printf("%02X ", zcl[i]);
-    printf("\n");
+    LOG_DEBUG("-> [Aqara Vibration Action] from 0x%04X, cluster 0x0012: ", af_->srcAddr);
+    for (int i = 0; i < zclLen; i++) LOG_DEBUG("%02X ", zcl[i]);
+    LOG_RAW("\n");
   } else if (af_->clusterId == 0x0000) { // Basic cluster (Aqara custom attributes)
     const uint8_t *zcl = &af_->data[hdrLen];
     int zclLen = af_->dataLen - hdrLen;
-    printf("   -> [Aqara Vibration Basic] from 0x%04X, cluster 0x0000: ", af_->srcAddr);
-    for (int i = 0; i < zclLen; i++) printf("%02X ", zcl[i]);
-    printf("\n");
+    LOG_DEBUG("-> [Aqara Vibration Basic] from 0x%04X, cluster 0x0000: ", af_->srcAddr);
+    for (int i = 0; i < zclLen; i++) LOG_DEBUG("%02X ", zcl[i]);
+    LOG_RAW("\n");
   } else if (af_->clusterId == 0x0001) { // Power Configuration
     if (cmdId == 0x01) { // Read Attributes Response
       const uint8_t *zcl = &af_->data[hdrLen];
       int zclLen = af_->dataLen - hdrLen;
       if (zclLen >= 5 && zcl[0] == 0x20 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Success
         uint8_t bat = zcl[4]; // Unit is 100 mV
-        printf("🔋 Vibration Sensor 0x%04X Battery Voltage: %.1f V\n", af_->srcAddr, (float)bat / 10.0);
+        LOG_EVENT("VIBRATION", af_->srcAddr, "Battery Voltage: %.1f V\n", (float)bat / 10.0);
       }
     }
   } else if (af_->clusterId == 0x0402) { // Temperature Measurement
@@ -76,10 +76,10 @@ static void VibrationSensor_HandleAf(const AF_MSG_T *af_) {
       int zclLen = af_->dataLen - hdrLen;
       if (cmdId == 0x01 && zclLen >= 6 && zcl[0] == 0x00 && zcl[1] == 0x00 && zcl[2] == 0x00) { // Read Resp Success
         int16_t temp = (int16_t)(zcl[4] | (zcl[5] << 8));
-        printf("🌡️ Vibration Sensor 0x%04X Temperature: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_EVENT("VIBRATION", af_->srcAddr, "Temperature: %.2f °C\n", (float)temp / 100.0);
       } else if (cmdId == 0x0A && zclLen >= 5 && zcl[0] == 0x00 && zcl[1] == 0x00) { // Report
         int16_t temp = (int16_t)(zcl[3] | (zcl[4] << 8));
-        printf("🌡️ Vibration Sensor 0x%04X Temperature Report: %.2f °C\n", af_->srcAddr, (float)temp / 100.0);
+        LOG_EVENT("VIBRATION", af_->srcAddr, "Temperature Report: %.2f °C\n", (float)temp / 100.0);
       }
     }
   }
@@ -144,7 +144,8 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   bool changed = false;
   if (idx == -1) {
     if (g_numVibrationSensors < MAX_VIBRATION_SENSORS) {
-      printf(" Vibration Sensor discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_);
+      LOG_DEBUG("Vibration Sensor discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_);
+      LOG_EVENT("VIBRATION", shortAddr_, "Network Join\n");
       g_vibrationSensors[g_numVibrationSensors].shortAddr = shortAddr_;
       g_vibrationSensors[g_numVibrationSensors].endpoint = endpoint_;
       g_vibrationSensors[g_numVibrationSensors].lastSeen = ZNP_GetCurrentTime();
@@ -155,6 +156,7 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
       g_vibrationSensors[g_numVibrationSensors].lastVibrationTime = 0.0;
       g_vibrationSensors[g_numVibrationSensors].isMoving = false;
       g_vibrationSensors[g_numVibrationSensors].lastMovementTime = 0.0;
+      g_vibrationSensors[g_numVibrationSensors].isTampered = false;
       g_vibrationSensors[g_numVibrationSensors].sensitivity = 10;
       g_numVibrationSensors++;
       changed = true;
@@ -181,10 +183,12 @@ void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
 void VibrationSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
   bool found = false;
   pthread_mutex_lock(&g_deviceMutex);
+  int targetIdx = -1;
   for (int i = 0; i < g_numVibrationSensors; i++) {
     if (g_vibrationSensors[i].shortAddr == shortAddr_) {
       memcpy(g_vibrationSensors[i].ieee, ieee_, 8);
       g_vibrationSensors[i].hasIeee = true;
+      targetIdx = i;
       found = true;
       break;
     }
@@ -192,10 +196,19 @@ void VibrationSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
   if (found) {
     for (int i = g_numVibrationSensors - 1; i >= 0; i--) {
       if (g_vibrationSensors[i].shortAddr != shortAddr_ && g_vibrationSensors[i].hasIeee && memcmp(g_vibrationSensors[i].ieee, ieee_, 8) == 0) {
+        // Preserve configuration from the old (now stale) entry
+        g_vibrationSensors[targetIdx].zoneId = g_vibrationSensors[i].zoneId;
+        g_vibrationSensors[targetIdx].configured = g_vibrationSensors[i].configured;
+        g_vibrationSensors[targetIdx].sensitivity = g_vibrationSensors[i].sensitivity;
+
         for (int j = i; j < g_numVibrationSensors - 1; j++) {
           g_vibrationSensors[j] = g_vibrationSensors[j + 1];
         }
         g_numVibrationSensors--;
+
+        if (targetIdx > i) {
+            targetIdx--;
+        }
       }
     }
   }
@@ -224,7 +237,7 @@ void VibrationSensor_Setup(uint16_t shortAddr_) {
   }
   if (!g_vibrationSensors[idx].hasIeee) {
     pthread_mutex_unlock(&g_deviceMutex);
-    printf("Vibration sensor 0x%04X missing IEEE - requesting...\n", shortAddr_);
+    LOG_DEBUG("Vibration sensor 0x%04X missing IEEE - requesting...\n", shortAddr_);
     uint8_t reqPay[4] = {shortAddr_ & 0xFF, (shortAddr_ >> 8) & 0xFF, 0x01, 0x00};
     ZNP_Sreq(0x25, 0x01, reqPay, 4, NULL, 3000);
     return;
@@ -236,14 +249,14 @@ void VibrationSensor_Setup(uint16_t shortAddr_) {
   g_vibrationSensors[idx].configured = true;
   pthread_mutex_unlock(&g_deviceMutex);
 
-  printf("Configuring Vibration Sensor 0x%04X...\n", shortAddr_);
+  LOG_DEBUG("Configuring Vibration Sensor 0x%04X...\n", shortAddr_);
   ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0500, g_coordinatorIeee, 8);
   usleep(500000);
   ZNP_WriteCieAddress(shortAddr_, endpoint, 0x20);
   usleep(500000);
   ZNP_SendZoneEnrollResponse(shortAddr_, endpoint, 0x21, 0x01);
   usleep(200000);
-  printf("Configuration sent to Vibration Sensor 0x%04X!\n", shortAddr_);
+  LOG_DEBUG("Configuration sent to Vibration Sensor 0x%04X!\n", shortAddr_);
   
   pthread_mutex_lock(&g_deviceMutex);
   uint8_t sens = 10;
@@ -260,7 +273,7 @@ void VibrationSensor_Setup(uint16_t shortAddr_) {
 }
 
 void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_t transSeq_, uint16_t zoneType_) {
-  printf("   -> Zone Enroll Request from Vibration Sensor 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_);
+  LOG_DEBUG("-> Zone Enroll Request from Vibration Sensor 0x%04X, zone_type=0x%04X\n", shortAddr_, zoneType_);
   uint8_t zoneId = g_nextZoneId++;
 
   pthread_mutex_lock(&g_deviceMutex);
@@ -276,7 +289,7 @@ void VibrationSensor_HandleEnroll(uint16_t shortAddr_, uint8_t endpoint_, uint8_
 }
 
 void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uint8_t zoneId_) {
-  printf("   -> Zone Status Change from Vibration Sensor 0x%04X: zone_status=0x%04X, zone_id=%d\n", shortAddr_, zoneStatus_, zoneId_);
+  LOG_DEBUG("-> Zone Status Change from Vibration Sensor 0x%04X: zone_status=0x%04X, zone_id=%d\n", shortAddr_, zoneStatus_, zoneId_);
 
   pthread_mutex_lock(&g_deviceMutex);
   int idx = -1;
@@ -297,13 +310,13 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
     if (movement_active) {
       if (!g_vibrationSensors[idx].isMoving) {
         g_vibrationSensors[idx].isMoving = true;
-        UseCase_Post(UC_MOVEMENT_DETECTED, shortAddr_, zoneStatus_);
+        UseCase_Post(UC_MOVEMENT_DETECTED, shortAddr_, zoneStatus_, 0);
       }
       g_vibrationSensors[idx].lastMovementTime = ZNP_GetCurrentTime();
     } else {
       if (g_vibrationSensors[idx].isMoving) {
         g_vibrationSensors[idx].isMoving = false;
-        UseCase_Post(UC_MOVEMENT_CLEARED, shortAddr_, 0);
+        UseCase_Post(UC_MOVEMENT_CLEARED, shortAddr_, 0, 0);
       }
     }
 
@@ -311,13 +324,28 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
     if (vibration_active) {
       if (!g_vibrationSensors[idx].isVibrating) {
         g_vibrationSensors[idx].isVibrating = true;
-        UseCase_Post(UC_VIBRATION_DETECTED, shortAddr_, zoneStatus_);
+        UseCase_Post(UC_VIBRATION_DETECTED, shortAddr_, zoneStatus_, 0);
       }
       g_vibrationSensors[idx].lastVibrationTime = ZNP_GetCurrentTime();
     } else {
       if (g_vibrationSensors[idx].isVibrating) {
         g_vibrationSensors[idx].isVibrating = false;
-        UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, 0);
+        UseCase_Post(UC_VIBRATION_CLEARED, shortAddr_, 0, 0);
+      }
+    }
+
+    bool tamper_active = ((zoneStatus_ & 0x0004) != 0); // Tamper bit
+
+    // Handle Tamper (Alarm 3)
+    if (tamper_active) {
+      if (!g_vibrationSensors[idx].isTampered) {
+        g_vibrationSensors[idx].isTampered = true;
+        UseCase_Post(UC_TAMPER_DETECTED, shortAddr_, zoneStatus_, 0);
+      }
+    } else {
+      if (g_vibrationSensors[idx].isTampered) {
+        g_vibrationSensors[idx].isTampered = false;
+        UseCase_Post(UC_TAMPER_CLEARED, shortAddr_, 0, 0);
       }
     }
   }
@@ -390,8 +418,8 @@ void VibrationSensor_PollAll(void) {
       g_vibrationSensors[i].isVibrating = false;
       // Clear the Alarm 2 bit in lastZoneStatus
       g_vibrationSensors[i].lastZoneStatus &= ~0x0002;
-      UseCase_Post(UC_VIBRATION_CLEARED, g_vibrationSensors[i].shortAddr, 0);
-      printf("   -> Auto-cleared Vibration (Alarm 2) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
+      UseCase_Post(UC_VIBRATION_CLEARED, g_vibrationSensors[i].shortAddr, 0, 0);
+      LOG_DEBUG("-> Auto-cleared Vibration (Alarm 2) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
     }
 
     // Check Movement timeout
@@ -399,15 +427,15 @@ void VibrationSensor_PollAll(void) {
       g_vibrationSensors[i].isMoving = false;
       // Clear the Alarm 1 bit in lastZoneStatus
       g_vibrationSensors[i].lastZoneStatus &= ~0x0001;
-      UseCase_Post(UC_MOVEMENT_CLEARED, g_vibrationSensors[i].shortAddr, 0);
-      printf("   -> Auto-cleared Movement (Alarm 1) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
+      UseCase_Post(UC_MOVEMENT_CLEARED, g_vibrationSensors[i].shortAddr, 0, 0);
+      LOG_DEBUG("-> Auto-cleared Movement (Alarm 1) for Sensor 0x%04X (Timeout)\n", g_vibrationSensors[i].shortAddr);
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);
 }
 
 void VibrationSensor_SetSensitivity(uint16_t shortAddr_, uint8_t level_) {
-  printf("Configuring Vibration Sensor 0x%04X sensitivity to level %d...\n", shortAddr_, level_);
+  printf("SUCCESS: Vibration Sensor 0x%04X sensitivity set to level %d.\n", shortAddr_, level_);
   
   pthread_mutex_lock(&g_deviceMutex);
   for (int i = 0; i < g_numVibrationSensors; i++) {

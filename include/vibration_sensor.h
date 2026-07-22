@@ -22,6 +22,7 @@ typedef struct
     bool isMoving;
     double lastMovementTime;
     uint16_t lastZoneStatus;
+    bool isTampered;
     uint8_t sensitivity;
 } VIBRATION_SENSOR_T;
 
@@ -40,6 +41,7 @@ bool VibrationSensor_IsKnown( uint16_t shortAddr_ );
 void VibrationSensor_UpdateSeen( uint16_t shortAddr_ );
 void VibrationSensor_DiscoverAllActiveEp( void );
 void VibrationSensor_PollAll( void );
+void VibrationSensor_PostAssign( uint16_t shortAddr_ );
 void VibrationSensor_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ );
 
 void VibrationSensor_SetSensitivity( uint16_t shortAddr_, uint8_t level_ );

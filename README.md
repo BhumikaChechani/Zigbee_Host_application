@@ -13,7 +13,7 @@ This application acts as the "brain" of your Zigbee network. It communicates wit
 
 ---
 
-## 🚀 Quick Start Guide
+## Quick Start Guide
 
 ### 1. Install Dependencies
 Before compiling, you need to install the C compiler, make utility, and serial diagnostic tools. Run the automated setup script included in this repository (supports Debian/Ubuntu, Fedora, CentOS, and Red Hat systems):
@@ -52,7 +52,7 @@ You **must** run the application from the root `host_c/` folder. This ensures th
 
 ---
 
-## 💻 CLI Commands
+## CLI Commands
 
 Once the application is running, you can interact with the Zigbee network directly by typing commands into your terminal. 
 
@@ -63,6 +63,8 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`status`** | Displays a summary of all registered devices, their network addresses, last seen times, and active configurations. |
 | **`discover [addr hex]`** | Broadcasts discovery requests to find new devices on the network. If a specific address is provided, it actively queries only that device. |
 | **`permit [duration]`** | Opens the Zigbee network for new devices to join. Defaults to 60 seconds. *(Example: `permit 120` opens it for 2 minutes).* |
+| **`remove <addr>`** | Forcefully removes a device from the internal registry and instructs it to leave the network. |
+| **`rebind <addr>`** | Forces the coordinator to re-establish Zigbee bindings for a device that is unresponsive. |
 | **`exit`** or **`quit`** | Safely closes the serial connection and exits the application. |
 
 ### Sensor Configuration
@@ -78,20 +80,21 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`zone <addr> <idx> <start> <end>`** | Configures a detection zone. Distance slices are 25cm each.<br>*(Example: `zone 7AF2 0 0 2` configures zone 0 to cover 0-50cm).* |
 | **`zonedel <addr> <idx>`** | Deletes a previously configured zone. |
 | **`spatiallearn <addr>`** | Triggers the sensor's spatial learning calibration (ensure the room is completely empty before running). |
-| **`lightthreshold [value]`** | Sets or displays the light intensity threshold (lux index) for Aqara Occupancy light sensing (Default: 10000). |
+| **`lightthreshold <addr> [value]`** | Sets or displays the light intensity threshold (lux index) for Aqara Occupancy light sensing (Default: 10000). |
 
 ### Siren Controls
 | Command | Description |
 | :--- | :--- |
-| **`siren on`** | Turns **all** sirens ON simultaneously. |
-| **`siren off`** | Turns **all** sirens OFF simultaneously. |
-| **`siren vol <0-3>`** | Sets the global siren volume (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
-| **`siren mode <1-6>`** | Sets the global siren sound mode (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
-| **`siren test <addr> [mode]`** | Sends a test warning to a specific siren. Can optionally override the global mode for testing. |
+| **`siren on <addr>`** | Turns a specific siren ON. |
+| **`siren off <addr>`** | Turns a specific siren OFF. |
+| **`siren vol <addr> <0-3>`** | Sets the volume for a specific siren (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
+| **`siren mode <addr> <1-6>`** | Sets the sound mode for a specific siren (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
+| **`siren test <addr> [mode]`** | Sends a test warning to a specific siren. Can optionally override its mode for testing. |
+| **`siren stop <addr>`** | Stops the test for a specific siren. |
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 The design separates three core responsibilities to ensure stability and responsiveness:
 1. **Transport**: Manages the serial link to the Zigbee chip.
@@ -145,6 +148,14 @@ Each sensor runs on its own background thread, and the central policy engine run
 4. **Act**: The `usecase` thread receives the `UC_BUTTON_ON` event and executes the policy (e.g., calling `Siren_ControlAll(1)` to sound the alarm).
 
 *(Notice how the button never talks directly to the siren—everything goes through the `usecase.c` logic layer!)*
+
+### Security & Health Monitoring
+The system includes built-in safeguards to ensure network reliability:
+- **Active Health Watchdog**: A background thread actively tracks the `last_seen` timestamp of all registered devices. 
+  - Sleepy battery-powered devices (buttons, contact sensors) are marked **OFFLINE** if they miss their check-ins for >2 hours.
+  - Active routers (sirens, occupancy sensors) are polled every 60 seconds and marked **OFFLINE** if they stop responding for >5 minutes.
+  - The `[HEALTH]` logs will instantly warn the user of unreachable devices, and the system prevents sending commands to unreachable sirens.
+- **Hardware Tamper Detection**: Devices equipped with physical tamper switches (Frient Contact Sensors, Frient Vibration Sensors, Smart Sirens, and Onics Panic Buttons) are actively monitored. If the battery cover is opened or the device is ripped off the wall, the system instantly logs a `[SECURITY] TAMPER DETECTED` warning to the console.
 
 ### Adding a New Sensor
 The architecture is designed to scale easily:

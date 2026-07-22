@@ -32,7 +32,9 @@ typedef enum
     UC_MOVEMENT_DETECTED, ///< Movement/Tilt detected        -> sirens on.
     UC_MOVEMENT_CLEARED,  ///< Movement/Tilt cleared         -> sirens off.
     UC_TAMPER_DETECTED,   ///< Siren physical tamper         -> sirens on.
-    UC_TAMPER_CLEARED     ///< Siren physical tamper cleared -> sirens off.
+    UC_TAMPER_CLEARED,    ///< Siren physical tamper cleared -> sirens off.
+    UC_DEVICE_OFFLINE,    ///< Device stopped reporting      -> log warning
+    UC_DEVICE_ONLINE      ///< Device resumed reporting      -> log info
 } UC_EVT_TYPE_T;
 
 /// @brief One event enqueued to the use-case thread.
@@ -41,6 +43,7 @@ typedef struct
     UC_EVT_TYPE_T type; ///< What happened.
     uint16_t srcAddr;   ///< Device that raised it (for logging/traceability).
     uint16_t raw;       ///< Raw cmd id / zone status, for logging only.
+    uint32_t val2;      ///< Extra data like distance or intensity.
 } UC_EVT_T;
 
 ///
@@ -67,6 +70,6 @@ void UseCase_Start( void );
 /// @param  raw_      Raw command id / zone status, for logging.
 /// @return None.
 ///
-void UseCase_Post( UC_EVT_TYPE_T type_, uint16_t srcAddr_, uint16_t raw_ );
+void UseCase_Post( UC_EVT_TYPE_T type_, uint16_t srcAddr_, uint16_t raw_, uint32_t val2_ );
 
 #endif // USECASE_H

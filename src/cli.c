@@ -116,7 +116,12 @@ static void Cli_HandleCommand( const char *cmd_ )
             uint8_t ep = Siren_GetEndpoint(addr);
             if ( ep == 0 )
             {
-                printf( "Siren 0x%04X not registered or not known.\n", addr );
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'siren test' command.\n", addr, devName);
+                }
             }
             else
             {
@@ -131,7 +136,12 @@ static void Cli_HandleCommand( const char *cmd_ )
             uint8_t ep = Siren_GetEndpoint(addr);
             if ( ep == 0 )
             {
-                printf( "Siren 0x%04X not registered or not known.\n", addr );
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'siren stop' command.\n", addr, devName);
+                }
             }
             else
             {
@@ -142,14 +152,32 @@ static void Cli_HandleCommand( const char *cmd_ )
         else if ( strcmp( sub, "on" ) == 0 )
         {
             uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
-            Siren_Control( addr, 1 );
-            printf( "Sent ON command to Siren 0x%04X.\n", addr );
+            if (Siren_GetEndpoint(addr) != 0) {
+                Siren_Control( addr, 1 );
+                printf( "Sent ON command to Siren 0x%04X.\n", addr );
+            } else {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'siren on' command.\n", addr, devName);
+                }
+            }
         }
         else if ( strcmp( sub, "off" ) == 0 )
         {
             uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
-            Siren_Control( addr, 0 );
-            printf( "Sent OFF command to Siren 0x%04X.\n", addr );
+            if (Siren_GetEndpoint(addr) != 0) {
+                Siren_Control( addr, 0 );
+                printf( "Sent OFF command to Siren 0x%04X.\n", addr );
+            } else {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'siren off' command.\n", addr, devName);
+                }
+            }
         }
         else if ( strcmp( sub, "vol" ) == 0 )
         {
@@ -157,7 +185,16 @@ static void Cli_HandleCommand( const char *cmd_ )
             {
                 uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
                 uint8_t v = (uint8_t)strtol( parts[3], NULL, 10 );
-                Siren_SetVolume( addr, v );
+                if (Siren_GetEndpoint(addr) != 0) {
+                    Siren_SetVolume( addr, v );
+                } else {
+                    const char* devName = Device_GetName(addr);
+                    if (strcmp(devName, "Unknown Device") == 0) {
+                        printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                    } else {
+                        printf("Error: The device at 0x%04X (%s) does not support the 'siren vol' command.\n", addr, devName);
+                    }
+                }
             }
             else
             {
@@ -170,7 +207,16 @@ static void Cli_HandleCommand( const char *cmd_ )
             {
                 uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
                 uint8_t m = (uint8_t)strtol( parts[3], NULL, 10 );
-                Siren_SetMode( addr, m );
+                if (Siren_GetEndpoint(addr) != 0) {
+                    Siren_SetMode( addr, m );
+                } else {
+                    const char* devName = Device_GetName(addr);
+                    if (strcmp(devName, "Unknown Device") == 0) {
+                        printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                    } else {
+                        printf("Error: The device at 0x%04X (%s) does not support the 'siren mode' command.\n", addr, devName);
+                    }
+                }
             }
             else
             {
@@ -194,9 +240,21 @@ static void Cli_HandleCommand( const char *cmd_ )
             
             uint32_t minCm = startSlice * 25;
             uint32_t maxCm = endSlice * 25;
+            bool found = false;
 #if ENABLE_AQARA_OCCUPANCY
-            AqaraOccupancy_SetZone( addr, zoneIdx, minCm, maxCm );
+            if (AqaraOccupancy_IsKnown(addr)) {
+                AqaraOccupancy_SetZone( addr, zoneIdx, minCm, maxCm );
+                found = true;
+            }
 #endif
+            if (!found) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'zone' command.\n", addr, devName);
+                }
+            }
         }
         else
         {
@@ -211,9 +269,21 @@ static void Cli_HandleCommand( const char *cmd_ )
         {
             uint16_t addr = strtoul( parts[1], NULL, 16 );
             int zoneIdx = (int)strtol( parts[2], NULL, 10 );
+            bool found = false;
 #if ENABLE_AQARA_OCCUPANCY
-            AqaraOccupancy_DeleteZone( addr, zoneIdx );
+            if (AqaraOccupancy_IsKnown(addr)) {
+                AqaraOccupancy_DeleteZone( addr, zoneIdx );
+                found = true;
+            }
 #endif
+            if (!found) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'zonedel' command.\n", addr, devName);
+                }
+            }
         }
         else
         {
@@ -226,16 +296,27 @@ static void Cli_HandleCommand( const char *cmd_ )
         {
             uint16_t addr = strtoul( parts[1], NULL, 16 );
             uint8_t level = (uint8_t)strtoul( parts[2], NULL, 10 );
+            bool found = false;
 #if ENABLE_AQARA_OCCUPANCY
             if (AqaraOccupancy_IsKnown(addr)) {
                 AqaraOccupancy_SetSensitivity( addr, level );
+                found = true;
             }
 #endif
 #if ENABLE_VIBRATION_SENSOR
             if (VibrationSensor_IsKnown(addr)) {
                 VibrationSensor_SetSensitivity( addr, level );
+                found = true;
             }
 #endif
+            if (!found) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'sensitivity' command.\n", addr, devName);
+                }
+            }
         }
         else
         {
@@ -247,9 +328,21 @@ static void Cli_HandleCommand( const char *cmd_ )
         if ( numParts >= 2 )
         {
             uint16_t addr = strtoul( parts[1], NULL, 16 );
+            bool found = false;
 #if ENABLE_AQARA_OCCUPANCY
-            AqaraOccupancy_SpatialLearning( addr );
+            if (AqaraOccupancy_IsKnown(addr)) {
+                AqaraOccupancy_SpatialLearning( addr );
+                found = true;
+            }
 #endif
+            if (!found) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'spatiallearn' command.\n", addr, devName);
+                }
+            }
         }
         else
         {
@@ -262,9 +355,21 @@ static void Cli_HandleCommand( const char *cmd_ )
         {
             uint16_t addr = strtoul( parts[1], NULL, 16 );
             printf( "Forcing full setup for 0x%04X...\n", addr );
+            bool found = false;
 #if ENABLE_AQARA_OCCUPANCY
-            AqaraOccupancy_PostAssign( addr );
+            if (AqaraOccupancy_IsKnown(addr)) {
+                AqaraOccupancy_PostAssign( addr );
+                found = true;
+            }
 #endif
+            if (!found) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'forcesetup' command.\n", addr, devName);
+                }
+            }
         }
         else
         {
@@ -277,9 +382,21 @@ static void Cli_HandleCommand( const char *cmd_ )
         {
             uint16_t addr = strtoul( parts[1], NULL, 16 );
             uint16_t threshold = (uint16_t)strtoul( parts[2], NULL, 10 );
+            bool found = false;
 #if ENABLE_AQARA_OCCUPANCY
-            AqaraOccupancy_SetLightThreshold( addr, threshold );
+            if (AqaraOccupancy_IsKnown(addr)) {
+                AqaraOccupancy_SetLightThreshold( addr, threshold );
+                found = true;
+            }
 #endif
+            if (!found) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'lightthreshold' command.\n", addr, devName);
+                }
+            }
         }
         else
         {
@@ -292,6 +409,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         {
             uint16_t addr = strtoul( parts[1], NULL, 16 );
             uint16_t delayMs = (uint16_t)strtoul( parts[2], NULL, 10 );
+            bool found = false;
 #if ENABLE_ONICS_BUTTON
             if ( OnicsButton_IsKnown( addr ) )
             {
@@ -308,12 +426,17 @@ static void Cli_HandleCommand( const char *cmd_ )
                 payloadFull[7] = (delayMs >> 8) & 0xFF;
 
                 ZNP_AfDataRequestExt( 2, addr, 0x20, 0, 8, 0x0006, 0, 0, 15, payloadFull, 8 );
-            }
-            else
-            {
-                printf( "Error: 0x%04X is not a known Onics Button.\n", addr );
+                found = true;
             }
 #endif
+            if (!found) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) does not support the 'onicsdelay' command.\n", addr, devName);
+                }
+            }
         }
         else
         {

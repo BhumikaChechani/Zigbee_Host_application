@@ -359,31 +359,40 @@ static void Cli_HandleCommand( const char *cmd_ )
         if ( numParts >= 2 )
         {
             uint16_t addr = (uint16_t)strtol( parts[1], NULL, 16 );
+            bool found = false;
 #if ENABLE_AQARA_OCCUPANCY
             if (AqaraOccupancy_IsKnown(addr)) {
                 AqaraOccupancy_ReadEnvironment( addr );
+                found = true;
             }
 #endif
 #if ENABLE_VIBRATION_SENSOR
             if (VibrationSensor_IsKnown(addr)) {
                 VibrationSensor_ReadEnvironment( addr );
+                found = true;
             }
 #endif
 #if ENABLE_CONTACT_SENSOR
             if (ContactSensor_IsKnown(addr)) {
                 ContactSensor_ReadEnvironment( addr );
+                found = true;
             }
 #endif
 #if ENABLE_ONICS_BUTTON
             if (OnicsButton_IsKnown(addr)) {
                 OnicsButton_ReadEnvironment( addr );
+                found = true;
             }
 #endif
 #if ENABLE_SIREN
             if (Siren_GetEndpoint(addr) != 0) {
                 Siren_ReadEnvironment( addr );
+                found = true;
             }
 #endif
+            if (!found) {
+                printf("Error: Device 0x%04X is not registered. (Is it a button? Some devices do not support environment queries)\n", addr);
+            }
         }
         else
         {

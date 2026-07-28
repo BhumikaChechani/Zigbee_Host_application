@@ -67,7 +67,6 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Type `okos on <addr>` | 🚨 Siren activates immediately. | Plays the saved custom tone at the saved volume. |
 | Type `okos off <addr>` | 🔇 Siren stops immediately. | |
 | Type `env <addr>` | 🌡️ Queries temp/humidity and battery. | Will query the device and output all available metrics. |
-| Type `okos status` | 📋 Displays all registered Okos Sirens. | Shows address, endpoint, saved tone, volume, and last seen time. |
 
 ---
 

@@ -67,7 +67,6 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  okos off [addr]                - Turn Okos siren(s) OFF (omit addr = all)\n" );
         printf( "  okos vol <addr> <0-2>          - Set volume (0=Low, 1=Med, 2=High/100dB)\n" );
         printf( "  okos tone <addr> <1-18>        - Set alarm tone (1=Burglar...18=Custom)\n" );
-        printf( "  okos status                    - Print Okos siren registry\n" );
         printf( "\n--- Sensor Configuration ---\n" );
         printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
         printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren, Okos Siren\n" );
@@ -246,7 +245,7 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_OKOS_SIREN
         if ( numParts < 2 )
         {
-            printf( "Usage: okos [on|off|vol|tone|status] [addr] [args]\n" );
+            printf( "Usage: okos [on|off|vol|tone] [addr] [args]\n" );
             return;
         }
         const char *sub = parts[1];
@@ -265,11 +264,7 @@ static void Cli_HandleCommand( const char *cmd_ )
             }
         }
 
-        if ( strcmp( sub, "status" ) == 0 )
-        {
-            OkosSiren_PrintStatus();
-        }
-        else if ( strcmp( sub, "on" ) == 0 )
+        if ( strcmp( sub, "on" ) == 0 )
         {
             if ( numParts >= 3 )
             {

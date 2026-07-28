@@ -92,7 +92,6 @@ Once the application is running, you can interact with the Zigbee network direct
 | **`okos off <addr>`** | Turns a specific Okos (Tuya) siren OFF. |
 | **`okos tone <addr> <1-18>`**| Sets the custom melody for an Okos siren (e.g., 1=Burglar, 7=Doorbell, 9=Beep). |
 | **`okos vol <addr> <0-2>`** | Sets the volume for an Okos siren (0=Low, 1=Medium, 2=High). |
-| **`okos status`** | Displays a summary table of all connected Okos sirens. |
 
 ---
 

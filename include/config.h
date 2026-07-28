@@ -16,5 +16,6 @@
 #define ENABLE_AQARA_OCCUPANCY 1
 #define ENABLE_VIBRATION_SENSOR 1
 #define ENABLE_OKOS_SIREN 1  ///< Okos Smart Siren (Tuya/Zigbee 3.0) — set 1 to enable
+#define ENABLE_AQARA_TVOC 1  ///< Aqara Air Quality Sensor (TVOC AAQS-S01) — set 1 to enable
 
 #endif // CONFIG_H

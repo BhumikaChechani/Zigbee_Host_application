@@ -70,7 +70,15 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 
 ---
 
-###  7. Aqara FP300 Presence Sensor
+###  7. Aqara Air Quality Sensor (TVOC AAQS-S01)
+| Action | Expected Behavior | Notes |
+| :--- | :--- | :--- |
+| Pull battery tab / network pair | `Network Join` printed in blue for `AQARA_TVOC`. | Registers the device. |
+| Type `env <addr>` | Queries and displays Temperature, Humidity, TVOC, and Battery. | TVOC is reported in ppb. The e-ink display updates locally, while Zigbee attributes are fetched on demand. |
+
+---
+
+###  8. Aqara FP300 Presence Sensor
 
 > [!NOTE]
 > **Demo Environment Presets:**

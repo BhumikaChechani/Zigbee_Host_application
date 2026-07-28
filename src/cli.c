@@ -29,6 +29,9 @@
 #if ENABLE_OKOS_SIREN
 #include "okos_siren.h"
 #endif
+#if ENABLE_AQARA_TVOC
+#include "aqara_tvoc.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +72,7 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  okos tone <addr> <1-18>        - Set alarm tone (1=Burglar...18=Custom)\n" );
         printf( "\n--- Sensor Configuration ---\n" );
         printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
-        printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren, Okos Siren\n" );
+        printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren, Okos Siren, Aqara TVOC\n" );
         printf( "  sensitivity <addr> <level>     - Set physical sensitivity level\n" );
         printf( "                                   * Aqara Occupancy: 1=Low, 2=Medium, 3=High\n" );
         printf( "                                   * Frient Vibration: 1=Most sensitive ... 15=Least sensitive (Default 10)\n" );
@@ -610,6 +613,12 @@ static void Cli_HandleCommand( const char *cmd_ )
             if (OkosSiren_IsKnown(addr)) {
                 OkosSiren_ReadEnvironment( addr );
                 OkosSiren_ReadBattery( addr );
+                found = true;
+            }
+#endif
+#if ENABLE_AQARA_TVOC
+            if (AqaraTvoc_IsKnown(addr)) {
+                AqaraTvoc_ReadEnvironment( addr );
                 found = true;
             }
 #endif

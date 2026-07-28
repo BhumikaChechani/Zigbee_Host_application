@@ -10,6 +10,7 @@ This application acts as the "brain" of your Zigbee network. It communicates wit
 - **Onics Smart/Panic Button (SBTZB-110)** (IAS Zone `0x0500` + On/Off `0x0006`)
 - **Aqara Wireless Mini Switch T1** (On/Off `0x0006`)
 - **Aqara FP300 Presence Sensor** (Occupancy `0x0406`, Light Sensing, + custom clusters)
+- **Aqara Air Quality Sensor (TVOC AAQS-S01)** (Temperature `0x0402`, Humidity `0x0405`, genAnalogInput `0x000C`)
 - **Contact Sensors**
 
 ---

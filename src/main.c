@@ -32,6 +32,9 @@
 #if ENABLE_OKOS_SIREN
 #include "okos_siren.h"
 #endif
+#if ENABLE_AQARA_TVOC
+#include "aqara_tvoc.h"
+#endif
 
 #include "usecase.h"
 #include "sensor_common.h"
@@ -259,6 +262,17 @@ void Device_Save( void )
         fprintf( file, " %d %d %d\n", g_vibrationSensors[i].hasIeee ? 1 : 0, g_vibrationSensors[i].zoneId, g_vibrationSensors[i].sensitivity );
     }
 #endif
+#if ENABLE_AQARA_TVOC
+    for ( int i = 0; i < g_numAqaraTvocs; i++ )
+    {
+        fprintf( file, "tvoc %04X %02X ", g_aqaraTvocs[i].shortAddr, g_aqaraTvocs[i].endpoint );
+        for ( int j = 0; j < 8; j++ )
+        {
+            fprintf( file, "%02X", g_aqaraTvocs[i].ieee[j] );
+        }
+        fprintf( file, " %d\n", g_aqaraTvocs[i].hasIeee ? 1 : 0 );
+    }
+#endif
 
     fclose( file );
     pthread_mutex_unlock( &g_deviceMutex );
@@ -462,6 +476,21 @@ void Device_Load( void )
             }
         }
 #endif
+#if ENABLE_AQARA_TVOC
+        else if ( strcmp( type, "tvoc" ) == 0 )
+        {
+            if ( fscanf( file, "%u", &hasIeee ) == 1 && g_numAqaraTvocs < MAX_AQARA_TVOC )
+            {
+                g_aqaraTvocs[g_numAqaraTvocs].shortAddr = shortAddr;
+                g_aqaraTvocs[g_numAqaraTvocs].endpoint = endpoint;
+                g_aqaraTvocs[g_numAqaraTvocs].lastSeen = ZNP_GetCurrentTime();
+                g_aqaraTvocs[g_numAqaraTvocs].hasIeee = ( hasIeee != 0 );
+                memcpy( g_aqaraTvocs[g_numAqaraTvocs].ieee, ieee, 8 );
+                g_numAqaraTvocs++;
+                Device_AddDiscoveredIeee( shortAddr, ieee );
+            }
+        }
+#endif
     }
 
     fclose( file );
@@ -515,6 +544,9 @@ int main( int argc, char *argv[] )
 #endif
 #if ENABLE_OKOS_SIREN
     OkosSiren_Init();
+#endif
+#if ENABLE_AQARA_TVOC
+    AqaraTvoc_Init();
 #endif
 
     // Load persisted devices
@@ -700,6 +732,9 @@ int main( int argc, char *argv[] )
 #if ENABLE_OKOS_SIREN
     OkosSiren_Start();
 #endif
+#if ENABLE_AQARA_TVOC
+    AqaraTvoc_Start();
+#endif
 
     // Start CLI thread
     Cli_Start();
@@ -786,6 +821,9 @@ const char* Device_GetName( uint16_t addr_ )
 #endif
 #if ENABLE_OKOS_SIREN
     if ( OkosSiren_IsKnown( addr_ ) ) return "Okos Smart Siren";
+#endif
+#if ENABLE_AQARA_TVOC
+    if ( AqaraTvoc_IsKnown( addr_ ) ) return "Aqara Air Quality Sensor";
 #endif
     return "Unknown Device";
 }
@@ -898,6 +936,14 @@ static void Main_CheckDeviceOfflineStatus( double now_ )
     {
         if ( now_ - g_vibrationSensors[i].lastSeen > 7200.0 )
             Main_SetOffline( g_vibrationSensors[i].shortAddr );
+    }
+#endif
+#if ENABLE_AQARA_TVOC
+    for ( int i = 0; i < g_numAqaraTvocs; i++ )
+    {
+        // Battery-powered e-ink display sensor
+        if ( now_ - g_aqaraTvocs[i].lastSeen > 7200.0 )
+            Main_SetOffline( g_aqaraTvocs[i].shortAddr );
     }
 #endif
 #if ENABLE_AQARA_BUTTON
@@ -1373,10 +1419,27 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                             }
                         }
 
+                        bool isTvoc = false;
+                        for ( int i = 0; i < numInCls; i++ )
+                        {
+                            // genAnalogInput is highly indicative of the Aqara TVOC sensor
+                            if ( inCls[i] == 0x000C )
+                            {
+                                isTvoc = true;
+                                break;
+                            }
+                        }
+
                         if ( isOccupancy )
                         {
 #if ENABLE_AQARA_OCCUPANCY
                             AqaraOccupancy_Discover( shortAddr, ep );
+#endif
+                        }
+                        else if ( isTvoc )
+                        {
+#if ENABLE_AQARA_TVOC
+                            AqaraTvoc_Discover( shortAddr, ep );
 #endif
                         }
                         else if ( isContact )
@@ -1471,6 +1534,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #if ENABLE_OKOS_SIREN
         if ( OkosSiren_IsKnown( af.srcAddr ) ) { isKnown = true; OkosSiren_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
+#if ENABLE_AQARA_TVOC
+        if ( AqaraTvoc_IsKnown( af.srcAddr ) ) { isKnown = true; AqaraTvoc_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
+#endif
 
         if ( !isKnown && Device_ShouldQuery( af.srcAddr ) )
         {
@@ -1513,6 +1579,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #endif
 #if ENABLE_AQARA_OCCUPANCY
         else if ( AqaraOccupancy_IsKnown( af.srcAddr ) ) { AqaraOccupancy_PostAf( af.srcAddr, &af ); }
+#endif
+#if ENABLE_AQARA_TVOC
+        else if ( AqaraTvoc_IsKnown( af.srcAddr ) ) { AqaraTvoc_PostAf( af.srcAddr, &af ); }
 #endif
     }
 }

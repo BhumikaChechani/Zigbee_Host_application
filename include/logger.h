@@ -20,7 +20,7 @@ void Logger_PrintTimestamp(void);
 // Logging Macros
 #define LOG_RAW(...) \
     do { \
-        if (g_logLevel <= LOG_LEVEL_DEBUG) { \
+        if (g_logLevel <= LOG_LEVEL_INFO) { \
             printf(__VA_ARGS__); \
         } \
     } while(0)

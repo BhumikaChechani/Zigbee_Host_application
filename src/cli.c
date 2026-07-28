@@ -249,7 +249,7 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_OKOS_SIREN
         if ( numParts < 2 )
         {
-            printf( "Usage: okos [on|off|vol|tone|beep|status] [addr] [args]\n" );
+            printf( "Usage: okos [on|off|vol|tone|status] [addr] [args]\n" );
             return;
         }
         const char *sub = parts[1];
@@ -318,15 +318,7 @@ static void Cli_HandleCommand( const char *cmd_ )
             }
             else { printf( "Usage: okos tone <addr> <1-18>\n" ); }
         }
-        else if ( strcmp( sub, "beep" ) == 0 )
-        {
-            if ( numParts >= 4 )
-            {
-                int count = (int)strtol( parts[3], NULL, 10 );
-                OkosSiren_PostBeep( count );
-            }
-            else { printf( "Usage: okos beep <addr> <count>\n" ); }
-        }
+
         else
         {
             printf( "ERROR: Unknown okos command '%s'. Type 'help'.\n", sub );

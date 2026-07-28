@@ -54,81 +54,7 @@ static void SendTuyaQuery(uint16_t addr, uint8_t ep)
     ZNP_AfDataRequestExt(2, addr, ep, 0, 8, 0x0000, seq4, 0, 30, zclBasic, 13);
 }
 
-// --------------- Thread ---------------
-static void Beep(int count)
-{
-    pthread_mutex_lock(&g_deviceMutex);
-    int n = g_numOkosSirens;
-    OKOS_SIREN_T tmp[MAX_OKOS_SIRENS];
-    memcpy(tmp, g_okosSirens, sizeof(OKOS_SIREN_T)*n);
-    pthread_mutex_unlock(&g_deviceMutex);
 
-    uint8_t on = 1, off = 0;
-    // Tone 9 is "Beep Fast". For Tuya DP (0-based enum), it is 8.
-    uint8_t toneEnum = 8;
-    uint8_t vol = 2; // High volume for beep
-    uint8_t dur4[4] = { 0, 0, 0, 1 }; // 1 second duration
-
-    for (int c = 0; c < count; c++) {
-        for (int i = 0; i < n; i++) {
-            if (!Device_IsOffline(tmp[i].shortAddr)) {
-                uint16_t a = tmp[i].shortAddr;
-                uint8_t e = tmp[i].endpoint;
-                // Pre-configure the beep tone (Tone 9 = Enum 8)
-                SendTuyaDP(a, e, 104, 0x04, &toneEnum, 1); usleep(20000);
-                SendTuyaDP(a, e, 116, 0x04, &vol, 1);      usleep(20000);
-                SendTuyaDP(a, e, 5,   0x04, &vol, 1);      usleep(20000);
-                SendTuyaDP(a, e, 21,  0x04, &toneEnum, 1); usleep(20000);
-                SendTuyaDP(a, e, 103, 0x02, dur4, 4);      usleep(20000);
-            }
-        }
-        
-        // Wait 300ms for the Tuya MCU to actually save the new melody before triggering
-        usleep(300000);
-        
-        for (int i = 0; i < n; i++) {
-            if (!Device_IsOffline(tmp[i].shortAddr)) {
-                uint16_t a = tmp[i].shortAddr;
-                uint8_t e = tmp[i].endpoint;
-                // Trigger using exhaustive switch DPs
-                SendTuyaDP(a, e, 1, 0x01, &on, 1);         usleep(20000);
-                SendTuyaDP(a, e, 102, 0x01, &on, 1);       usleep(20000);
-                SendTuyaDP(a, e, 13, 0x01, &on, 1);        usleep(20000);
-            }
-        }
-        
-        // Wait 1 second (1000000 us) to allow the hardware to actually play the beep fully
-        usleep(1000000);
-        
-        for (int i = 0; i < n; i++) {
-            if (!Device_IsOffline(tmp[i].shortAddr)) {
-                uint16_t a = tmp[i].shortAddr;
-                uint8_t e = tmp[i].endpoint;
-                // Stop (send all switch DPs off)
-                SendTuyaDP(a, e, 1, 0x01, &off, 1);        usleep(20000);
-                SendTuyaDP(a, e, 102, 0x01, &off, 1);      usleep(20000);
-                SendTuyaDP(a, e, 13, 0x01, &off, 1);       usleep(20000);
-            }
-        }
-        
-        // Restore original tone and volume so the siren defaults back to user preference
-        usleep(300000);
-        for (int i = 0; i < n; i++) {
-            if (!Device_IsOffline(tmp[i].shortAddr)) {
-                uint16_t a = tmp[i].shortAddr;
-                uint8_t e = tmp[i].endpoint;
-                uint8_t origTone = (tmp[i].toneId > 0) ? (tmp[i].toneId - 1) : 0;
-                uint8_t origVol = tmp[i].volume;
-                SendTuyaDP(a, e, 104, 0x04, &origTone, 1); usleep(20000);
-                SendTuyaDP(a, e, 116, 0x04, &origVol, 1);  usleep(20000);
-                SendTuyaDP(a, e, 5,   0x04, &origVol, 1);  usleep(20000);
-                SendTuyaDP(a, e, 21,  0x04, &origTone, 1); usleep(20000);
-            }
-        }
-        
-        if (c < count-1) usleep(500000);
-    }
-}
 
 static void HandleAf(const AF_MSG_T *af)
 {
@@ -328,7 +254,6 @@ static void *OkosSiren_Thread(void *arg)
         SENSOR_MSG_T *msg = (SENSOR_MSG_T *)MsgQueue_Pop(&s_inbox);
         if (!msg) continue;
         if      (msg->kind == SENSOR_MSG_ASSIGN) OkosSiren_Setup(msg->shortAddr);
-        else if (msg->kind == SENSOR_MSG_BEEP)   Beep((int)msg->shortAddr);
         else if (msg->kind == SENSOR_MSG_AF)      HandleAf(&msg->af);
         free(msg);
     }
@@ -353,7 +278,7 @@ static SENSOR_MSG_T *MkMsg(SENSOR_MSG_KIND_T kind, uint16_t addr)
 }
 
 void OkosSiren_PostAssign(uint16_t a) { SENSOR_MSG_T *m = MkMsg(SENSOR_MSG_ASSIGN, a); if (m) MsgQueue_Push(&s_inbox, m); }
-void OkosSiren_PostBeep(int n)        { SENSOR_MSG_T *m = MkMsg(SENSOR_MSG_BEEP, (uint16_t)n); if (m) MsgQueue_Push(&s_inbox, m); }
+
 
 void OkosSiren_PostAf(uint16_t addr, const AF_MSG_T *af)
 {

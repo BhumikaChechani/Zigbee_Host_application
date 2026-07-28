@@ -26,6 +26,9 @@
 #if ENABLE_VIBRATION_SENSOR
 #include "vibration_sensor.h"
 #endif
+#if ENABLE_OKOS_SIREN
+#include "okos_siren.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,9 +62,18 @@ static void Cli_HandleCommand( const char *cmd_ )
         printf( "  siren vol <addr> <0-3>         - Set a specific siren's volume\n" );
         printf( "  siren mode <addr> <1-6>        - Set a specific siren's warning mode\n" );
         printf( "                                   * 1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic\n" );
+        printf( "\n--- Okos Smart Siren ---\n" );
+        printf( "  okos on  [addr]                - Turn Okos siren(s) ON (omit addr = all)\n" );
+        printf( "  okos off [addr]                - Turn Okos siren(s) OFF (omit addr = all)\n" );
+        printf( "  okos vol <addr> <0-2>          - Set volume (0=Low, 1=Med, 2=High/100dB)\n" );
+        printf( "  okos tone <addr> <1-18>        - Set alarm tone (1=Burglar...18=Custom)\n" );
+        printf( "  okos env <addr>                - Read temperature + humidity\n" );
+        printf( "  okos battery <addr>            - Read battery percentage\n" );
+        printf( "  okos beep <addr> <n>           - Send N short beeps\n" );
+        printf( "  okos status                    - Print Okos siren registry\n" );
         printf( "\n--- Sensor Configuration ---\n" );
         printf( "  env <addr>                     - Fetch environment data (Temp/Humidity/Battery)\n" );
-        printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren\n" );
+        printf( "                                   * Works for: Aqara Occupancy, Frient Vibration, Frient Siren, Okos Siren\n" );
         printf( "  sensitivity <addr> <level>     - Set physical sensitivity level\n" );
         printf( "                                   * Aqara Occupancy: 1=Low, 2=Medium, 3=High\n" );
         printf( "                                   * Frient Vibration: 1=Most sensitive ... 15=Least sensitive (Default 10)\n" );
@@ -98,6 +110,9 @@ static void Cli_HandleCommand( const char *cmd_ )
 #endif
 #if ENABLE_AQARA_OCCUPANCY
         AqaraOccupancy_PrintStatus();
+#endif
+#if ENABLE_OKOS_SIREN
+        OkosSiren_PrintStatus();
 #endif
         printf( "\n" );
     }
@@ -227,6 +242,115 @@ static void Cli_HandleCommand( const char *cmd_ )
         {
             printf( "ERROR: Unknown siren command '%s'. Type 'help' for usage.\n", sub );
         }
+#endif
+    }
+    else if ( strcmp( base, "okos" ) == 0 )
+    {
+#if ENABLE_OKOS_SIREN
+        if ( numParts < 2 )
+        {
+            printf( "Usage: okos [on|off|vol|tone|env|battery|beep|status] [addr] [args]\n" );
+            return;
+        }
+        const char *sub = parts[1];
+
+        // Pre-emptively validate the address if provided (so we can print detailed errors)
+        if ( numParts >= 3 ) {
+            uint16_t addr = (uint16_t)strtoul(parts[2], NULL, 16);
+            if (!OkosSiren_IsKnown(addr)) {
+                const char* devName = Device_GetName(addr);
+                if (strcmp(devName, "Unknown Device") == 0) {
+                    printf("Error: Address 0x%04X is not registered in the network.\n", addr);
+                } else {
+                    printf("Error: The device at 0x%04X (%s) is not an Okos Siren and does not support 'okos' commands.\n", addr, devName);
+                }
+                return;
+            }
+        }
+
+        if ( strcmp( sub, "status" ) == 0 )
+        {
+            OkosSiren_PrintStatus();
+        }
+        else if ( strcmp( sub, "on" ) == 0 )
+        {
+            if ( numParts >= 3 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                OkosSiren_Control( addr, 1 );
+            }
+            else { OkosSiren_ControlAll( 1 ); }
+        }
+        else if ( strcmp( sub, "off" ) == 0 )
+        {
+            if ( numParts >= 3 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                OkosSiren_Control( addr, 0 );
+            }
+            else { OkosSiren_ControlAll( 0 ); }
+        }
+        else if ( strcmp( sub, "vol" ) == 0 )
+        {
+            if ( numParts >= 4 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                uint32_t v = strtoul( parts[3], NULL, 10 );
+                if (v > 2) {
+                    printf("Error: Invalid volume '%u'. Must be between 0 and 2.\n", v);
+                } else {
+                    OkosSiren_SetVolume( addr, (uint8_t)v );
+                }
+            }
+            else { printf( "Usage: okos vol <addr> <0-2>\n" ); }
+        }
+        else if ( strcmp( sub, "tone" ) == 0 )
+        {
+            if ( numParts >= 4 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                uint32_t t = strtoul( parts[3], NULL, 10 );
+                if (t < 1 || t > 18) {
+                    printf("Error: Invalid tone '%u'. Must be between 1 and 18.\n", t);
+                } else {
+                    OkosSiren_SetTone( addr, (uint8_t)t );
+                }
+            }
+            else { printf( "Usage: okos tone <addr> <1-18>\n" ); }
+        }
+        else if ( strcmp( sub, "env" ) == 0 )
+        {
+            if ( numParts >= 3 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                OkosSiren_ReadEnvironment( addr );
+            }
+            else { printf( "Usage: okos env <addr>\n" ); }
+        }
+        else if ( strcmp( sub, "battery" ) == 0 )
+        {
+            if ( numParts >= 3 )
+            {
+                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
+                OkosSiren_ReadBattery( addr );
+            }
+            else { printf( "Usage: okos battery <addr>\n" ); }
+        }
+        else if ( strcmp( sub, "beep" ) == 0 )
+        {
+            if ( numParts >= 4 )
+            {
+                int count = (int)strtol( parts[3], NULL, 10 );
+                OkosSiren_PostBeep( count );
+            }
+            else { printf( "Usage: okos beep <addr> <count>\n" ); }
+        }
+        else
+        {
+            printf( "ERROR: Unknown okos command '%s'. Type 'help'.\n", sub );
+        }
+#else
+        printf( "Okos siren module is disabled (ENABLE_OKOS_SIREN=0).\n" );
 #endif
     }
     else if ( strcmp( base, "zone" ) == 0 )
@@ -466,6 +590,9 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_SIREN
             Siren_DiscoverAllActiveEp();
 #endif
+#if ENABLE_OKOS_SIREN
+            OkosSiren_DiscoverAllActiveEp();
+#endif
 #if ENABLE_AQARA_BUTTON
             AqaraButton_DiscoverAllActiveEp();
 #endif
@@ -510,6 +637,13 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_SIREN
             if (Siren_GetEndpoint(addr) != 0) {
                 Siren_ReadEnvironment( addr );
+                found = true;
+            }
+#endif
+#if ENABLE_OKOS_SIREN
+            if (OkosSiren_IsKnown(addr)) {
+                OkosSiren_ReadEnvironment( addr );
+                OkosSiren_ReadBattery( addr );
                 found = true;
             }
 #endif
@@ -621,6 +755,9 @@ static void Cli_HandleCommand( const char *cmd_ )
 #endif
 #if ENABLE_SIREN
                 Siren_PostAssign( addr );
+#endif
+#if ENABLE_OKOS_SIREN
+                OkosSiren_PostAssign( addr );
 #endif
             }
             else

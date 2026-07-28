@@ -6,6 +6,7 @@ This application acts as the "brain" of your Zigbee network. It communicates wit
 
 ### Supported Devices
 - **Smart Siren (SIRZB-110)** (IAS WD cluster `0x0502`)
+- **Okos Smart Siren / Neo Coolcam** (Tuya `0xEF00` + Environment + Battery)
 - **Onics Smart/Panic Button (SBTZB-110)** (IAS Zone `0x0500` + On/Off `0x0006`)
 - **Aqara Wireless Mini Switch T1** (On/Off `0x0006`)
 - **Aqara FP300 Presence Sensor** (Occupancy `0x0406`, Light Sensing, + custom clusters)
@@ -85,12 +86,14 @@ Once the application is running, you can interact with the Zigbee network direct
 ### Siren Controls
 | Command | Description |
 | :--- | :--- |
-| **`siren on <addr>`** | Turns a specific siren ON. |
-| **`siren off <addr>`** | Turns a specific siren OFF. |
-| **`siren vol <addr> <0-3>`** | Sets the volume for a specific siren (0 = Low, 1 = Medium, 2 = High, 3 = Very High). |
-| **`siren mode <addr> <1-6>`** | Sets the sound mode for a specific siren (1=Burglar, 2=Fire, 3=Emergency, 4=Police Panic, 5=Fire Panic, 6=Emergency Panic). |
-| **`siren test <addr> [mode]`** | Sends a test warning to a specific siren. Can optionally override its mode for testing. |
-| **`siren stop <addr>`** | Stops the test for a specific siren. |
+| **`siren on <addr>`** | Turns a specific SIRZB-110 siren ON. |
+| **`siren off <addr>`** | Turns a specific SIRZB-110 siren OFF. |
+| **`okos on <addr>`** | Turns a specific Okos (Tuya) siren ON (uses saved custom melody). |
+| **`okos off <addr>`** | Turns a specific Okos (Tuya) siren OFF. |
+| **`okos tone <addr> <1-18>`**| Sets the custom melody for an Okos siren (e.g., 1=Burglar, 7=Doorbell, 9=Beep). |
+| **`okos vol <addr> <0-2>`** | Sets the volume for an Okos siren (0=Low, 1=Medium, 2=High). |
+| **`okos beep <addr> <N>`** | Plays a short acknowledgement beep `N` times on an Okos siren. |
+| **`okos status`** | Displays a summary table of all connected Okos sirens. |
 
 ---
 

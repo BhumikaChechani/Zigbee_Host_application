@@ -59,7 +59,21 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 
 ---
 
-###  6. Aqara FP300 Presence Sensor
+###  6. Okos Smart Siren (Neo Coolcam / Tuya)
+| Test Action (What to do) | Expected Result (System Response) | Notes |
+| :--- | :--- | :--- |
+| Type `okos tone <addr> <1-18>` | 🎶 Sets siren melody. | 1=Burglar, 7=Doorbell, 9=Beep Fast, 11=High Siren, etc. |
+| Type `okos vol <addr> <0-2>` | 🔊 Sets siren volume. | 0=Low, 1=Medium, 2=High. |
+| Type `okos on <addr>` | 🚨 Siren activates immediately. | Plays the saved custom tone at the saved volume. |
+| Type `okos off <addr>` | 🔇 Siren stops immediately. | |
+| Type `okos beep <addr> <count>` | 🔔 Plays short, fast beeps. | Overrides tone to Mode 9 for 1 second per beep, then restores original tone. |
+| Type `okos battery <addr>` | 🔋 Queries battery status. | Battery-powered devices may ignore on-demand requests until they wake up. |
+| Type `okos env <addr>` | 🌡️ Queries temp/humidity. | Will automatically log environmental data when sensor broadcasts it. |
+| Type `okos status` | 📋 Displays all registered Okos Sirens. | Shows address, endpoint, saved tone, volume, and last seen time. |
+
+---
+
+###  7. Aqara FP300 Presence Sensor
 
 > [!NOTE]
 > **Demo Environment Presets:**
@@ -82,7 +96,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 
 ---
 
-### 💻 7. Global CLI Commands (Controller Level)
+### 💻 8. Global CLI Commands (Controller Level)
 | Test Action (What to do) | Expected Result (System Response) | Notes |
 | :--- | :--- | :--- |
 | Type `status` and hit Enter | 📋 Prints list of all connected devices. | Shows online status, last-seen, and light readings. |
@@ -96,7 +110,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 
 ---
 
-###  8. System Alarm & Siren Sound Matrix
+###  9. System Alarm & Siren Sound Matrix
 
 The table below lists all conditions that trigger or modify the sirens, along with the specific siren mode and sound profile activated.
 

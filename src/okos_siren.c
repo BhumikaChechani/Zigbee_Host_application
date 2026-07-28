@@ -64,23 +64,69 @@ static void Beep(int count)
     pthread_mutex_unlock(&g_deviceMutex);
 
     uint8_t on = 1, off = 0;
+    // Tone 9 is "Beep Fast". For Tuya DP (0-based enum), it is 8.
+    uint8_t toneEnum = 8;
+    uint8_t vol = 2; // High volume for beep
+    uint8_t dur4[4] = { 0, 0, 0, 1 }; // 1 second duration
+
     for (int c = 0; c < count; c++) {
         for (int i = 0; i < n; i++) {
             if (!Device_IsOffline(tmp[i].shortAddr)) {
-                ZNP_SendSirenWarning(tmp[i].shortAddr, tmp[i].endpoint, NextSeq(), 1, 0, 1);
-                SendTuyaDP(tmp[i].shortAddr, tmp[i].endpoint, 102, 0x01, &on, 1);
-                SendTuyaDP(tmp[i].shortAddr, tmp[i].endpoint, 1, 0x01, &on, 1);
+                uint16_t a = tmp[i].shortAddr;
+                uint8_t e = tmp[i].endpoint;
+                // Pre-configure the beep tone (Tone 9 = Enum 8)
+                SendTuyaDP(a, e, 104, 0x04, &toneEnum, 1); usleep(20000);
+                SendTuyaDP(a, e, 116, 0x04, &vol, 1);      usleep(20000);
+                SendTuyaDP(a, e, 5,   0x04, &vol, 1);      usleep(20000);
+                SendTuyaDP(a, e, 21,  0x04, &toneEnum, 1); usleep(20000);
+                SendTuyaDP(a, e, 103, 0x02, dur4, 4);      usleep(20000);
             }
         }
-        usleep(150000);
+        
+        // Wait 300ms for the Tuya MCU to actually save the new melody before triggering
+        usleep(300000);
+        
         for (int i = 0; i < n; i++) {
             if (!Device_IsOffline(tmp[i].shortAddr)) {
-                ZNP_SendSirenWarning(tmp[i].shortAddr, tmp[i].endpoint, NextSeq(), 0, 0, 0);
-                SendTuyaDP(tmp[i].shortAddr, tmp[i].endpoint, 102, 0x01, &off, 1);
-                SendTuyaDP(tmp[i].shortAddr, tmp[i].endpoint, 1, 0x01, &off, 1);
+                uint16_t a = tmp[i].shortAddr;
+                uint8_t e = tmp[i].endpoint;
+                // Trigger using exhaustive switch DPs
+                SendTuyaDP(a, e, 1, 0x01, &on, 1);         usleep(20000);
+                SendTuyaDP(a, e, 102, 0x01, &on, 1);       usleep(20000);
+                SendTuyaDP(a, e, 13, 0x01, &on, 1);        usleep(20000);
             }
         }
-        if (c < count-1) usleep(300000);
+        
+        // Wait 1 second (1000000 us) to allow the hardware to actually play the beep fully
+        usleep(1000000);
+        
+        for (int i = 0; i < n; i++) {
+            if (!Device_IsOffline(tmp[i].shortAddr)) {
+                uint16_t a = tmp[i].shortAddr;
+                uint8_t e = tmp[i].endpoint;
+                // Stop (send all switch DPs off)
+                SendTuyaDP(a, e, 1, 0x01, &off, 1);        usleep(20000);
+                SendTuyaDP(a, e, 102, 0x01, &off, 1);      usleep(20000);
+                SendTuyaDP(a, e, 13, 0x01, &off, 1);       usleep(20000);
+            }
+        }
+        
+        // Restore original tone and volume so the siren defaults back to user preference
+        usleep(300000);
+        for (int i = 0; i < n; i++) {
+            if (!Device_IsOffline(tmp[i].shortAddr)) {
+                uint16_t a = tmp[i].shortAddr;
+                uint8_t e = tmp[i].endpoint;
+                uint8_t origTone = (tmp[i].toneId > 0) ? (tmp[i].toneId - 1) : 0;
+                uint8_t origVol = tmp[i].volume;
+                SendTuyaDP(a, e, 104, 0x04, &origTone, 1); usleep(20000);
+                SendTuyaDP(a, e, 116, 0x04, &origVol, 1);  usleep(20000);
+                SendTuyaDP(a, e, 5,   0x04, &origVol, 1);  usleep(20000);
+                SendTuyaDP(a, e, 21,  0x04, &origTone, 1); usleep(20000);
+            }
+        }
+        
+        if (c < count-1) usleep(500000);
     }
 }
 
@@ -148,11 +194,7 @@ static void HandleAf(const AF_MSG_T *af)
             pthread_mutex_unlock(&g_deviceMutex);
         }
     } else if (af->clusterId == OKOS_TUYA_CLUSTER) {
-        LOG_INFO("OKOS_SIREN 0x%04X: Tuya AF payload len=%d: ", af->srcAddr, af->dataLen);
-        for (int i = 0; i < af->dataLen; i++) LOG_RAW("%02X ", af->data[i]);
-        LOG_RAW("\n");
-        for (int i = 0; i < af->dataLen; i++) LOG_RAW("%02X ", af->data[i]);
-        LOG_RAW("\n");
+        LOG_DEBUG("OKOS_SIREN 0x%04X: Tuya AF payload len=%d\n", af->srcAddr, af->dataLen);
 
         if (af->dataLen < 3) return;
         uint8_t tuyaCmd   = af->data[2];
@@ -219,7 +261,6 @@ static void HandleAf(const AF_MSG_T *af)
 
                     if (dpId == 15 || dpId == 101 || dpId == 114 || dpId == 115) { // Battery %
                         uint8_t bat = (numVal > 100) ? 100 : (uint8_t)numVal;
-                        LOG_INFO("[OKOS_SIREN 0x%04X] Battery: %u%%\n", af->srcAddr, bat);
                         LOG_EVENT("OKOS_SIREN", af->srcAddr, "Battery: %u%%\n", bat);
                         pthread_mutex_lock(&g_deviceMutex);
                         for (int i = 0; i < g_numOkosSirens; i++)
@@ -228,7 +269,6 @@ static void HandleAf(const AF_MSG_T *af)
                     } else if (dpId == 106 || dpId == 108 || dpId == 109) { // Temp
                         float temp = (numVal > 1000) ? (numVal / 100.0f) : (numVal / 10.0f);
                         int16_t tempCdeg = (int16_t)(temp * 100);
-                        LOG_INFO("[OKOS_SIREN 0x%04X] Temperature: %.2f C\n", af->srcAddr, temp);
                         LOG_EVENT("OKOS_SIREN", af->srcAddr, "Temperature: %.2f C\n", temp);
                         pthread_mutex_lock(&g_deviceMutex);
                         for (int i = 0; i < g_numOkosSirens; i++)
@@ -237,7 +277,6 @@ static void HandleAf(const AF_MSG_T *af)
                     } else if (dpId == 107 || dpId == 110) { // Humidity
                         float hum = (numVal > 100) ? (numVal / 10.0f) : (float)numVal;
                         uint16_t humHpct = (uint16_t)(hum * 100);
-                        LOG_INFO("[OKOS_SIREN 0x%04X] Humidity: %.2f%%\n", af->srcAddr, hum);
                         LOG_EVENT("OKOS_SIREN", af->srcAddr, "Humidity: %.2f%%\n", hum);
                         pthread_mutex_lock(&g_deviceMutex);
                         for (int i = 0; i < g_numOkosSirens; i++)
@@ -267,9 +306,7 @@ static void HandleAf(const AF_MSG_T *af)
         }
     } else if (af->clusterId == 0x0000) {
         // Tuya devices often return MCU version or custom data on the Basic cluster
-        LOG_INFO("OKOS_SIREN 0x%04X: Basic Cluster (0x0000) payload len=%d: ", af->srcAddr, af->dataLen);
-        for (int i = 0; i < af->dataLen; i++) LOG_RAW("%02X ", af->data[i]);
-        LOG_RAW("\n");
+        LOG_DEBUG("OKOS_SIREN 0x%04X: Basic Cluster (0x0000) payload len=%d\n", af->srcAddr, af->dataLen);
         
         // Check for Tuya specific attribute 0xFFE2 / 0xFFE4 which might contain battery
         if (af->dataLen >= 6 && af->data[0] == 0x08) {
@@ -279,9 +316,7 @@ static void HandleAf(const AF_MSG_T *af)
     } else {
         // Other clusters (e.g. ZCL Power 0x0001, Temp 0x0402)
         if (af->clusterId == OKOS_POWER_CLUSTER || af->clusterId == OKOS_TEMP_CLUSTER || af->clusterId == OKOS_HUM_CLUSTER) {
-            LOG_INFO("OKOS_SIREN 0x%04X: Cluster 0x%04X payload len=%d: ", af->srcAddr, af->clusterId, af->dataLen);
-            for (int i = 0; i < af->dataLen; i++) LOG_RAW("%02X ", af->data[i]);
-            LOG_RAW("\n");
+            LOG_DEBUG("OKOS_SIREN 0x%04X: Cluster 0x%04X payload len=%d\n", af->srcAddr, af->clusterId, af->dataLen);
         }
     }
 }
@@ -481,8 +516,6 @@ void OkosSiren_ControlAllDuration(uint8_t warnMode, uint16_t dur)
             usleep(20000);
             SendTuyaDP(addr, ep, 13,  0x01, &off, 1);
             usleep(20000);
-            // IAS Warning Stop
-            ZNP_SendSirenWarning(addr, ep, NextSeq(), 0, vol, 0);
             LOG_INFO("SUCCESS: OkosSiren 0x%04X OFF.\n", addr);
         } else {
             // toneId is 1-based; Tuya melody DPs expect 0-based enum
@@ -505,12 +538,6 @@ void OkosSiren_ControlAllDuration(uint8_t warnMode, uint16_t dur)
             SendTuyaDP(addr, ep, 1,   0x01, &on, 1);  usleep(20000);
             SendTuyaDP(addr, ep, 102, 0x01, &on, 1);  usleep(20000);
             SendTuyaDP(addr, ep, 13,  0x01, &on, 1);  usleep(20000);
-
-            // Step 3: Trigger via IAS Warning Device command
-            // We use a FIXED warning mode of 1 (Burglar) so the IAS cluster accepts it.
-            // (If we use toneId, modes >= 7 are rejected by the cluster).
-            // The Tuya DPs above configure the ACTUAL melody that plays.
-            ZNP_SendSirenWarning(addr, ep, NextSeq(), 1, vol ? vol : 1, dur);
 
             LOG_INFO("SUCCESS: OkosSiren 0x%04X ON (tone=%d vol=%d).\n", addr, toneId, vol);
         }
@@ -544,8 +571,6 @@ void OkosSiren_Control(uint16_t addr, uint8_t warnMode)
                 usleep(20000);
                 SendTuyaDP(addr, ep, 13,  0x01, &off, 1);
                 usleep(20000);
-                // IAS Warning Stop
-                ZNP_SendSirenWarning(addr, ep, NextSeq(), 0, vol, 0);
                 LOG_INFO("SUCCESS: OkosSiren 0x%04X OFF.\n", addr);
             } else {
                 // toneId is 1-based; Tuya melody DPs expect 0-based enum
@@ -569,12 +594,6 @@ void OkosSiren_Control(uint16_t addr, uint8_t warnMode)
                 SendTuyaDP(addr, ep, 1,   0x01, &on, 1);  usleep(20000);
                 SendTuyaDP(addr, ep, 102, 0x01, &on, 1);  usleep(20000);
                 SendTuyaDP(addr, ep, 13,  0x01, &on, 1);  usleep(20000);
-
-                // Step 3: Trigger via IAS Warning Device command
-                // We use a FIXED warning mode of 1 (Burglar) so the IAS cluster accepts it.
-                // (If we use toneId, modes >= 7 are rejected by the cluster).
-                // The Tuya DPs above configure the ACTUAL melody that plays.
-                ZNP_SendSirenWarning(addr, ep, NextSeq(), 1, vol ? vol : 1, dur);
 
                 LOG_INFO("SUCCESS: OkosSiren 0x%04X ON (tone=%d vol=%d).\n", addr, toneId, vol);
             }

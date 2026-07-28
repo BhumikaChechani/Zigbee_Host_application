@@ -1364,13 +1364,11 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                             }
                             if ( !isVibration )
                             {
-                                isContact = true;
-#if ENABLE_ONICS_BUTTON
-                                if ( OnicsButton_IsKnown( shortAddr ) )
-                                {
-                                    isContact = false; // Prevent Panic EP from being stolen by contact sensor
-                                }
-#endif
+                                // Instead of blindly assuming it's a contact sensor (since TVOC also uses 0x0402),
+                                // query the Model Identifier. We will classify it when the AF response arrives.
+                                LOG_DEBUG("Device 0x%04X is DevID 0x0402 (IAS Zone). Querying ModelIdentifier to classify...\n", shortAddr);
+                                uint8_t req[5] = { 0x00, 0x55, 0x00, 0x05, 0x00 };
+                                ZNP_AfDataRequestExt( 2, shortAddr, ep, 0, 8, 0x0000, 0x55, 0, 30, req, 5 );
                             }
                         }
 
@@ -1537,6 +1535,54 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #if ENABLE_AQARA_TVOC
         if ( AqaraTvoc_IsKnown( af.srcAddr ) ) { isKnown = true; AqaraTvoc_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
+
+        if ( !isKnown && af.clusterId == 0x0000 && af.dataLen >= 6 )
+        {
+            uint8_t fc = af.data[0];
+            int hdrLen = (fc & 0x04) ? 5 : 3;
+            if ( af.dataLen > hdrLen )
+            {
+                uint8_t cmdId = af.data[hdrLen-1];
+                if ( cmdId == 0x01 || cmdId == 0x0A ) // Read Rsp or Report
+                {
+                    const uint8_t *zcl = &af.data[hdrLen];
+                    uint16_t attr = zcl[0] | (zcl[1] << 8);
+                    
+                    if ( attr == 0x0005 )
+                    {
+                        uint8_t typeOffset = (cmdId == 0x01) ? 3 : 2;
+                        // For Read Rsp (0x01), zcl[2] is Status. If success (0x00), type is at 3.
+                        // For Report (0x0A), there is no Status, type is at 2.
+                        bool success = (cmdId == 0x0A) || (cmdId == 0x01 && zcl[2] == 0x00);
+                        
+                        if ( success && zcl[typeOffset] == 0x42 )
+                        {
+                            uint8_t strLen = zcl[typeOffset + 1];
+                            if ( af.dataLen >= hdrLen + typeOffset + 2 + strLen )
+                            {
+                                char model[64] = {0};
+                                memcpy( model, &zcl[typeOffset + 2], (strLen < 63) ? strLen : 63 );
+                                LOG_DEBUG("Device 0x%04X reported ModelIdentifier: '%s'\n", af.srcAddr, model);
+                                if ( strstr( model, "airmonitor" ) )
+                                {
+#if ENABLE_AQARA_TVOC
+                                    AqaraTvoc_Discover( af.srcAddr, af.srcEp );
+                                    isKnown = true;
+#endif
+                                }
+                                else if ( strstr( model, "magnet" ) || strstr( model, "sensor_switch" ) )
+                                {
+#if ENABLE_CONTACT_SENSOR
+                                    ContactSensor_Discover( af.srcAddr, af.srcEp );
+                                    isKnown = true;
+#endif
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         if ( !isKnown && Device_ShouldQuery( af.srcAddr ) )
         {

@@ -29,6 +29,9 @@
 #if ENABLE_VIBRATION_SENSOR
 #include "vibration_sensor.h"
 #endif
+#if ENABLE_OKOS_SIREN
+#include "okos_siren.h"
+#endif
 
 #include "usecase.h"
 #include "sensor_common.h"
@@ -171,6 +174,22 @@ void Device_Save( void )
             fprintf( file, "%02X", g_sirens[i].ieee[j] );
         }
         fprintf( file, " %d %d %u %u\n", g_sirens[i].hasIeee ? 1 : 0, g_sirens[i].zoneId, g_sirens[i].volume, g_sirens[i].mode );
+    }
+#endif
+#if ENABLE_OKOS_SIREN
+    for ( int i = 0; i < g_numOkosSirens; i++ )
+    {
+        fprintf( file, "okos_siren %04X %02X ", g_okosSirens[i].shortAddr, g_okosSirens[i].endpoint );
+        for ( int j = 0; j < 8; j++ )
+        {
+            fprintf( file, "%02X", g_okosSirens[i].ieee[j] );
+        }
+        fprintf( file, " %d %d %u %u %u\n",
+                 g_okosSirens[i].hasIeee   ? 1 : 0,
+                 g_okosSirens[i].zoneId,
+                 g_okosSirens[i].volume,
+                 g_okosSirens[i].toneId,
+                 g_okosSirens[i].strobeMode );
     }
 #endif
 
@@ -417,6 +436,32 @@ void Device_Load( void )
             }
         }
 #endif
+#if ENABLE_OKOS_SIREN
+        else if ( strcmp( type, "okos_siren" ) == 0 )
+        {
+            uint32_t vol = 2, toneId = 1, strobe = 0;
+            int scanned = fscanf( file, "%u %u %u %u %u", &hasIeee, &zoneId, &vol, &toneId, &strobe );
+            if ( scanned >= 2 && g_numOkosSirens < MAX_OKOS_SIRENS )
+            {
+                OKOS_SIREN_T *s = &g_okosSirens[g_numOkosSirens];
+                s->shortAddr        = shortAddr;
+                s->endpoint         = (uint8_t)endpoint;
+                s->lastSeen         = ZNP_GetCurrentTime();
+                s->hasIeee          = ( hasIeee != 0 );
+                memcpy( s->ieee, ieee, 8 );
+                s->zoneId           = (uint8_t)zoneId;
+                s->volume           = (uint8_t)vol;
+                s->toneId           = (uint8_t)toneId;
+                s->strobeMode       = (uint8_t)strobe;
+                s->configured       = true;
+                s->temperatureCdeg  = 0x7FFF;
+                s->humidityHpct     = 0xFFFF;
+                s->batteryPct       = 0xFF;
+                g_numOkosSirens++;
+                Device_AddDiscoveredIeee( shortAddr, ieee );
+            }
+        }
+#endif
     }
 
     fclose( file );
@@ -467,6 +512,9 @@ int main( int argc, char *argv[] )
 #endif
 #if ENABLE_VIBRATION_SENSOR
     VibrationSensor_Init();
+#endif
+#if ENABLE_OKOS_SIREN
+    OkosSiren_Init();
 #endif
 
     // Load persisted devices
@@ -649,6 +697,9 @@ int main( int argc, char *argv[] )
 #if ENABLE_VIBRATION_SENSOR
     VibrationSensor_Start();
 #endif
+#if ENABLE_OKOS_SIREN
+    OkosSiren_Start();
+#endif
 
     // Start CLI thread
     Cli_Start();
@@ -690,6 +741,9 @@ int main( int argc, char *argv[] )
 #if ENABLE_SIREN
         Siren_PollAll();
 #endif
+#if ENABLE_OKOS_SIREN
+        OkosSiren_PollAll();
+#endif
 
         usleep( 5000 ); // Small yield
     }
@@ -729,6 +783,9 @@ const char* Device_GetName( uint16_t addr_ )
 #endif
 #if ENABLE_AQARA_OCCUPANCY
     if ( AqaraOccupancy_IsKnown( addr_ ) ) return "Presence Sensor";
+#endif
+#if ENABLE_OKOS_SIREN
+    if ( OkosSiren_IsKnown( addr_ ) ) return "Okos Smart Siren";
 #endif
     return "Unknown Device";
 }
@@ -821,6 +878,14 @@ static void Main_CheckDeviceOfflineStatus( double now_ )
             Main_SetOffline( g_sirens[i].shortAddr );
     }
 #endif
+#if ENABLE_OKOS_SIREN
+    for ( int i = 0; i < g_numOkosSirens; i++ )
+    {
+        // Okos Sirens have battery backup and may enter deep sleep, reporting only every few hours.
+        if ( now_ - g_okosSirens[i].lastSeen > 7200.0 )
+            Main_SetOffline( g_okosSirens[i].shortAddr );
+    }
+#endif
 #if ENABLE_CONTACT_SENSOR
     for ( int i = 0; i < g_numContactSensors; i++ )
     {
@@ -879,12 +944,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         uint8_t ieeeBytes[8];
         memcpy( ieeeBytes, &frame_->payload[4], 8 );
 
-        LOG_DEBUG("✨ [JOIN] New device joined: short=0x%04X, IEEE=", nwkAddr );
-        for ( int i = 7; i >= 0; i-- )
-        {
-            LOG_RAW("%02x", ieeeBytes[i] );
-        }
-        LOG_RAW("\n");
+        LOG_INFO("✨ [JOIN] New device joined: short=0x%04X, IEEE=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+                 nwkAddr, ieeeBytes[7], ieeeBytes[6], ieeeBytes[5], ieeeBytes[4],
+                 ieeeBytes[3], ieeeBytes[2], ieeeBytes[1], ieeeBytes[0] );
 
         Device_AddDiscoveredIeee( nwkAddr, ieeeBytes );
         Main_SetOnline( nwkAddr );
@@ -901,7 +963,8 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             uint8_t reqPay[4] = { nwkAddr & 0xFF, ( nwkAddr >> 8 ) & 0xFF, 0x01, 0x00 };
             ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 ); // IEEE_addr_req
             ZNP_ZdoActiveEpReq( nwkAddr );
-            ZNP_QuerySimpleDesc( nwkAddr, 43 ); // Develco siren ep-43 fallback
+            ZNP_QuerySimpleDesc( nwkAddr, 1 );  // Standard ep-1 (Okos, Aqara, Tuya, etc.)
+            ZNP_QuerySimpleDesc( nwkAddr, 43 ); // Develco/Frient siren ep-43 fallback
         }
     }
     // 1.5 ZDO State Change Indication (cmd0: 0x45, cmd1: 0xC0)
@@ -1037,7 +1100,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
         // Join trigger via MSG_CB (cluster 0x0013)
         if ( clusterId == 0x0013 )
         {
-            LOG_DEBUG("✨ [JOIN via MSG_CB] Device announced: short=0x%04X\n", srcAddr );
+            LOG_INFO("✨ [JOIN via MSG_CB] Device announced: short=0x%04X\n", srcAddr );
             if ( asdu != NULL && asduLen >= 10 )
             {
                 uint16_t annceShort = asdu[0] | ( asdu[1] << 8 );
@@ -1059,6 +1122,7 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                 uint8_t reqPay[4] = { srcAddr & 0xFF, ( srcAddr >> 8 ) & 0xFF, 0x01, 0x00 };
                 ZNP_Sreq( 0x25, 0x01, reqPay, 4, NULL, 3000 );
                 ZNP_ZdoActiveEpReq( srcAddr );
+                ZNP_QuerySimpleDesc( srcAddr, 1 );
                 ZNP_QuerySimpleDesc( srcAddr, 43 );
 
 #if ENABLE_ONICS_BUTTON
@@ -1099,6 +1163,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #endif
 #if ENABLE_CONTACT_SENSOR
                 ContactSensor_UpdateIeee( shortAddr, ieee );
+#endif
+#if ENABLE_OKOS_SIREN
+                OkosSiren_UpdateIeee( shortAddr, ieee );
 #endif
             }
         }
@@ -1172,35 +1239,54 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                     }
                 }
 
-                LOG_DEBUG("Device 0x%04X ep 0x%02X Profile=0x%04X DevID=0x%04X InClusters=[",
-                        shortAddr, ep, profileId, deviceId );
+                LOG_INFO("Device 0x%04X ep 0x%02X Profile=0x%04X DevID=0x%04X InClusters=[",
+                         shortAddr, ep, profileId, deviceId );
                 for ( int i = 0; i < numInCls; i++ )
                 {
-                    LOG_DEBUG( "0x%04X%s", inCls[i], ( i == numInCls - 1 ) ? "" : ", " );
+                    LOG_INFO( "0x%04X%s", inCls[i], ( i == numInCls - 1 ) ? "" : ", " );
                 }
-                LOG_DEBUG( "] OutClusters=[" );
+                LOG_INFO( "] OutClusters=[" );
                 for ( int i = 0; i < numOutCls; i++ )
                 {
-                    LOG_DEBUG( "0x%04X%s", outCls[i], ( i == numOutCls - 1 ) ? "" : ", " );
+                    LOG_INFO( "0x%04X%s", outCls[i], ( i == numOutCls - 1 ) ? "" : ", " );
                 }
-                LOG_RAW("]\n");
+                LOG_INFO("]\n");
 
                 if ( profileId == 0x0104 )
                 {
                     bool isSiren = false;
+                    bool isOkosTuya = false;
                     for ( int i = 0; i < numInCls; i++ )
                     {
                         if ( inCls[i] == 0x0502 )
                         {
                             isSiren = true;
-                            break;
+                        }
+                        if ( inCls[i] == 0xEF00 || deviceId == 0x0051 )
+                        {
+                            isOkosTuya = true;
                         }
                     }
 
-                    if ( isSiren )
+                    if ( isOkosTuya )
                     {
+#if ENABLE_OKOS_SIREN
+                        OkosSiren_Discover( shortAddr, ep );
+#endif
+                    }
+                    else if ( isSiren )
+                    {
+#if ENABLE_OKOS_SIREN
+                        if ( ep == 0x01 || !ENABLE_SIREN )
+                        {
+                            OkosSiren_Discover( shortAddr, ep );
+                        }
+#endif
 #if ENABLE_SIREN
-                        Siren_Discover( shortAddr, ep );
+                        if ( ep == 0x2B || !ENABLE_OKOS_SIREN )
+                        {
+                            Siren_Discover( shortAddr, ep );
+                        }
 #endif
                     }
 #if ENABLE_SIREN
@@ -1382,6 +1468,9 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
 #if ENABLE_VIBRATION_SENSOR
         if ( VibrationSensor_IsKnown( af.srcAddr ) ) { isKnown = true; VibrationSensor_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
 #endif
+#if ENABLE_OKOS_SIREN
+        if ( OkosSiren_IsKnown( af.srcAddr ) ) { isKnown = true; OkosSiren_UpdateSeen( af.srcAddr ); Main_SetOnline( af.srcAddr ); }
+#endif
 
         if ( !isKnown && Device_ShouldQuery( af.srcAddr ) )
         {
@@ -1391,6 +1480,12 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
                 Siren_Discover( af.srcAddr, af.srcEp );
 #endif
             }
+            else if ( af.srcEp == 1 )
+            {
+#if ENABLE_OKOS_SIREN
+                OkosSiren_Discover( af.srcAddr, af.srcEp );
+#endif
+            }
             else
             {
                 LOG_DEBUG("❓ Unknown device 0x%04X sent AF message on cluster 0x%04X. Requesting Active EPs...\n", af.srcAddr, af.clusterId);
@@ -1398,8 +1493,11 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             }
         }
 
+#if ENABLE_OKOS_SIREN
+        if ( OkosSiren_IsKnown( af.srcAddr ) ) { OkosSiren_PostAf( af.srcAddr, &af ); }
+#endif
 #if ENABLE_SIREN
-        if ( Siren_IsKnown( af.srcAddr ) ) { Siren_PostAf( af.srcAddr, &af ); }
+        else if ( Siren_IsKnown( af.srcAddr ) ) { Siren_PostAf( af.srcAddr, &af ); }
 #endif
 #if ENABLE_AQARA_BUTTON
         else if ( AqaraButton_IsKnown( af.srcAddr ) ) { AqaraButton_PostAf( af.srcAddr, &af ); }

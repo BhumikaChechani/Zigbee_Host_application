@@ -249,7 +249,7 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_OKOS_SIREN
         if ( numParts < 2 )
         {
-            printf( "Usage: okos [on|off|vol|tone|env|battery|beep|status] [addr] [args]\n" );
+            printf( "Usage: okos [on|off|vol|tone|beep|status] [addr] [args]\n" );
             return;
         }
         const char *sub = parts[1];
@@ -317,24 +317,6 @@ static void Cli_HandleCommand( const char *cmd_ )
                 }
             }
             else { printf( "Usage: okos tone <addr> <1-18>\n" ); }
-        }
-        else if ( strcmp( sub, "env" ) == 0 )
-        {
-            if ( numParts >= 3 )
-            {
-                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
-                OkosSiren_ReadEnvironment( addr );
-            }
-            else { printf( "Usage: okos env <addr>\n" ); }
-        }
-        else if ( strcmp( sub, "battery" ) == 0 )
-        {
-            if ( numParts >= 3 )
-            {
-                uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
-                OkosSiren_ReadBattery( addr );
-            }
-            else { printf( "Usage: okos battery <addr>\n" ); }
         }
         else if ( strcmp( sub, "beep" ) == 0 )
         {

@@ -67,8 +67,7 @@ This sheet is designed for straightforward QA testing. Follow the **Test Action*
 | Type `okos on <addr>` | 🚨 Siren activates immediately. | Plays the saved custom tone at the saved volume. |
 | Type `okos off <addr>` | 🔇 Siren stops immediately. | |
 | Type `okos beep <addr> <count>` | 🔔 Plays short, fast beeps. | Overrides tone to Mode 9 for 1 second per beep, then restores original tone. |
-| Type `okos battery <addr>` | 🔋 Queries battery status. | Battery-powered devices may ignore on-demand requests until they wake up. |
-| Type `okos env <addr>` | 🌡️ Queries temp/humidity. | Will automatically log environmental data when sensor broadcasts it. |
+| Type `env <addr>` | 🌡️ Queries temp/humidity and battery. | Will query the device and output all available metrics. |
 | Type `okos status` | 📋 Displays all registered Okos Sirens. | Shows address, endpoint, saved tone, volume, and last seen time. |
 
 ---

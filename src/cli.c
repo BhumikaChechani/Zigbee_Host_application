@@ -113,6 +113,9 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_OKOS_SIREN
         OkosSiren_PrintStatus();
 #endif
+#if ENABLE_AQARA_TVOC
+        AqaraTvoc_PrintStatus();
+#endif
         printf( "\n" );
     }
     else if ( strcmp( base, "siren" ) == 0 )

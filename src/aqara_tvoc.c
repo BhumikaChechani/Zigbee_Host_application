@@ -30,29 +30,62 @@ static void HandleAf(const AF_MSG_T *af)
     if (cmdId == 0x0A || cmdId == 0x01) { // Report or Read Rsp
         if (zclLen >= 4) {
             uint16_t attr = zcl[0] | (zcl[1] << 8);
-            uint8_t dataType = zcl[2];
+            
+            bool success = (cmdId == 0x0A) || (cmdId == 0x01 && zcl[2] == 0x00);
+            if (!success) return;
+
+            uint8_t typeOffset = (cmdId == 0x01) ? 3 : 2;
+            uint8_t dataOffset = (cmdId == 0x01) ? 4 : 3;
+
+            if (zclLen < dataOffset + 1) return;
+            
+            uint8_t dataType = zcl[typeOffset];
+            const uint8_t *data = &zcl[dataOffset];
             
             // Temperature
-            if (af->clusterId == AQARA_TVOC_TEMP_CLUSTER && attr == 0x0000 && dataType == 0x29 && zclLen >= 5) {
-                int16_t tempRaw = zcl[3] | (zcl[4] << 8);
+            if (af->clusterId == AQARA_TVOC_TEMP_CLUSTER && attr == 0x0000 && dataType == 0x29 && zclLen >= dataOffset + 2) {
+                int16_t tempRaw = data[0] | (data[1] << 8);
                 float tempC = tempRaw / 100.0f;
                 LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mTemperature: %.2f°C\033[0m\n", tempC);
             }
             // Humidity
-            else if (af->clusterId == AQARA_TVOC_HUM_CLUSTER && attr == 0x0000 && dataType == 0x21 && zclLen >= 5) {
-                uint16_t humRaw = zcl[3] | (zcl[4] << 8);
+            else if (af->clusterId == AQARA_TVOC_HUM_CLUSTER && attr == 0x0000 && dataType == 0x21 && zclLen >= dataOffset + 2) {
+                uint16_t humRaw = data[0] | (data[1] << 8);
                 float humPercent = humRaw / 100.0f;
                 LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mHumidity: %.2f%%\033[0m\n", humPercent);
             }
             // TVOC (genAnalogInput, presentValue is attr 0x0055, type single precision float 0x39)
-            else if (af->clusterId == AQARA_TVOC_ANALOG_CLUSTER && attr == 0x0055 && dataType == 0x39 && zclLen >= 7) {
+            else if (af->clusterId == AQARA_TVOC_ANALOG_CLUSTER && attr == 0x0055 && dataType == 0x39 && zclLen >= dataOffset + 4) {
                 float tvoc = 0.0f;
-                memcpy(&tvoc, &zcl[3], 4);
-                LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;35mTVOC: %.2f ppb\033[0m\n", tvoc);
+                memcpy(&tvoc, &data[0], 4);
+                
+                const char* quality;
+                const char* color;
+                TVOC_AQ_STATE_T newState;
+                
+                if (tvoc <= 65.0f) { quality = "Excellent"; color = "\033[1;32m"; newState = TVOC_AQ_EXCELLENT; }
+                else if (tvoc <= 220.0f) { quality = "Good"; color = "\033[1;36m"; newState = TVOC_AQ_GOOD; }
+                else if (tvoc <= 660.0f) { quality = "Moderate"; color = "\033[1;33m"; newState = TVOC_AQ_MODERATE; }
+                else if (tvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; newState = TVOC_AQ_POOR; }
+                else { quality = "Unhealthy"; color = "\033[1;31m"; newState = TVOC_AQ_UNHEALTHY; }
+                
+                LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;35mTVOC: %.2f ppb\033[0m (Air Quality: %s%s\033[0m)\n", tvoc, color, quality);
+                
+                pthread_mutex_lock(&g_deviceMutex);
+                for (int i = 0; i < g_numAqaraTvocs; i++) {
+                    if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
+                        if (g_aqaraTvocs[i].lastAirQuality != TVOC_AQ_UNKNOWN && g_aqaraTvocs[i].lastAirQuality != newState) {
+                            LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;33m⚠️ AIR QUALITY ALERT: Changed to %s%s\033[0m (Reading: %.2f ppb)!\n", color, quality, tvoc);
+                        }
+                        g_aqaraTvocs[i].lastAirQuality = newState;
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&g_deviceMutex);
             }
             // Battery (genPowerCfg)
-            else if (af->clusterId == AQARA_TVOC_POWER_CLUSTER && attr == 0x0021 && dataType == 0x20 && zclLen >= 4) {
-                uint8_t battRaw = zcl[3];
+            else if (af->clusterId == AQARA_TVOC_POWER_CLUSTER && attr == 0x0021 && dataType == 0x20 && zclLen >= dataOffset + 1) {
+                uint8_t battRaw = data[0];
                 LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %d%%\033[0m\n", battRaw / 2);
             }
         }
@@ -98,15 +131,45 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
 {
     pthread_mutex_lock(&g_deviceMutex);
     int idx = -1;
-    for (int i = 0; i < g_numAqaraTvocs; i++) {
-        if (g_aqaraTvocs[i].shortAddr == addr) { idx = i; break; }
+    uint8_t ieee[8];
+    bool hasIeee = Device_GetDiscoveredIeee(addr, ieee);
+
+    if (hasIeee) {
+        for (int i = 0; i < g_numAqaraTvocs; i++) {
+            if (g_aqaraTvocs[i].hasIeee && memcmp(g_aqaraTvocs[i].ieee, ieee, 8) == 0) {
+                idx = i;
+                if (g_aqaraTvocs[i].shortAddr != addr) {
+                    LOG_EVENT("AQARA_TVOC", addr, "Network Rejoin (Short address changed from 0x%04X)\n", g_aqaraTvocs[i].shortAddr);
+                    g_aqaraTvocs[i].shortAddr = addr;
+                }
+                break;
+            }
+        }
     }
+
+    if (idx == -1) {
+        for (int i = 0; i < g_numAqaraTvocs; i++) {
+            if (g_aqaraTvocs[i].shortAddr == addr) { idx = i; break; }
+        }
+    }
+
     if (idx == -1 && g_numAqaraTvocs < MAX_AQARA_TVOC) {
         LOG_EVENT("AQARA_TVOC", addr, "Network Join\n");
         g_aqaraTvocs[g_numAqaraTvocs].shortAddr = addr;
         g_aqaraTvocs[g_numAqaraTvocs].endpoint = ep;
         g_aqaraTvocs[g_numAqaraTvocs].lastSeen = ZNP_GetCurrentTime();
+        if (hasIeee) {
+            g_aqaraTvocs[g_numAqaraTvocs].hasIeee = true;
+            memcpy(g_aqaraTvocs[g_numAqaraTvocs].ieee, ieee, 8);
+        }
         g_numAqaraTvocs++;
+    } else if (idx != -1) {
+        g_aqaraTvocs[idx].endpoint = ep;
+        g_aqaraTvocs[idx].lastSeen = ZNP_GetCurrentTime();
+        if (hasIeee && !g_aqaraTvocs[idx].hasIeee) {
+            g_aqaraTvocs[idx].hasIeee = true;
+            memcpy(g_aqaraTvocs[idx].ieee, ieee, 8);
+        }
     }
     pthread_mutex_unlock(&g_deviceMutex);
 }
@@ -167,6 +230,19 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
     } else {
         pthread_mutex_unlock(&g_deviceMutex);
     }
+}
+
+void AqaraTvoc_PrintStatus(void)
+{
+    pthread_mutex_lock(&g_deviceMutex);
+    printf("Registered Aqara TVOC Sensors (%d):\n", g_numAqaraTvocs);
+    double now = ZNP_GetCurrentTime();
+    for (int i = 0; i < g_numAqaraTvocs; i++) {
+        double diff = now - g_aqaraTvocs[i].lastSeen;
+        printf("  0x%04X ep=0x%02X seen=%.1fs ago\n", 
+            g_aqaraTvocs[i].shortAddr, g_aqaraTvocs[i].endpoint, diff);
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
 }
 
 #endif

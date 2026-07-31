@@ -742,7 +742,7 @@ int main( int argc, char *argv[] )
     LOG_INFO(" Coordinator is active. Permit join is OPEN (%ds).\n", PERMIT_JOIN_DURATION );
     LOG_INFO("   Enter CLI commands (type 'help' for info). Press Ctrl+C to exit.\n\n");
 
-    double lastRefresh = ZNP_GetCurrentTime();
+    // double lastRefresh = ZNP_GetCurrentTime(); // Unused since auto-refresh is disabled
     MT_FRAME_T eventFrame;
 
     while ( 1 )
@@ -753,14 +753,16 @@ int main( int argc, char *argv[] )
             Main_HandleIncomingFrame( &eventFrame );
         }
 
-        // Auto-refresh permit join if needed
+        // Auto-refresh permit join if needed (DISABLED PER USER REQUEST)
         double now = ZNP_GetCurrentTime();
+        /*
         if ( now - lastRefresh > PERMIT_JOIN_REFRESH )
         {
             LOG_DEBUG("[Auto-Refresh] Re-opening permit join...\n" );
             ZNP_PermitJoin( PERMIT_JOIN_DURATION );
             lastRefresh = now;
         }
+        */
 
         // Offline watchdog: scan all devices every 60s
         static double lastOfflineCheck = 0;

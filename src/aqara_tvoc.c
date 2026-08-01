@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
-
+#include "znp_host.h"
 #if ENABLE_AQARA_TVOC
 
 AQARA_TVOC_T g_aqaraTvocs[MAX_AQARA_TVOC];
@@ -133,6 +133,7 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
     int idx = -1;
     uint8_t ieee[8];
     bool hasIeee = Device_GetDiscoveredIeee(addr, ieee);
+    bool changed = false;
 
     if (hasIeee) {
         for (int i = 0; i < g_numAqaraTvocs; i++) {
@@ -141,6 +142,7 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
                 if (g_aqaraTvocs[i].shortAddr != addr) {
                     LOG_EVENT("AQARA_TVOC", addr, "Network Rejoin (Short address changed from 0x%04X)\n", g_aqaraTvocs[i].shortAddr);
                     g_aqaraTvocs[i].shortAddr = addr;
+                    changed = true;
                 }
                 break;
             }
@@ -163,15 +165,24 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
             memcpy(g_aqaraTvocs[g_numAqaraTvocs].ieee, ieee, 8);
         }
         g_numAqaraTvocs++;
+        changed = true;
     } else if (idx != -1) {
-        g_aqaraTvocs[idx].endpoint = ep;
+        if (g_aqaraTvocs[idx].endpoint != ep) {
+            g_aqaraTvocs[idx].endpoint = ep;
+            changed = true;
+        }
         g_aqaraTvocs[idx].lastSeen = ZNP_GetCurrentTime();
         if (hasIeee && !g_aqaraTvocs[idx].hasIeee) {
             g_aqaraTvocs[idx].hasIeee = true;
             memcpy(g_aqaraTvocs[idx].ieee, ieee, 8);
+            changed = true;
         }
     }
     pthread_mutex_unlock(&g_deviceMutex);
+    
+    if (changed) {
+        Device_Save();
+    }
 }
 
 bool AqaraTvoc_IsKnown(uint16_t addr)

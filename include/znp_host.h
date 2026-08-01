@@ -260,6 +260,14 @@ bool ZNP_PermitJoin(uint8_t duration_);
 bool ZNP_BdbSetTcRequireKeyExchange(bool require_);
 
 ///
+/// @brief  Add an Install Code (with CRC) to the coordinator's Trust Center for a specific IEEE address.
+/// @param  ieee_                8-byte IEEE address (little-endian).
+/// @param  installCodeWithCrc_  18-byte Install Code + CRC.
+/// @return true if accepted by the ZNP.
+///
+bool ZNP_BdbAddInstallCode(const uint8_t *ieee_, const uint8_t *installCodeWithCrc_);
+
+///
 /// @brief  AF_REGISTER - register the host application endpoint.
 /// @param  endpoint_        Endpoint number to register.
 /// @param  profileId_       Application profile id (e.g. 0x0104 HA).

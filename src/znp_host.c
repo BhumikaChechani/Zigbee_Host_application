@@ -833,6 +833,28 @@ bool ZNP_BdbSetTcRequireKeyExchange( bool require_ )
     return false;
 }
 
+bool ZNP_BdbAddInstallCode(const uint8_t *ieee_, const uint8_t *installCodeWithCrc_)
+{
+    LOG_DEBUG("[BDB] Adding Install Code for IEEE %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
+              ieee_[7], ieee_[6], ieee_[5], ieee_[4], ieee_[3], ieee_[2], ieee_[1], ieee_[0]);
+              
+    uint8_t payload[27]; 
+    payload[0] = 1; // 1 = BDB_INSTALL_CODE_USE_IC_CRC
+    memcpy(&payload[1], ieee_, 8);
+    memcpy(&payload[9], installCodeWithCrc_, 18);
+    
+    MT_FRAME_T rx;
+    // MT_APP_CNF_BDB_ADD_INSTALLCODE is cmd0=0x2F, cmd1=0x04
+    if ( ZNP_Sreq( 0x2F, 0x04, payload, 27, &rx, 3000 ) )
+    {
+        uint8_t status = rx.len >= 1 ? rx.payload[0] : 0xFF;
+        LOG_DEBUG("add install code status=%d %s\n", status, status == 0 ? "(SUCCESS)" : "(FAILED)");
+        return status == 0;
+    }
+    LOG_DEBUG("no response to add install code\n" );
+    return false;
+}
+
 bool ZNP_PermitJoin( uint8_t duration_ )
 {
     bool ok = false;

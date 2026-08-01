@@ -690,6 +690,26 @@ int main( int argc, char *argv[] )
     ZNP_BdbSetTcRequireKeyExchange( false );
     LOG_RAW("\n");
 
+    // Add Install Code for Air Quality Sensor
+    LOG_INFO("[5.8] Adding Install Code for Aqara Air Quality Sensor (Serial: A00447SYH1CQB01061)...\n");
+    // IEEE: 54:EF:44:10:00:92:6A:D5 (Little-Endian)
+    uint8_t aqaraIeee[8] = { 0xD5, 0x6A, 0x92, 0x00, 0x10, 0x44, 0xEF, 0x54 }; 
+    // IC + CRC: 46D98D2E19964365573FD6913960E4C1A25D
+    uint8_t aqaraIc[18] = {
+        0x46, 0xD9, 0x8D, 0x2E, 0x19, 0x96, 0x43, 0x65,
+        0x57, 0x3F, 0xD6, 0x91, 0x39, 0x60, 0xE4, 0xC1,
+        0xA2, 0x5D
+    };
+    if (ZNP_BdbAddInstallCode(aqaraIeee, aqaraIc))
+    {
+        LOG_INFO("   Install Code accepted by Trust Center! Network Key will be delivered using derived Link Key.\n");
+    }
+    else
+    {
+        LOG_WARNING("   Failed to add Install Code! Coordinator may fallback to ZigBeeAlliance09 key.\n");
+    }
+    LOG_RAW("\n");
+
     // 6. Open permit join
     LOG_INFO("[6] Opening permit join (all methods)...\n");
     ZNP_PermitJoin( PERMIT_JOIN_DURATION );

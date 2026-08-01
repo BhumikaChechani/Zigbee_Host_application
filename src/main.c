@@ -1091,6 +1091,23 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
             LOG_DEBUG("🔒 [TC_AUTH] Trust Center processing authentication/key exchange for Device 0x%04X...\n", shortAddr );
         }
     }
+    // 1.8 APP_CNF BDB Indications (cmd0: 0x2F)
+    else if ( frame_->cmd0 == 0x2F )
+    {
+        // 0x80 = MT_APP_CNF_BDB_COMMISSIONING_NOTIFICATION
+        if ( frame_->cmd1 == 0x80 && frame_->len >= 2 )
+        {
+            uint8_t status = frame_->payload[0];
+            uint8_t commMode = frame_->payload[1];
+            LOG_DEBUG("🛡️ [BDB_COMMISSIONING_NOTIFY] Status: %d, Mode: %d\n", status, commMode);
+        }
+        // 0x81 = MT_APP_CNF_BDB_TC_LINK_KEY_EXCHANGE_NOTIFICATION_IND
+        else if ( frame_->cmd1 == 0x81 && frame_->len >= 2 )
+        {
+            uint8_t status = frame_->payload[0];
+            LOG_WARNING("❌ [KEY_EXCHANGE_FAIL] Trust Center rejected a device! Key Exchange Failed (Status: %d)\n", status);
+        }
+    }
     // 2. ZDO Response/Callback Parser (0x45 0xFF, 0x45 0x81, 0x45 0x86)
     else if ( frame_->cmd0 == 0x45 &&
               ( frame_->cmd1 == 0xFF || frame_->cmd1 == 0x81 || frame_->cmd1 == 0x86 ) )

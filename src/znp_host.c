@@ -855,6 +855,23 @@ bool ZNP_BdbAddInstallCode(const uint8_t *ieee_, const uint8_t *installCodeWithC
     return false;
 }
 
+bool ZNP_BdbSetJoinUsesInstallCodeKey(bool enforce_)
+{
+    LOG_DEBUG("[BDB] Set Join Uses Install Code Key = %s\n", enforce_ ? "TRUE" : "FALSE" );
+    uint8_t payload[1];
+    payload[0] = enforce_ ? 0x01 : 0x00;
+
+    MT_FRAME_T rx;
+    if ( ZNP_Sreq( 0x2F, 0x06, payload, 1, &rx, 3000 ) )
+    {
+        uint8_t status = rx.len >= 1 ? rx.payload[0] : 0xFF;
+        LOG_DEBUG("status=%d %s\n", status, status == 0 ? "(SUCCESS)" : "(FAILED)");
+        return status == 0;
+    }
+    LOG_DEBUG("no response\n" );
+    return false;
+}
+
 bool ZNP_PermitJoin( uint8_t duration_ )
 {
     bool ok = false;

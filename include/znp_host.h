@@ -268,6 +268,18 @@ bool ZNP_BdbSetTcRequireKeyExchange(bool require_);
 bool ZNP_BdbAddInstallCode(const uint8_t *ieee_, const uint8_t *installCodeWithCrc_);
 
 ///
+/// @brief  Enforce strict security: ONLY devices with an Install Code can join.
+///
+/// If set to true, the Trust Center will reject any device attempting to join using
+/// the global 'ZigBeeAlliance09' fallback key.
+/// Uses MT_APP_CNF APP_CNF_BDB_SET_JOINUSESINSTALLCODEKEY (0x2F / 0x06).
+///
+/// @param  enforce_  true to block global key joins, false to allow fallback.
+/// @return true if accepted by the ZNP.
+///
+bool ZNP_BdbSetJoinUsesInstallCodeKey(bool enforce_);
+
+///
 /// @brief  AF_REGISTER - register the host application endpoint.
 /// @param  endpoint_        Endpoint number to register.
 /// @param  profileId_       Application profile id (e.g. 0x0104 HA).

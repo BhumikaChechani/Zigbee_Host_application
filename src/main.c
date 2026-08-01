@@ -711,7 +711,19 @@ int main( int argc, char *argv[] )
     LOG_RAW("\n");
 
     // 6. Open permit join
-    LOG_INFO("[6] Opening permit join (all methods)...\n");
+    LOG_INFO("[6] Enforcing strict Install Code security policy...\n");
+    if (ZNP_BdbSetJoinUsesInstallCodeKey(true))
+    {
+        LOG_INFO("   SUCCESS! Only devices with a registered Install Code can now join.\n");
+    }
+    else
+    {
+        LOG_WARNING("   Failed to set JoinUsesInstallCodeKey policy!\n");
+    }
+    LOG_RAW("\n");
+
+    // 7. Open permit join
+    LOG_INFO("[7] Opening permit join (all methods)....\n");
     ZNP_PermitJoin( PERMIT_JOIN_DURATION );
     LOG_RAW("\n");
 

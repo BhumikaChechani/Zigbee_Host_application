@@ -1059,10 +1059,36 @@ static void Main_HandleIncomingFrame( const MT_FRAME_T *frame_ )
     // 1.6 ZDO Leave Indication (cmd0: 0x45, cmd1: 0xCB)
     else if ( frame_->cmd0 == 0x45 && frame_->cmd1 == 0xCB )
     {
-        if ( frame_->len >= 10 )
+        if ( frame_->len >= 13 )
         {
             uint16_t shortAddr = frame_->payload[0] | ( frame_->payload[1] << 8 );
-            LOG_DEBUG("[LEAVE] Device 0x%04X intentionally left the network (User Reset or Leave Request)!\n", shortAddr );
+            uint8_t request = frame_->payload[10];
+            uint8_t rejoin = frame_->payload[12];
+            
+            // If request == 1 and rejoin == 0, it often means the Trust Center kicked the device 
+            // (e.g., due to failing Install Code authentication).
+            if (request == 1 && rejoin == 0)
+            {
+                LOG_WARNING("❌ [REJECTED] Device 0x%04X was removed/rejected by Trust Center (Install Code mismatch or key exchange failed)!\n", shortAddr );
+            }
+            else
+            {
+                LOG_DEBUG("[LEAVE] Device 0x%04X intentionally left the network (request=%d, rejoin=%d).\n", shortAddr, request, rejoin );
+            }
+        }
+        else if ( frame_->len >= 10 )
+        {
+            uint16_t shortAddr = frame_->payload[0] | ( frame_->payload[1] << 8 );
+            LOG_DEBUG("[LEAVE] Device 0x%04X left the network!\n", shortAddr );
+        }
+    }
+    // 1.7 ZDO TC Device Indication (cmd0: 0x45, cmd1: 0xCA)
+    else if ( frame_->cmd0 == 0x45 && frame_->cmd1 == 0xCA )
+    {
+        if ( frame_->len >= 12 )
+        {
+            uint16_t shortAddr = frame_->payload[0] | ( frame_->payload[1] << 8 );
+            LOG_DEBUG("🔒 [TC_AUTH] Trust Center processing authentication/key exchange for Device 0x%04X...\n", shortAddr );
         }
     }
     // 2. ZDO Response/Callback Parser (0x45 0xFF, 0x45 0x81, 0x45 0x86)

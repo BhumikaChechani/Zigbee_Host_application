@@ -307,7 +307,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   }
   case UC_LIGHT_ON:
-    LOG_EVENT("OCCUPANCY", event_->srcAddr, "\033[1;34mLight ON  (Intensity %u)\033[0m\n", event_->raw);
+    LOG_EVENT("OCCUPANCY", event_->srcAddr, "\033[1;36mLight ON  (Intensity %u)\033[0m\n", event_->raw);
 #if ENABLE_SIREN
     Siren_TriggerAll(6, 240);
 #endif

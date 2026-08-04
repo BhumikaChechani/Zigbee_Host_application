@@ -796,41 +796,11 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   }
   usleep(300000);
 
-  // -------------------------------------------------------------------------
-  // STEP 5b: Configure Reporting for Motion Status (0x0143) - uint8, change=1
-  // -------------------------------------------------------------------------
-  {
-    uint8_t f[14] = {
-        0x04, 0x5F, 0x11, seq++, 0x06, // Configure Reporting
-        0x00,                          // direction
-        0x43, 0x01,                    // attr 0x0143
-        0x20,                          // uint8
-        0x00, 0x00,                    // min = 0 s
-        0x05, 0x00,                    // max = 5 s
-        0x01                           // change = 1
-    };
-    ZNP_AfDataRequestExt(0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq,
-                         0x00, 0x1E, f, 14);
-  }
-  usleep(300000);
-
-  // -------------------------------------------------------------------------
-  // STEP 5c: Configure Reporting for Approach Direction (0x0144) - uint8, change=1
-  // -------------------------------------------------------------------------
-  {
-    uint8_t f[14] = {
-        0x04, 0x5F, 0x11, seq++, 0x06, // Configure Reporting
-        0x00,                          // direction
-        0x44, 0x01,                    // attr 0x0144
-        0x20,                          // uint8
-        0x00, 0x00,                    // min = 0 s
-        0x05, 0x00,                    // max = 5 s
-        0x01                           // change = 1
-    };
-    ZNP_AfDataRequestExt(0x02, shortAddr_, endpoint, 0x0000, 8, 0xFCC0, seq,
-                         0x00, 0x1E, f, 14);
-  }
-  usleep(300000);
+  // NOTE: Configure Reporting for motion status (0x0143) and approach direction
+  // (0x0144) is intentionally NOT sent here. The FP300 firmware crashes and
+  // rejoins the network ~20s after receiving these commands, creating an
+  // infinite rejoin loop. These attributes will still be parsed if the device
+  // pushes them spontaneously on its own.
 
   // -------------------------------------------------------------------------
   // STEP 6: Set Absence Delay Timer (0x0197) = 10s (minimum supported)

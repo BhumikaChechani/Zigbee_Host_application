@@ -223,17 +223,17 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         // Read Temp (attr 0x0000)
         uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
-        usleep(250000);
+        usleep(1000000);
         
         // Read Humidity (attr 0x0000)
         uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
-        usleep(250000);
+        usleep(1000000);
         
         // Read TVOC (genAnalogInput attr 0x0055)
         uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
-        usleep(250000);
+        usleep(1000000);
         
         // Read Battery (attr 0x0021)
         uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x21, 0x00 };

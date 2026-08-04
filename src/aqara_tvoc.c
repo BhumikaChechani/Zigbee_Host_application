@@ -261,36 +261,36 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         
         char tStr[32], hStr[32], vStr[32], bStr[32];
         
-        printf("\n\033[1;36m--- ☁️  Aqara TVOC Environment Cache (0x%04X) ---\033[0m\n", addr);
+        printf("\n\033[1;36m--- Aqara TVOC Environment Cache (0x%04X) ---\033[0m\n", addr);
         
         if (t.lastTempTime > 0) {
             format_time(now - t.lastTempTime, tStr);
-            printf("  \033[1;31m🌡️  Temperature :\033[0m %.2f°C\t\033[90m(updated %s)\033[0m\n", t.lastTemp, tStr);
+            printf("  \033[1;31mTemperature :\033[0m %.2f°C\t\033[90m(updated %s)\033[0m\n", t.lastTemp, tStr);
         } else {
-            printf("  \033[1;31m🌡️  Temperature :\033[0m \033[90m[Waiting for data...]\033[0m\n");
+            printf("  \033[1;31mTemperature :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastHumTime > 0) {
             format_time(now - t.lastHumTime, hStr);
-            printf("  \033[1;34m💧 Humidity    :\033[0m %.2f%%\t\033[90m(updated %s)\033[0m\n", t.lastHum, hStr);
+            printf("  \033[1;34mHumidity    :\033[0m %.2f%%\t\033[90m(updated %s)\033[0m\n", t.lastHum, hStr);
         } else {
-            printf("  \033[1;34m💧 Humidity    :\033[0m \033[90m[Waiting for data...]\033[0m\n");
+            printf("  \033[1;34mHumidity    :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastTvocTime > 0) {
             format_time(now - t.lastTvocTime, vStr);
-            printf("  \033[1;35m🌬️  TVOC        :\033[0m %.2f ppb\t\033[90m(updated %s)\033[0m\n", t.lastTvoc, vStr);
+            printf("  \033[1;35mTVOC        :\033[0m %.2f ppb\t\033[90m(updated %s)\033[0m\n", t.lastTvoc, vStr);
         } else {
-            printf("  \033[1;35m🌬️  TVOC        :\033[0m \033[90m[Waiting for data...]\033[0m\n");
+            printf("  \033[1;35mTVOC        :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastBattTime > 0) {
             format_time(now - t.lastBattTime, bStr);
-            printf("  \033[1;32m🔋 Battery     :\033[0m %d%%\t\033[90m(updated %s)\033[0m\n", t.lastBatt, bStr);
+            printf("  \033[1;32mBattery     :\033[0m %d%%\t\033[90m(updated %s)\033[0m\n", t.lastBatt, bStr);
         } else {
-            printf("  \033[1;32m🔋 Battery     :\033[0m \033[90m[Waiting for data...]\033[0m\n");
+            printf("  \033[1;32mBattery     :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
-        printf("\033[1;36m-------------------------------------------------\033[0m\n\n");
+        printf("\033[1;36m---------------------------------------------\033[0m\n\n");
         
         if (t.lastTempTime == 0 && t.lastHumTime == 0 && t.lastTvocTime == 0) {
             printf("\033[1;33m[TIP] Cache is empty. Queueing network read requests to the sensor...\033[0m\n");

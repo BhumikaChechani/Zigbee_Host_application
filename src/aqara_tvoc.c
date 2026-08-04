@@ -27,6 +27,13 @@ static void HandleAf(const AF_MSG_T *af)
     const uint8_t *zcl = &af->data[hdrLen];
     int zclLen = af->dataLen - hdrLen;
 
+    // DEBUG: print raw payload
+    printf("\033[90m[DEBUG] TVOC RAW from 0x%04X clst 0x%04X: \033[0m", af->srcAddr, af->clusterId);
+    for (int i=0; i<af->dataLen; i++) {
+        printf("\033[90m%02X \033[0m", af->data[i]);
+    }
+    printf("\n");
+
     if (cmdId == 0x0A || cmdId == 0x01) { // Report or Read Rsp
         if (zclLen >= 4) {
             uint16_t attr = zcl[0] | (zcl[1] << 8);

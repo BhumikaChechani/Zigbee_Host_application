@@ -191,13 +191,10 @@ static void *AqaraTvoc_PollThread(void *arg)
 
             uint8_t reqTemp[5] = { 0x00, ++pollSeq, 0x00, 0x00, 0x00 };
             ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_TEMP_CLUSTER,    pollSeq, 0, 30, reqTemp, 5);
-            usleep(200000);
             uint8_t reqHum[5]  = { 0x00, ++pollSeq, 0x00, 0x00, 0x00 };
             ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_HUM_CLUSTER,     pollSeq, 0, 30, reqHum,  5);
-            usleep(200000);
             uint8_t reqTvoc[5] = { 0x00, ++pollSeq, 0x00, 0x55, 0x00 };
             ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_ANALOG_CLUSTER,  pollSeq, 0, 30, reqTvoc, 5);
-            usleep(200000);
             uint8_t reqBatt[5] = { 0x00, ++pollSeq, 0x00, 0x20, 0x00 };
             ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_POWER_CLUSTER,   pollSeq, 0, 30, reqBatt, 5);
         }
@@ -369,15 +366,12 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         static uint8_t seq = 0;
         uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
-        usleep(250000);
         
         uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
-        usleep(250000);
         
         uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
-        usleep(250000);
         
         uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x20, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_POWER_CLUSTER, seq, 0, 30, reqBatt, 5 );

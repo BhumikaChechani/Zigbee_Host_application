@@ -981,10 +981,18 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
     uint8_t ieeeBytes[8];
     memcpy(ieeeBytes, &frame_->payload[4], 8);
 
-    LOG_INFO("✨ [JOIN] New device joined: short=0x%04X, "
-             "IEEE=%02x%02x%02x%02x%02x%02x%02x%02x\n",
-             nwkAddr, ieeeBytes[7], ieeeBytes[6], ieeeBytes[5], ieeeBytes[4],
-             ieeeBytes[3], ieeeBytes[2], ieeeBytes[1], ieeeBytes[0]);
+    const char *devType = Device_GetName(nwkAddr);
+    if (strcmp(devType, "Unknown Device") != 0) {
+      LOG_INFO("✨ [REJOIN] Known %s joined: short=0x%04X, "
+               "IEEE=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+               devType, nwkAddr, ieeeBytes[7], ieeeBytes[6], ieeeBytes[5], ieeeBytes[4],
+               ieeeBytes[3], ieeeBytes[2], ieeeBytes[1], ieeeBytes[0]);
+    } else {
+      LOG_INFO("✨ [JOIN] New device joined: short=0x%04X, "
+               "IEEE=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+               nwkAddr, ieeeBytes[7], ieeeBytes[6], ieeeBytes[5], ieeeBytes[4],
+               ieeeBytes[3], ieeeBytes[2], ieeeBytes[1], ieeeBytes[0]);
+    }
 
     Device_AddDiscoveredIeee(nwkAddr, ieeeBytes);
     Main_SetOnline(nwkAddr);
@@ -1153,8 +1161,14 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
 
     // Join trigger via MSG_CB (cluster 0x0013)
     if (clusterId == 0x0013) {
-      LOG_INFO("✨ [JOIN via MSG_CB] Device announced: short=0x%04X\n",
-               srcAddr);
+      const char *devType = Device_GetName(srcAddr);
+      if (strcmp(devType, "Unknown Device") != 0) {
+        LOG_INFO("✨ [REJOIN via MSG_CB] Known %s announced: short=0x%04X\n",
+                 devType, srcAddr);
+      } else {
+        LOG_INFO("✨ [JOIN via MSG_CB] New device announced: short=0x%04X\n",
+                 srcAddr);
+      }
       if (asdu != NULL && asduLen >= 10) {
         uint16_t annceShort = asdu[0] | (asdu[1] << 8);
         Device_AddDiscoveredIeee(annceShort, &asdu[2]);
@@ -1275,17 +1289,17 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
           }
         }
 
-        LOG_INFO(
+        LOG_DEBUG(
             "Device 0x%04X ep 0x%02X Profile=0x%04X DevID=0x%04X InClusters=[",
             shortAddr, ep, profileId, deviceId);
         for (int i = 0; i < numInCls; i++) {
-          LOG_INFO("0x%04X%s", inCls[i], (i == numInCls - 1) ? "" : ", ");
+          LOG_DEBUG("0x%04X%s", inCls[i], (i == numInCls - 1) ? "" : ", ");
         }
-        LOG_INFO("] OutClusters=[");
+        LOG_DEBUG("] OutClusters=[");
         for (int i = 0; i < numOutCls; i++) {
-          LOG_INFO("0x%04X%s", outCls[i], (i == numOutCls - 1) ? "" : ", ");
+          LOG_DEBUG("0x%04X%s", outCls[i], (i == numOutCls - 1) ? "" : ", ");
         }
-        LOG_INFO("]\n");
+        LOG_DEBUG("]\n");
 
         if (profileId == 0x0104) {
           bool isSiren = false;

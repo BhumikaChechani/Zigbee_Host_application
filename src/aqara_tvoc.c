@@ -51,7 +51,8 @@ static void HandleAf(const AF_MSG_T *af)
             if (af->clusterId == AQARA_TVOC_TEMP_CLUSTER && attr == 0x0000 && dataType == 0x29 && zclLen >= dataOffset + 2) {
                 int16_t tempRaw = data[0] | (data[1] << 8);
                 float tempC = tempRaw / 100.0f;
-                LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mTemperature: %.2f°C\033[0m\n", tempC);
+                if (cmdId == 0x0A)
+                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mTemperature: %.2f°C\033[0m\n", tempC);
                 
                 pthread_mutex_lock(&g_deviceMutex);
                 for (int i = 0; i < g_numAqaraTvocs; i++) {
@@ -67,7 +68,8 @@ static void HandleAf(const AF_MSG_T *af)
             else if (af->clusterId == AQARA_TVOC_HUM_CLUSTER && attr == 0x0000 && dataType == 0x21 && zclLen >= dataOffset + 2) {
                 uint16_t humRaw = data[0] | (data[1] << 8);
                 float humPercent = humRaw / 100.0f;
-                LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mHumidity: %.2f%%\033[0m\n", humPercent);
+                if (cmdId == 0x0A)
+                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mHumidity: %.2f%%\033[0m\n", humPercent);
                 
                 pthread_mutex_lock(&g_deviceMutex);
                 for (int i = 0; i < g_numAqaraTvocs; i++) {
@@ -94,13 +96,14 @@ static void HandleAf(const AF_MSG_T *af)
                 else if (tvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; newState = TVOC_AQ_POOR; }
                 else { quality = "Unhealthy"; color = "\033[1;31m"; newState = TVOC_AQ_UNHEALTHY; }
                 
-                LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;35mTVOC: %.2f ppb\033[0m (Air Quality: %s%s\033[0m)\n", tvoc, color, quality);
+                if (cmdId == 0x0A)
+                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;35mTVOC: %.2f ppb\033[0m (Air Quality: %s%s\033[0m)\n", tvoc, color, quality);
                 
                 pthread_mutex_lock(&g_deviceMutex);
                 for (int i = 0; i < g_numAqaraTvocs; i++) {
                     if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
                         if (g_aqaraTvocs[i].lastAirQuality != TVOC_AQ_UNKNOWN && g_aqaraTvocs[i].lastAirQuality != newState) {
-                            LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;33m⚠️ AIR QUALITY ALERT: Changed to %s%s\033[0m (Reading: %.2f ppb)!\n", color, quality, tvoc);
+                            LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;33m[AIR QUALITY ALERT] Changed to %s%s\033[0m (Reading: %.2f ppb)\n", color, quality, tvoc);
                         }
                         g_aqaraTvocs[i].lastAirQuality = newState;
                         g_aqaraTvocs[i].lastTvoc = tvoc;
@@ -115,7 +118,8 @@ static void HandleAf(const AF_MSG_T *af)
                 uint8_t battRaw = data[0];
                 
                 if (attr == 0x0021) {
-                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %d%%\033[0m\n", battRaw / 2);
+                    if (cmdId == 0x0A)
+                        LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %d%%\033[0m\n", battRaw / 2);
                     pthread_mutex_lock(&g_deviceMutex);
                     for (int i = 0; i < g_numAqaraTvocs; i++) {
                         if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
@@ -131,7 +135,8 @@ static void HandleAf(const AF_MSG_T *af)
                     if (pct > 100) pct = 100;
                     if (pct < 0) pct = 0;
                     
-                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %.1fV (~%d%%)\033[0m\n", voltage, pct);
+                    if (cmdId == 0x0A)
+                        LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %.1fV (~%d%%)\033[0m\n", voltage, pct);
                     pthread_mutex_lock(&g_deviceMutex);
                     for (int i = 0; i < g_numAqaraTvocs; i++) {
                         if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
@@ -288,28 +293,32 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         
         if (t.lastTempTime > 0) {
             format_time(now - t.lastTempTime, tStr);
-            printf("  \033[1;31mTemperature :\033[0m %.2f°C\t\033[90m(updated %s)\033[0m\n", t.lastTemp, tStr);
+            char valT[24]; snprintf(valT, sizeof(valT), "%.2f°C", t.lastTemp);
+            printf("  \033[1;31mTemperature :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valT, tStr);
         } else {
             printf("  \033[1;31mTemperature :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastHumTime > 0) {
             format_time(now - t.lastHumTime, hStr);
-            printf("  \033[1;34mHumidity    :\033[0m %.2f%%\t\033[90m(updated %s)\033[0m\n", t.lastHum, hStr);
+            char valH[24]; snprintf(valH, sizeof(valH), "%.2f%%", t.lastHum);
+            printf("  \033[1;34mHumidity    :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valH, hStr);
         } else {
             printf("  \033[1;34mHumidity    :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastTvocTime > 0) {
             format_time(now - t.lastTvocTime, vStr);
-            printf("  \033[1;35mTVOC        :\033[0m %.2f ppb\t\033[90m(updated %s)\033[0m\n", t.lastTvoc, vStr);
+            char valV[24]; snprintf(valV, sizeof(valV), "%.2f ppb", t.lastTvoc);
+            printf("  \033[1;35mTVOC        :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valV, vStr);
         } else {
             printf("  \033[1;35mTVOC        :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastBattTime > 0) {
             format_time(now - t.lastBattTime, bStr);
-            printf("  \033[1;32mBattery     :\033[0m %d%%\t\033[90m(updated %s)\033[0m\n", t.lastBatt, bStr);
+            char valB[24]; snprintf(valB, sizeof(valB), "%d%%", t.lastBatt);
+            printf("  \033[1;32mBattery     :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valB, bStr);
         } else {
             printf("  \033[1;32mBattery     :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }

@@ -279,7 +279,7 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         }
         printf("-----------------------------------------------\n\n");
         
-        if (t.lastTempTime == 0 || t.lastHumTime == 0 || t.lastTvocTime == 0) {
+        if (t.lastTempTime == 0 && t.lastHumTime == 0 && t.lastTvocTime == 0) {
             printf("\033[1;33m[TIP] Cache is empty. Queueing network read requests to the sensor...\033[0m\n");
             printf("      Please press the button on the sensor to wake it up, so it can receive\n");
             printf("      these requests. Then run 'env 0x%04X' again in a few seconds.\n\n", addr);

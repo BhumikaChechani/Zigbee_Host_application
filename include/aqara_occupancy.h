@@ -38,6 +38,8 @@ typedef struct {
   double lastPolled;  ///< Timestamp of the last outgoing poll (Read Attributes) sent to this device.
   double lastSetupAttempt; ///< Timestamp of the last setup attempt (rate-limiter).
   OccupancyZone zones[MAX_OCCUPANCY_ZONES]; ///< Configured distance ranges.
+  uint8_t motionStatus;      ///< Last radar motion classification (attr 0x0143).
+  uint8_t approachDirection; ///< Last approach direction (attr 0x0144). 0=Left, 1=Right, 0xFF=Unknown.
 } AQARA_OCCUPANCY_T;
 
 #define MAX_AQARA_OCCUPANCY 32 ///< Maximum occupancy sensors tracked.

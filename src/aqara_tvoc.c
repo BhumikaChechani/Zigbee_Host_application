@@ -278,6 +278,32 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
             printf("  Battery: [Waiting for sensor data...]\n");
         }
         printf("-----------------------------------------------\n\n");
+        
+        if (t.lastTempTime == 0 || t.lastHumTime == 0 || t.lastTvocTime == 0) {
+            printf("\033[1;33m[TIP] Cache is empty. Queueing network read requests to the sensor...\033[0m\n");
+            printf("      Please press the button on the sensor to wake it up, so it can receive\n");
+            printf("      these requests. Then run 'env 0x%04X' again in a few seconds.\n\n", addr);
+            
+            static uint8_t seq = 0;
+            // Read Temp (attr 0x0000)
+            uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
+            usleep(250000);
+            
+            // Read Humidity (attr 0x0000)
+            uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
+            usleep(250000);
+            
+            // Read TVOC (genAnalogInput attr 0x0055)
+            uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
+            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
+            usleep(250000);
+            
+            // Read Battery (attr 0x0021)
+            uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x21, 0x00 };
+            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_POWER_CLUSTER, seq, 0, 30, reqBatt, 5 );
+        }
     } else {
         pthread_mutex_unlock(&g_deviceMutex);
     }

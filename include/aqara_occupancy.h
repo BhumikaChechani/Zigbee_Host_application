@@ -16,6 +16,7 @@ typedef struct {
   uint32_t maxCm;
   bool isActive; ///< True if this zone index is configured.
   bool occupied; ///< Current presence state of this zone slice.
+  double lastOccupiedTime; ///< Timestamp of last time distance was within this zone.
 } OccupancyZone;
 
 /// @brief Structure to track an Aqara occupancy sensor.

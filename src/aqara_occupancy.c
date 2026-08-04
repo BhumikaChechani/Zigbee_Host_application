@@ -1044,6 +1044,7 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
       continue;
 
     bool logicalOccupied;
+    double now = ZNP_GetCurrentTime();
 
     if (!sensorSaysOccupied) {
       // Sensor explicitly says NO presence -> always clear all zones
@@ -1051,11 +1052,28 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
       logicalOccupied = false;
     } else if (dist == 0) {
       // Fall back to raw presence only if zone starts at 0.
-      logicalOccupied = (g_aqaraOccupancies[idx].zones[z].minCm == 0);
+      bool inZone = (g_aqaraOccupancies[idx].zones[z].minCm == 0);
+      if (inZone) {
+        g_aqaraOccupancies[idx].zones[z].lastOccupiedTime = now;
+        logicalOccupied = true;
+      } else {
+        // Multi-target hysteresis: hold presence for 10 seconds
+        logicalOccupied = (g_aqaraOccupancies[idx].zones[z].occupied &&
+                           (now - g_aqaraOccupancies[idx].zones[z].lastOccupiedTime < 10.0));
+      }
     } else {
       // Valid distance -> apply software zone filter.
-      logicalOccupied = (dist >= g_aqaraOccupancies[idx].zones[z].minCm &&
-                         dist <= g_aqaraOccupancies[idx].zones[z].maxCm);
+      bool inZone = (dist >= g_aqaraOccupancies[idx].zones[z].minCm &&
+                     dist <= g_aqaraOccupancies[idx].zones[z].maxCm);
+      if (inZone) {
+        g_aqaraOccupancies[idx].zones[z].lastOccupiedTime = now;
+        logicalOccupied = true;
+      } else {
+        // Multi-target hysteresis: if the sensor jumps to another target,
+        // hold presence in this zone for 10 seconds before clearing.
+        logicalOccupied = (g_aqaraOccupancies[idx].zones[z].occupied &&
+                           (now - g_aqaraOccupancies[idx].zones[z].lastOccupiedTime < 10.0));
+      }
     }
     bool prevOccupied = g_aqaraOccupancies[idx].zones[z].occupied;
     g_aqaraOccupancies[idx].zones[z].occupied = logicalOccupied;

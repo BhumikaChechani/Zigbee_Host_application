@@ -195,8 +195,6 @@ static void *AqaraTvoc_PollThread(void *arg)
             ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_HUM_CLUSTER,     pollSeq, 0, 30, reqHum,  5);
             uint8_t reqTvoc[5] = { 0x00, ++pollSeq, 0x00, 0x55, 0x00 };
             ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_ANALOG_CLUSTER,  pollSeq, 0, 30, reqTvoc, 5);
-            uint8_t reqBatt[5] = { 0x00, ++pollSeq, 0x00, 0x20, 0x00 };
-            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_POWER_CLUSTER,   pollSeq, 0, 30, reqBatt, 5);
         }
     }
     return NULL;
@@ -372,9 +370,6 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         
         uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
-        
-        uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x20, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_POWER_CLUSTER, seq, 0, 30, reqBatt, 5 );
     } else {
         pthread_mutex_unlock(&g_deviceMutex);
     }

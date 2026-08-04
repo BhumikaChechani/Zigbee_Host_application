@@ -240,6 +240,12 @@ void AqaraTvoc_UpdateSeen(uint16_t addr)
     pthread_mutex_unlock(&g_deviceMutex);
 }
 
+static void format_time(double diff, char* out) {
+    if (diff < 60) sprintf(out, "%.1fs ago", diff);
+    else if (diff < 3600) sprintf(out, "%dm %ds ago", (int)(diff/60), (int)diff%60);
+    else sprintf(out, "%dh %dm ago", (int)(diff/3600), ((int)diff%3600)/60);
+}
+
 void AqaraTvoc_ReadEnvironment(uint16_t addr)
 {
     pthread_mutex_lock(&g_deviceMutex);
@@ -253,31 +259,38 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         
         double now = ZNP_GetCurrentTime();
         
-        printf("\n--- Aqara TVOC Environment Cache (0x%04X) ---\n", addr);
+        char tStr[32], hStr[32], vStr[32], bStr[32];
+        
+        printf("\n\033[1;36m--- ☁️  Aqara TVOC Environment Cache (0x%04X) ---\033[0m\n", addr);
+        
         if (t.lastTempTime > 0) {
-            printf("  Temperature: %.2f°C (updated %.1fs ago)\n", t.lastTemp, now - t.lastTempTime);
+            format_time(now - t.lastTempTime, tStr);
+            printf("  \033[1;31m🌡️  Temperature :\033[0m %.2f°C\t\033[90m(updated %s)\033[0m\n", t.lastTemp, tStr);
         } else {
-            printf("  Temperature: [Waiting for sensor data...]\n");
+            printf("  \033[1;31m🌡️  Temperature :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastHumTime > 0) {
-            printf("  Humidity: %.2f%% (updated %.1fs ago)\n", t.lastHum, now - t.lastHumTime);
+            format_time(now - t.lastHumTime, hStr);
+            printf("  \033[1;34m💧 Humidity    :\033[0m %.2f%%\t\033[90m(updated %s)\033[0m\n", t.lastHum, hStr);
         } else {
-            printf("  Humidity: [Waiting for sensor data...]\n");
+            printf("  \033[1;34m💧 Humidity    :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastTvocTime > 0) {
-            printf("  TVOC: %.2f ppb (updated %.1fs ago)\n", t.lastTvoc, now - t.lastTvocTime);
+            format_time(now - t.lastTvocTime, vStr);
+            printf("  \033[1;35m🌬️  TVOC        :\033[0m %.2f ppb\t\033[90m(updated %s)\033[0m\n", t.lastTvoc, vStr);
         } else {
-            printf("  TVOC: [Waiting for sensor data...]\n");
+            printf("  \033[1;35m🌬️  TVOC        :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastBattTime > 0) {
-            printf("  Battery: %d%% (updated %.1fs ago)\n", t.lastBatt, now - t.lastBattTime);
+            format_time(now - t.lastBattTime, bStr);
+            printf("  \033[1;32m🔋 Battery     :\033[0m %d%%\t\033[90m(updated %s)\033[0m\n", t.lastBatt, bStr);
         } else {
-            printf("  Battery: [Waiting for sensor data...]\n");
+            printf("  \033[1;32m🔋 Battery     :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
-        printf("-----------------------------------------------\n\n");
+        printf("\033[1;36m-------------------------------------------------\033[0m\n\n");
         
         if (t.lastTempTime == 0 && t.lastHumTime == 0 && t.lastTvocTime == 0) {
             printf("\033[1;33m[TIP] Cache is empty. Queueing network read requests to the sensor...\033[0m\n");

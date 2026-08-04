@@ -245,27 +245,39 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #endif
     bool hasDoorSensors = false;
     bool isDoorOpen = IsDoorOpenForZone(zoneIdx, &hasDoorSensors);
+    uint32_t minCm = 0;
+    uint32_t maxCm = 0;
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numAqaraOccupancies; i++) {
+        if (g_aqaraOccupancies[i].shortAddr == event_->srcAddr) {
+            minCm = g_aqaraOccupancies[i].zones[zoneIdx].minCm;
+            maxCm = g_aqaraOccupancies[i].zones[zoneIdx].maxCm;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+
     LOG_DEBUG("[USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s, Sensors: %d)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO", hasDoorSensors);
     if (!hasDoorSensors) {
         // No contact sensor registered at all - trigger alarm unconditionally
         LOG_EVENT("OCCUPANCY", event_->srcAddr,
-            "\033[1;32mPresence DETECTED | Zone %-2u | %4u cm\033[0m\n",
-            zoneIdx, event_->val2);
+            "\033[1;32mPresence DETECTED | Zone %-2u [%u-%u cm] | %4u cm\033[0m\n",
+            zoneIdx, minCm, maxCm, event_->val2);
 #if ENABLE_SIREN
         Siren_TriggerAll(5, 5);
 #endif
     } else if (isDoorOpen) {
         LOG_EVENT("OCCUPANCY", event_->srcAddr,
-            "\033[1;32mPresence DETECTED | Zone %-2u | %4u cm\033[0m\n",
-            zoneIdx, event_->val2);
+            "\033[1;32mPresence DETECTED | Zone %-2u [%u-%u cm] | %4u cm\033[0m\n",
+            zoneIdx, minCm, maxCm, event_->val2);
 #if ENABLE_SIREN
         Siren_TriggerAll(5, 5);
 #endif
     } else {
         LOG_EVENT("OCCUPANCY", event_->srcAddr,
-            "\033[1;33mPresence IGNORED  | Zone %-2u | %4u cm | Reason: Door is CLOSED\033[0m\n",
-            zoneIdx, event_->val2);
+            "\033[1;33mPresence IGNORED  | Zone %-2u [%u-%u cm] | %4u cm | Reason: Door is CLOSED\033[0m\n",
+            zoneIdx, minCm, maxCm, event_->val2);
     }
 #else
     LOG_DEBUG("[USECASE] Person detected in zone 0x%04X (index %u)\n",
@@ -275,9 +287,23 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   }
   case UC_OCCUPANCY_CLEARED: {
     uint8_t zoneIdx = (uint8_t)event_->raw;
+    uint32_t minCm = 0;
+    uint32_t maxCm = 0;
+#if ENABLE_AQARA_OCCUPANCY
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numAqaraOccupancies; i++) {
+        if (g_aqaraOccupancies[i].shortAddr == event_->srcAddr) {
+            minCm = g_aqaraOccupancies[i].zones[zoneIdx].minCm;
+            maxCm = g_aqaraOccupancies[i].zones[zoneIdx].maxCm;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+#endif
+
     LOG_EVENT("OCCUPANCY", event_->srcAddr,
-        "\033[1;31mPresence CLEARED  | Zone %-2u | %4u cm\033[0m\n",
-        zoneIdx, event_->val2);
+        "\033[1;31mPresence CLEARED  | Zone %-2u [%u-%u cm] | %4u cm\033[0m\n",
+        zoneIdx, minCm, maxCm, event_->val2);
     break;
   }
   case UC_LIGHT_ON:

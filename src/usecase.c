@@ -326,7 +326,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   }
   case UC_CONTACT_CLOSED: {
-    LOG_EVENT("CONTACT", event_->srcAddr, "\033[0;35mDoor CLOSED\033[0m\n");
+    LOG_EVENT("CONTACT", event_->srcAddr, "\033[1;34mDoor CLOSED\033[0m\n");
 #if ENABLE_SIREN
     Siren_PostBeep(1);
 #endif

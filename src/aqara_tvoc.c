@@ -164,6 +164,47 @@ static void *AqaraTvoc_Thread(void *arg)
     return NULL;
 }
 
+// Poll thread: every 5 minutes, queue read requests for all registered TVOC
+// sensors into the ZNP indirect queue. When the sensor's radio wakes for any
+// reason (heartbeat, button press, threshold push), it finds these requests
+// and answers them automatically, keeping the cache fresh.
+static void *AqaraTvoc_PollThread(void *arg)
+{
+    (void)arg;
+    sleep(10); // Small startup delay
+    while (1) {
+        sleep(300); // 5 minutes between poll cycles
+
+        pthread_mutex_lock(&g_deviceMutex);
+        int num = g_numAqaraTvocs;
+        uint16_t addrs[MAX_AQARA_TVOC];
+        uint8_t  eps[MAX_AQARA_TVOC];
+        for (int i = 0; i < num; i++) {
+            addrs[i] = g_aqaraTvocs[i].shortAddr;
+            eps[i]   = g_aqaraTvocs[i].endpoint;
+        }
+        pthread_mutex_unlock(&g_deviceMutex);
+
+        for (int i = 0; i < num; i++) {
+            static uint8_t pollSeq = 0xC0;
+            LOG_DEBUG("[TVOC] Background poll: queueing read requests for 0x%04X\n", addrs[i]);
+
+            uint8_t reqTemp[5] = { 0x00, ++pollSeq, 0x00, 0x00, 0x00 };
+            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_TEMP_CLUSTER,    pollSeq, 0, 30, reqTemp, 5);
+            usleep(200000);
+            uint8_t reqHum[5]  = { 0x00, ++pollSeq, 0x00, 0x00, 0x00 };
+            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_HUM_CLUSTER,     pollSeq, 0, 30, reqHum,  5);
+            usleep(200000);
+            uint8_t reqTvoc[5] = { 0x00, ++pollSeq, 0x00, 0x55, 0x00 };
+            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_ANALOG_CLUSTER,  pollSeq, 0, 30, reqTvoc, 5);
+            usleep(200000);
+            uint8_t reqBatt[5] = { 0x00, ++pollSeq, 0x00, 0x20, 0x00 };
+            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_POWER_CLUSTER,   pollSeq, 0, 30, reqBatt, 5);
+        }
+    }
+    return NULL;
+}
+
 void AqaraTvoc_Init(void)
 {
     memset(g_aqaraTvocs, 0, sizeof(g_aqaraTvocs));
@@ -174,6 +215,10 @@ void AqaraTvoc_Init(void)
 void AqaraTvoc_Start(void)
 {
     pthread_create(&s_thread, NULL, AqaraTvoc_Thread, NULL);
+
+    pthread_t pollThread;
+    pthread_create(&pollThread, NULL, AqaraTvoc_PollThread, NULL);
+    pthread_detach(pollThread);
 }
 
 void AqaraTvoc_PostAf(uint16_t addr, const AF_MSG_T *af)

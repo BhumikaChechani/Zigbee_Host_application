@@ -286,69 +286,56 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         pthread_mutex_unlock(&g_deviceMutex);
         
         double now = ZNP_GetCurrentTime();
-        
-        char tStr[32], hStr[32], vStr[32], bStr[32];
+        char ts[32];
         
         printf("\n\033[1;36m--- Aqara TVOC Environment Cache (0x%04X) ---\033[0m\n", addr);
         
         if (t.lastTempTime > 0) {
-            format_time(now - t.lastTempTime, tStr);
-            char valT[24]; snprintf(valT, sizeof(valT), "%.2f°C", t.lastTemp);
-            printf("  \033[1;31mTemperature :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valT, tStr);
+            format_time(now - t.lastTempTime, ts);
+            printf("  \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(updated %s)\033[0m\n", t.lastTemp, ts);
         } else {
             printf("  \033[1;31mTemperature :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastHumTime > 0) {
-            format_time(now - t.lastHumTime, hStr);
-            char valH[24]; snprintf(valH, sizeof(valH), "%.2f%%", t.lastHum);
-            printf("  \033[1;34mHumidity    :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valH, hStr);
+            format_time(now - t.lastHumTime, ts);
+            printf("  \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(updated %s)\033[0m\n", t.lastHum, ts);
         } else {
             printf("  \033[1;34mHumidity    :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastTvocTime > 0) {
-            format_time(now - t.lastTvocTime, vStr);
-            char valV[24]; snprintf(valV, sizeof(valV), "%.2f ppb", t.lastTvoc);
-            printf("  \033[1;35mTVOC        :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valV, vStr);
+            format_time(now - t.lastTvocTime, ts);
+            printf("  \033[1;35mTVOC        :\033[0m %6.2f ppb \033[90m(updated %s)\033[0m\n", t.lastTvoc, ts);
         } else {
             printf("  \033[1;35mTVOC        :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         
         if (t.lastBattTime > 0) {
-            format_time(now - t.lastBattTime, bStr);
-            char valB[24]; snprintf(valB, sizeof(valB), "%d%%", t.lastBatt);
-            printf("  \033[1;32mBattery     :\033[0m %-14s\033[90m(updated %s)\033[0m\n", valB, bStr);
+            format_time(now - t.lastBattTime, ts);
+            printf("  \033[1;32mBattery     :\033[0m %6d %%   \033[90m(updated %s)\033[0m\n", t.lastBatt, ts);
         } else {
             printf("  \033[1;32mBattery     :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
-        printf("\033[1;36m---------------------------------------------\033[0m\n\n");
+        printf("\033[1;36m---------------------------------------------\033[0m\n");
+        printf("\033[90m  [Read requests queued. Press sensor button to refresh.]\033[0m\n\n");
         
-        if (t.lastTempTime == 0 && t.lastHumTime == 0 && t.lastTvocTime == 0) {
-            printf("\033[1;33m[TIP] Cache is empty. Queueing network read requests to the sensor...\033[0m\n");
-            printf("      Please press the button on the sensor to wake it up, so it can receive\n");
-            printf("      these requests. Then run 'env 0x%04X' again in a few seconds.\n\n", addr);
-            
-            static uint8_t seq = 0;
-            // Read Temp (attr 0x0000)
-            uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
-            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
-            usleep(250000);
-            
-            // Read Humidity (attr 0x0000)
-            uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
-            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
-            usleep(250000);
-            
-            // Read TVOC (genAnalogInput attr 0x0055)
-            uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
-            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
-            usleep(250000);
-            
-            // Read Battery Voltage (attr 0x0020) instead of Percentage (0x0021)
-            uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x20, 0x00 };
-            ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_POWER_CLUSTER, seq, 0, 30, reqBatt, 5 );
-        }
+        // Always queue read requests so the sensor can answer whenever it wakes
+        static uint8_t seq = 0;
+        uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
+        usleep(250000);
+        
+        uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
+        usleep(250000);
+        
+        uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
+        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
+        usleep(250000);
+        
+        uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x20, 0x00 };
+        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_POWER_CLUSTER, seq, 0, 30, reqBatt, 5 );
     } else {
         pthread_mutex_unlock(&g_deviceMutex);
     }

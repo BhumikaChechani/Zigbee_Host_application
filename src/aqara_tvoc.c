@@ -219,21 +219,26 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         uint8_t ep = g_aqaraTvocs[idx].endpoint;
         pthread_mutex_unlock(&g_deviceMutex);
         
+        printf("\n\033[1;33m[TIP] The Aqara TVOC is a battery-powered sleepy device.\033[0m\n");
+        printf("      It turns off its radio to save power. If you don't receive all 4 readings\n");
+        printf("      (Temp, Hum, TVOC, Battery), try pressing the button on the sensor FIRST\n");
+        printf("      to wake it up, and then immediately run 'env 0x%04X' within 3 seconds.\n\n", addr);
+        
         static uint8_t seq = 0;
         // Read Temp (attr 0x0000)
         uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
-        usleep(1000000);
+        usleep(500000);
         
         // Read Humidity (attr 0x0000)
         uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
-        usleep(1000000);
+        usleep(500000);
         
         // Read TVOC (genAnalogInput attr 0x0055)
         uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
         ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
-        usleep(1000000);
+        usleep(500000);
         
         // Read Battery (attr 0x0021)
         uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x21, 0x00 };

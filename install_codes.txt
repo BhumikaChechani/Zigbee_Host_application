@@ -1,0 +1,3 @@
+# Format: IEEE_ADDRESS(16 hex chars) INSTALL_CODE_WITH_CRC(36 hex chars)
+# The IEEE address must be Little-Endian format (exactly as received over the air).
+D56A92001044EF54 46D98D2E19964365573FD6913960E4C1A25D

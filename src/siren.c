@@ -649,8 +649,20 @@ void Siren_PrintStatus( void )
     double now = ZNP_GetCurrentTime();
     for ( int i = 0; i < g_numSirens; i++ )
     {
-        printf( "  - 0x%04X: ep=0x%02X, last_seen=%.1fs ago\n",
-                g_sirens[i].shortAddr, g_sirens[i].endpoint, now - g_sirens[i].lastSeen );
+        printf( "  - 0x%04X: IEEE=", g_sirens[i].shortAddr );
+        if ( g_sirens[i].hasIeee )
+        {
+            for ( int j = 7; j >= 0; j-- )
+            {
+                printf( "%02x", g_sirens[i].ieee[j] );
+            }
+        }
+        else
+        {
+            printf( "Unknown" );
+        }
+        printf( ", ep=0x%02X, last_seen=%.1fs ago\n",
+                g_sirens[i].endpoint, now - g_sirens[i].lastSeen );
     }
     pthread_mutex_unlock( &g_deviceMutex );
 }

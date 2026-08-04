@@ -704,8 +704,16 @@ void OkosSiren_PrintStatus(void)
     double now = ZNP_GetCurrentTime();
     for (int i = 0; i < g_numOkosSirens; i++) {
         OKOS_SIREN_T *s = &g_okosSirens[i];
-        LOG_RAW("  0x%04X ep=0x%02X tone=%d vol=%d tamper=%s seen=%.1fs ago",
-               s->shortAddr, s->endpoint, s->toneId, s->volume,
+        LOG_RAW("  - 0x%04X: IEEE=", s->shortAddr);
+        if (s->hasIeee) {
+            for (int j = 7; j >= 0; j--) {
+                LOG_RAW("%02x", s->ieee[j]);
+            }
+        } else {
+            LOG_RAW("Unknown");
+        }
+        LOG_RAW(", ep=0x%02X, tone=%d, vol=%d, tamper=%s, seen=%.1fs ago",
+               s->endpoint, s->toneId, s->volume,
                s->isTampered ? "YES" : "no", now - s->lastSeen);
         if (s->temperatureCdeg != 0x7FFF) LOG_RAW(" temp=%.2fC", s->temperatureCdeg/100.0f);
         if (s->humidityHpct   != 0xFFFF) LOG_RAW(" hum=%.2f%%", s->humidityHpct/100.0f);

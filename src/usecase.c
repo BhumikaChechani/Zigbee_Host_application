@@ -245,21 +245,22 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #if ENABLE_AQARA_OCCUPANCY
     uint8_t zoneIdx = (uint8_t)event_->raw;
 #if ENABLE_CONTACT_SENSOR
-    // If a door's last status update is old, a change notification may have
-    // been lost - queue an active re-read so the stored state self-heals for
-    // the next decision (non-blocking, rate-limited).
     ContactSensor_RefreshIfStale(30.0);
 #endif
     bool isDoorOpen = IsDoorOpenForZone(zoneIdx);
     LOG_DEBUG("[USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
     if (isDoorOpen) {
-        LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence DETECTED in Zone %u (%u cm)\n", zoneIdx, event_->val2);
+        LOG_EVENT("OCCUPANCY", event_->srcAddr,
+            "\033[1;32mPresence DETECTED | Zone %-2u | %4u cm\033[0m\n",
+            zoneIdx, event_->val2);
 #if ENABLE_SIREN
-        Siren_TriggerAll(5, 5); // Mode 5, 5 seconds
+        Siren_TriggerAll(5, 5);
 #endif
     } else {
-        LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence IGNORED in Zone %u (%u cm) -> Reason: Door is CLOSED\n", zoneIdx, event_->val2);
+        LOG_EVENT("OCCUPANCY", event_->srcAddr,
+            "\033[1;33mPresence IGNORED  | Zone %-2u | %4u cm | Reason: Door is CLOSED\033[0m\n",
+            zoneIdx, event_->val2);
     }
 #else
     LOG_DEBUG("[USECASE] Person detected in zone 0x%04X (index %u)\n",
@@ -269,7 +270,9 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
   }
   case UC_OCCUPANCY_CLEARED: {
     uint8_t zoneIdx = (uint8_t)event_->raw;
-    LOG_EVENT("OCCUPANCY", event_->srcAddr, "Presence CLEARED in Zone %u\n", zoneIdx);
+    LOG_EVENT("OCCUPANCY", event_->srcAddr,
+        "\033[1;31mPresence CLEARED  | Zone %-2u | %4u cm\033[0m\n",
+        zoneIdx, event_->val2);
     break;
   }
   case UC_LIGHT_ON:

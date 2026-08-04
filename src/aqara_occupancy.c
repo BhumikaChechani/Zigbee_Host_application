@@ -1005,24 +1005,27 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
       logicalOccupied = (dist >= g_aqaraOccupancies[idx].zones[z].minCm &&
                          dist <= g_aqaraOccupancies[idx].zones[z].maxCm);
     }
-    bool stateChanged =
-        (logicalOccupied != g_aqaraOccupancies[idx].zones[z].occupied);
-
+    bool prevOccupied = g_aqaraOccupancies[idx].zones[z].occupied;
     g_aqaraOccupancies[idx].zones[z].occupied = logicalOccupied;
+
+    bool stateChanged = (logicalOccupied != prevOccupied);
 
     if (stateChanged) {
       if (logicalOccupied) {
-
-        // Pack zone index into the 'raw' argument of UC_EVT_T so usecase knows
-        // which zone triggered
         UseCase_Post(UC_OCCUPANCY_DETECTED, shortAddr_, z, dist);
       } else {
         if (sensorSaysOccupied && dist > 0) {
-          LOG_EVENT("OCCUPANCY", shortAddr_, "Presence IGNORED in Zone %d (%u cm) -> Outside boundaries [%u-%u cm]\n", z, dist, g_aqaraOccupancies[idx].zones[z].minCm, g_aqaraOccupancies[idx].zones[z].maxCm);
+          // Presence outside zone boundaries - yellow ignored log
+          LOG_EVENT("OCCUPANCY", shortAddr_,
+              "\033[1;33mPresence IGNORED  | Zone %-2d | %4u cm | Reason: Outside boundaries [%u-%u cm]\033[0m\n",
+              z, dist,
+              g_aqaraOccupancies[idx].zones[z].minCm,
+              g_aqaraOccupancies[idx].zones[z].maxCm);
         }
-
-
-        UseCase_Post(UC_OCCUPANCY_CLEARED, shortAddr_, z, dist);
+        if (prevOccupied) {
+          // Only emit CLEARED if this zone was actually occupied before
+          UseCase_Post(UC_OCCUPANCY_CLEARED, shortAddr_, z, dist);
+        }
       }
     }
   }

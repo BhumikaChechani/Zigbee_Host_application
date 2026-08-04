@@ -32,7 +32,12 @@ static void HandleAf(const AF_MSG_T *af)
             uint16_t attr = zcl[0] | (zcl[1] << 8);
             
             bool success = (cmdId == 0x0A) || (cmdId == 0x01 && zcl[2] == 0x00);
-            if (!success) return;
+            if (!success) {
+                if (cmdId == 0x01 && zcl[2] != 0x00) {
+                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;31mZCL Error (cluster 0x%04X, attr 0x%04X): status 0x%02X\033[0m\n", af->clusterId, attr, zcl[2]);
+                }
+                return;
+            }
 
             uint8_t typeOffset = (cmdId == 0x01) ? 3 : 2;
             uint8_t dataOffset = (cmdId == 0x01) ? 4 : 3;
@@ -106,19 +111,37 @@ static void HandleAf(const AF_MSG_T *af)
                 pthread_mutex_unlock(&g_deviceMutex);
             }
             // Battery (genPowerCfg)
-            else if (af->clusterId == AQARA_TVOC_POWER_CLUSTER && attr == 0x0021 && dataType == 0x20 && zclLen >= dataOffset + 1) {
+            else if (af->clusterId == AQARA_TVOC_POWER_CLUSTER && dataType == 0x20 && zclLen >= dataOffset + 1) {
                 uint8_t battRaw = data[0];
-                LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %d%%\033[0m\n", battRaw / 2);
                 
-                pthread_mutex_lock(&g_deviceMutex);
-                for (int i = 0; i < g_numAqaraTvocs; i++) {
-                    if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
-                        g_aqaraTvocs[i].lastBatt = battRaw / 2;
-                        g_aqaraTvocs[i].lastBattTime = ZNP_GetCurrentTime();
-                        break;
+                if (attr == 0x0021) {
+                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %d%%\033[0m\n", battRaw / 2);
+                    pthread_mutex_lock(&g_deviceMutex);
+                    for (int i = 0; i < g_numAqaraTvocs; i++) {
+                        if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
+                            g_aqaraTvocs[i].lastBatt = battRaw / 2;
+                            g_aqaraTvocs[i].lastBattTime = ZNP_GetCurrentTime();
+                            break;
+                        }
                     }
+                    pthread_mutex_unlock(&g_deviceMutex);
+                } else if (attr == 0x0020) { // Battery Voltage (units of 100mV)
+                    float voltage = battRaw / 10.0f;
+                    int pct = (int)(((voltage - 2.5f) / 0.5f) * 100);
+                    if (pct > 100) pct = 100;
+                    if (pct < 0) pct = 0;
+                    
+                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %.1fV (~%d%%)\033[0m\n", voltage, pct);
+                    pthread_mutex_lock(&g_deviceMutex);
+                    for (int i = 0; i < g_numAqaraTvocs; i++) {
+                        if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
+                            g_aqaraTvocs[i].lastBatt = pct;
+                            g_aqaraTvocs[i].lastBattTime = ZNP_GetCurrentTime();
+                            break;
+                        }
+                    }
+                    pthread_mutex_unlock(&g_deviceMutex);
                 }
-                pthread_mutex_unlock(&g_deviceMutex);
             }
         }
     }
@@ -313,8 +336,8 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
             ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
             usleep(250000);
             
-            // Read Battery (attr 0x0021)
-            uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x21, 0x00 };
+            // Read Battery Voltage (attr 0x0020) instead of Percentage (0x0021)
+            uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x20, 0x00 };
             ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_POWER_CLUSTER, seq, 0, 30, reqBatt, 5 );
         }
     } else {

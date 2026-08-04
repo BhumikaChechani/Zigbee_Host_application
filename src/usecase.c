@@ -42,21 +42,16 @@ static bool ContactCountsAsOpen(int idx, double now) {
            (now - g_contactSensors[idx].lastOpenedTime) < DOOR_OPEN_GRACE_S;
 }
 
-static bool IsDoorOpenForZone(uint8_t zoneIdx) {
-    // NOTE: the contact sensor's zoneId is its IAS enrollment id (handed out
-    // by g_nextZoneId++, shared with sirens/buttons) - it is NOT related to
-    // the FP300's software zone index (0-3). Matching the two only makes
-    // sense if the installer deliberately assigned matching ids; in every
-    // other case fall back to "is ANY door open", which is the correct
-    // semantic for the door+presence alarm.
+static bool IsDoorOpenForZone(uint8_t zoneIdx, bool *hasSensors_out) {
     bool open = false;
     bool matchedById = false;
     double now = ZNP_GetCurrentTime();
 
     pthread_mutex_lock(&g_deviceMutex);
+    int numSensors = g_numContactSensors;
 
     // 1. Exact zoneId match (deliberate multi-door mapping).
-    for (int i = 0; i < g_numContactSensors; i++) {
+    for (int i = 0; i < numSensors; i++) {
         if (g_contactSensors[i].zoneId == (int)zoneIdx) {
             open = ContactCountsAsOpen(i, now);
             matchedById = true;
@@ -64,10 +59,9 @@ static bool IsDoorOpenForZone(uint8_t zoneIdx) {
         }
     }
 
-    // 2. Fallback: any registered door open counts. Robust against the IAS
-    //    id / zone index mismatch and against stale duplicate entries.
+    // 2. Fallback: any registered door open counts.
     if (!matchedById) {
-        for (int i = 0; i < g_numContactSensors; i++) {
+        for (int i = 0; i < numSensors; i++) {
             if (ContactCountsAsOpen(i, now)) {
                 open = true;
                 break;
@@ -76,6 +70,8 @@ static bool IsDoorOpenForZone(uint8_t zoneIdx) {
     }
 
     pthread_mutex_unlock(&g_deviceMutex);
+
+    if (hasSensors_out) *hasSensors_out = (numSensors > 0);
     return open;
 }
 
@@ -247,10 +243,19 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #if ENABLE_CONTACT_SENSOR
     ContactSensor_RefreshIfStale(30.0);
 #endif
-    bool isDoorOpen = IsDoorOpenForZone(zoneIdx);
-    LOG_DEBUG("[USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s)\n",
-           event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO");
-    if (isDoorOpen) {
+    bool hasDoorSensors = false;
+    bool isDoorOpen = IsDoorOpenForZone(zoneIdx, &hasDoorSensors);
+    LOG_DEBUG("[USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s, Sensors: %d)\n",
+           event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO", hasDoorSensors);
+    if (!hasDoorSensors) {
+        // No contact sensor registered at all - trigger alarm unconditionally
+        LOG_EVENT("OCCUPANCY", event_->srcAddr,
+            "\033[1;32mPresence DETECTED | Zone %-2u | %4u cm\033[0m\n",
+            zoneIdx, event_->val2);
+#if ENABLE_SIREN
+        Siren_TriggerAll(5, 5);
+#endif
+    } else if (isDoorOpen) {
         LOG_EVENT("OCCUPANCY", event_->srcAddr,
             "\033[1;32mPresence DETECTED | Zone %-2u | %4u cm\033[0m\n",
             zoneIdx, event_->val2);

@@ -47,12 +47,32 @@ static void HandleAf(const AF_MSG_T *af)
                 int16_t tempRaw = data[0] | (data[1] << 8);
                 float tempC = tempRaw / 100.0f;
                 LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mTemperature: %.2f°C\033[0m\n", tempC);
+                
+                pthread_mutex_lock(&g_deviceMutex);
+                for (int i = 0; i < g_numAqaraTvocs; i++) {
+                    if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
+                        g_aqaraTvocs[i].lastTemp = tempC;
+                        g_aqaraTvocs[i].lastTempTime = ZNP_GetCurrentTime();
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&g_deviceMutex);
             }
             // Humidity
             else if (af->clusterId == AQARA_TVOC_HUM_CLUSTER && attr == 0x0000 && dataType == 0x21 && zclLen >= dataOffset + 2) {
                 uint16_t humRaw = data[0] | (data[1] << 8);
                 float humPercent = humRaw / 100.0f;
                 LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mHumidity: %.2f%%\033[0m\n", humPercent);
+                
+                pthread_mutex_lock(&g_deviceMutex);
+                for (int i = 0; i < g_numAqaraTvocs; i++) {
+                    if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
+                        g_aqaraTvocs[i].lastHum = humPercent;
+                        g_aqaraTvocs[i].lastHumTime = ZNP_GetCurrentTime();
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&g_deviceMutex);
             }
             // TVOC (genAnalogInput, presentValue is attr 0x0055, type single precision float 0x39)
             else if (af->clusterId == AQARA_TVOC_ANALOG_CLUSTER && attr == 0x0055 && dataType == 0x39 && zclLen >= dataOffset + 4) {
@@ -78,6 +98,8 @@ static void HandleAf(const AF_MSG_T *af)
                             LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;33m⚠️ AIR QUALITY ALERT: Changed to %s%s\033[0m (Reading: %.2f ppb)!\n", color, quality, tvoc);
                         }
                         g_aqaraTvocs[i].lastAirQuality = newState;
+                        g_aqaraTvocs[i].lastTvoc = tvoc;
+                        g_aqaraTvocs[i].lastTvocTime = ZNP_GetCurrentTime();
                         break;
                     }
                 }
@@ -87,6 +109,16 @@ static void HandleAf(const AF_MSG_T *af)
             else if (af->clusterId == AQARA_TVOC_POWER_CLUSTER && attr == 0x0021 && dataType == 0x20 && zclLen >= dataOffset + 1) {
                 uint8_t battRaw = data[0];
                 LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %d%%\033[0m\n", battRaw / 2);
+                
+                pthread_mutex_lock(&g_deviceMutex);
+                for (int i = 0; i < g_numAqaraTvocs; i++) {
+                    if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
+                        g_aqaraTvocs[i].lastBatt = battRaw / 2;
+                        g_aqaraTvocs[i].lastBattTime = ZNP_GetCurrentTime();
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&g_deviceMutex);
             }
         }
     }
@@ -216,33 +248,36 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         if (g_aqaraTvocs[i].shortAddr == addr) { idx = i; break; }
     }
     if (idx != -1) {
-        uint8_t ep = g_aqaraTvocs[idx].endpoint;
+        AQARA_TVOC_T t = g_aqaraTvocs[idx];
         pthread_mutex_unlock(&g_deviceMutex);
         
-        printf("\n\033[1;33m[TIP] The Aqara TVOC is a battery-powered sleepy device.\033[0m\n");
-        printf("      It turns off its radio to save power. If you don't receive all 4 readings\n");
-        printf("      (Temp, Hum, TVOC, Battery), try pressing the button on the sensor FIRST\n");
-        printf("      to wake it up, and then immediately run 'env 0x%04X' within 3 seconds.\n\n", addr);
+        double now = ZNP_GetCurrentTime();
         
-        static uint8_t seq = 0;
-        // Read Temp (attr 0x0000)
-        uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
-        usleep(500000);
+        printf("\n--- Aqara TVOC Environment Cache (0x%04X) ---\n", addr);
+        if (t.lastTempTime > 0) {
+            printf("  Temperature: %.2f°C (updated %.1fs ago)\n", t.lastTemp, now - t.lastTempTime);
+        } else {
+            printf("  Temperature: [Waiting for sensor data...]\n");
+        }
         
-        // Read Humidity (attr 0x0000)
-        uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
-        usleep(500000);
+        if (t.lastHumTime > 0) {
+            printf("  Humidity: %.2f%% (updated %.1fs ago)\n", t.lastHum, now - t.lastHumTime);
+        } else {
+            printf("  Humidity: [Waiting for sensor data...]\n");
+        }
         
-        // Read TVOC (genAnalogInput attr 0x0055)
-        uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
-        usleep(500000);
+        if (t.lastTvocTime > 0) {
+            printf("  TVOC: %.2f ppb (updated %.1fs ago)\n", t.lastTvoc, now - t.lastTvocTime);
+        } else {
+            printf("  TVOC: [Waiting for sensor data...]\n");
+        }
         
-        // Read Battery (attr 0x0021)
-        uint8_t reqBatt[5] = { 0x00, ++seq, 0x00, 0x21, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_POWER_CLUSTER, seq, 0, 30, reqBatt, 5 );
+        if (t.lastBattTime > 0) {
+            printf("  Battery: %d%% (updated %.1fs ago)\n", t.lastBatt, now - t.lastBattTime);
+        } else {
+            printf("  Battery: [Waiting for sensor data...]\n");
+        }
+        printf("-----------------------------------------------\n\n");
     } else {
         pthread_mutex_unlock(&g_deviceMutex);
     }

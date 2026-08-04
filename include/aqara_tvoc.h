@@ -30,6 +30,14 @@ typedef struct {
     bool     hasIeee;
     double   lastSeen;
     TVOC_AQ_STATE_T lastAirQuality;
+    float    lastTemp;
+    double   lastTempTime;
+    float    lastHum;
+    double   lastHumTime;
+    float    lastTvoc;
+    double   lastTvocTime;
+    uint8_t  lastBatt;
+    double   lastBattTime;
 } AQARA_TVOC_T;
 
 extern AQARA_TVOC_T g_aqaraTvocs[MAX_AQARA_TVOC];

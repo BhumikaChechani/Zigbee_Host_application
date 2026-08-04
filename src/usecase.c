@@ -307,26 +307,26 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   }
   case UC_LIGHT_ON:
-    LOG_EVENT("OCCUPANCY", event_->srcAddr, "Light ON (Intensity %u)\n", event_->raw);
+    LOG_EVENT("OCCUPANCY", event_->srcAddr, "\033[1;33mLight ON  (Intensity %u)\033[0m\n", event_->raw);
 #if ENABLE_SIREN
     Siren_TriggerAll(6, 240);
 #endif
     break;
   case UC_LIGHT_OFF:
-    LOG_EVENT("OCCUPANCY", event_->srcAddr, "Light OFF (Intensity %u)\n", event_->raw);
+    LOG_EVENT("OCCUPANCY", event_->srcAddr, "\033[1;30mLight OFF (Intensity %u)\033[0m\n", event_->raw);
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
     break;
   case UC_CONTACT_OPEN: {
-    LOG_EVENT("CONTACT", event_->srcAddr, "Door OPEN\n");
+    LOG_EVENT("CONTACT", event_->srcAddr, "\033[1;35mDoor OPEN\033[0m\n");
 #if ENABLE_SIREN
     Siren_PostBeep(2);
 #endif
     break;
   }
   case UC_CONTACT_CLOSED: {
-    LOG_EVENT("CONTACT", event_->srcAddr, "Door CLOSED\n");
+    LOG_EVENT("CONTACT", event_->srcAddr, "\033[0;35mDoor CLOSED\033[0m\n");
 #if ENABLE_SIREN
     Siren_PostBeep(1);
 #endif

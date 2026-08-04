@@ -1065,22 +1065,12 @@ static void EvaluatePresenceLogic(uint16_t shortAddr_) {
     if (stateChanged) {
       if (logicalOccupied) {
         UseCase_Post(UC_OCCUPANCY_DETECTED, shortAddr_, z, dist);
-      } else {
-        bool outsideBoundaries = (sensorSaysOccupied && dist > 0);
-        if (outsideBoundaries) {
-          // Target exists but moved outside this zone's boundaries.
-          // Log IGNORED only — zone state already cleared above.
-          // Do NOT also emit CLEARED (redundant and confusing).
-          LOG_EVENT("OCCUPANCY", shortAddr_,
-              "\033[1;33mPresence IGNORED  | Zone %-2d | %4u cm | Reason: Outside boundaries [%u-%u cm]\033[0m\n",
-              z, dist,
-              g_aqaraOccupancies[idx].zones[z].minCm,
-              g_aqaraOccupancies[idx].zones[z].maxCm);
-        } else if (prevOccupied) {
-          // Sensor actually reports no presence and zone WAS occupied before.
-          // Emit CLEARED so downstream (sirens etc.) can react.
-          UseCase_Post(UC_OCCUPANCY_CLEARED, shortAddr_, z, dist);
-        }
+      } else if (prevOccupied) {
+        // Zone was occupied and is now clear (any reason: sensor cleared,
+        // or target moved outside zone boundary). Emit CLEARED so downstream
+        // can react (siren off etc.). The "door closed" IGNORED case is
+        // handled in usecase.c for the DETECTED path only.
+        UseCase_Post(UC_OCCUPANCY_CLEARED, shortAddr_, z, dist);
       }
     }
   }

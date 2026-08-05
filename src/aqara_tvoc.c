@@ -382,6 +382,43 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         AQARA_TVOC_T t = g_aqaraTvocs[idx];
         pthread_mutex_unlock(&g_deviceMutex);
         
+        printf("\033[90mFetching latest environment data from 0x%04X (takes up to 3s)...\033[0m\n", addr);
+        
+        double oldTempTime = t.lastTempTime;
+        double oldHumTime  = t.lastHumTime;
+        double oldTvocTime = t.lastTvocTime;
+        
+        static uint8_t seq = 0;
+        uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+        ZNP_AfDataRequestExt(2, addr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5);
+        
+        uint8_t reqHum[5]  = { 0x00, ++seq, 0x00, 0x00, 0x00 };
+        ZNP_AfDataRequestExt(2, addr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5);
+        
+        uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
+        ZNP_AfDataRequestExt(2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5);
+        
+        // Wait up to 3 seconds for the sensor to reply
+        bool gotNewData = false;
+        for (int w = 0; w < 30; w++) {
+            usleep(100000); // 100ms
+            pthread_mutex_lock(&g_deviceMutex);
+            if (g_aqaraTvocs[idx].lastTempTime > oldTempTime || 
+                g_aqaraTvocs[idx].lastHumTime > oldHumTime || 
+                g_aqaraTvocs[idx].lastTvocTime > oldTvocTime) {
+                t = g_aqaraTvocs[idx];
+                gotNewData = true;
+                pthread_mutex_unlock(&g_deviceMutex);
+                break;
+            }
+            pthread_mutex_unlock(&g_deviceMutex);
+        }
+        
+        // Re-fetch in case it updated slightly
+        pthread_mutex_lock(&g_deviceMutex);
+        t = g_aqaraTvocs[idx];
+        pthread_mutex_unlock(&g_deviceMutex);
+        
         double now = ZNP_GetCurrentTime();
         char ts[32];
         
@@ -391,14 +428,14 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
             format_time(now - t.lastTempTime, ts);
             printf("  \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(live %s)\033[0m\n", t.lastTemp, ts);
         } else {
-            printf("  \033[1;31mTemperature :\033[0m \033[90m[Waiting for sensor push...]\033[0m\n");
+            printf("  \033[1;31mTemperature :\033[0m \033[90m[No data]\033[0m\n");
         }
         
         if (t.lastHumTime > 0) {
             format_time(now - t.lastHumTime, ts);
             printf("  \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(live %s)\033[0m\n", t.lastHum, ts);
         } else {
-            printf("  \033[1;34mHumidity    :\033[0m \033[90m[Waiting for sensor push...]\033[0m\n");
+            printf("  \033[1;34mHumidity    :\033[0m \033[90m[No data]\033[0m\n");
         }
         
         if (t.lastTvocTime > 0) {
@@ -413,7 +450,7 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
             
             printf("  \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(live %s)\033[0m\n", t.lastTvoc, color, quality, ts);
         } else {
-            printf("  \033[1;35mTVOC        :\033[0m \033[90m[Waiting for sensor push...]\033[0m\n");
+            printf("  \033[1;35mTVOC        :\033[0m \033[90m[No data]\033[0m\n");
         }
         
         if (t.lastBattTime > 0) {
@@ -421,6 +458,13 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
             printf("  \033[1;32mBattery     :\033[0m %6d %%   \033[90m(live %s)\033[0m\n", t.lastBatt, ts);
         }
         printf("\033[1;36m----------------------------------------------\033[0m\n");
+        
+        if (!gotNewData) {
+            printf("\033[1;33m[!] Sensor is asleep and did not respond to the query.\033[0m\n");
+            printf("\033[90m    Data above is the last known state. Press the button on the sensor to wake it.\033[0m\n\n");
+        } else {
+            printf("\033[1;32m[✓] Successfully fetched latest real-time data from sensor.\033[0m\n\n");
+        }
     } else {
         pthread_mutex_unlock(&g_deviceMutex);
     }

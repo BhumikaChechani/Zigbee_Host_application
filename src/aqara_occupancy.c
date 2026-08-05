@@ -683,7 +683,7 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   g_aqaraOccupancies[idx].lastSetupAttempt = now;
   pthread_mutex_unlock(&g_deviceMutex);
 
-  LOG_EVENT("OCCUPANCY", shortAddr_, "Running setup (bind + ZCL config)...\n");
+  LOG_DEBUG("OCCUPANCY 0x%04X: Running setup (bind + ZCL config)...\n", shortAddr_);
 
   // -------------------------------------------------------------------------
   // STEP 1: Bind clusters so unsolicited reports reach the coordinator
@@ -887,7 +887,7 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   }
   usleep(300000);
 
-  LOG_EVENT("OCCUPANCY", shortAddr_, "Setup OK (bind+ZCL config done)\n");
+  LOG_DEBUG("OCCUPANCY 0x%04X: Setup OK (bind+ZCL config done)\n", shortAddr_);
 }
 
 ///

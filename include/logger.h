@@ -34,6 +34,13 @@ void Logger_PrintTimestamp(void);
         } \
     } while(0)
 
+#define LOG_DEBUG_RAW(...) \
+    do { \
+        if (g_logLevel <= LOG_LEVEL_DEBUG) { \
+            printf(__VA_ARGS__); \
+        } \
+    } while(0)
+
 #define LOG_INFO(...) \
     do { \
         if (g_logLevel <= LOG_LEVEL_INFO) { \

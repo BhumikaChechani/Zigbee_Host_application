@@ -1163,10 +1163,10 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
     if (clusterId == 0x0013) {
       const char *devType = Device_GetName(srcAddr);
       if (strcmp(devType, "Unknown Device") != 0) {
-        LOG_INFO("✨ [REJOIN via MSG_CB] Known %s announced: short=0x%04X\n",
+        LOG_DEBUG("✨ [REJOIN via MSG_CB] Known %s announced: short=0x%04X\n",
                  devType, srcAddr);
       } else {
-        LOG_INFO("✨ [JOIN via MSG_CB] New device announced: short=0x%04X\n",
+        LOG_DEBUG("✨ [JOIN via MSG_CB] New device announced: short=0x%04X\n",
                  srcAddr);
       }
       if (asdu != NULL && asduLen >= 10) {
@@ -1207,9 +1207,9 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
       if (Device_GetDiscoveredIeee(shortAddr, ieee)) {
         LOG_DEBUG("ZDO IEEE Rsp: short=0x%04X -> IEEE=", shortAddr);
         for (int i = 7; i >= 0; i--) {
-          LOG_RAW("%02x", ieee[i]);
+          LOG_DEBUG_RAW("%02x", ieee[i]);
         }
-        LOG_RAW("\n");
+        LOG_DEBUG_RAW("\n");
 
         // Update modules with the resolved IEEE address
 #if ENABLE_SIREN
@@ -1235,12 +1235,12 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
       LOG_DEBUG("ZDO Active EPs Rsp: short=0x%04X, EPs=[", shortAddr);
       bool hasEp23 = false;
       for (int i = 0; i < matchCount; i++) {
-        LOG_RAW("%d%s", matchList[i], (i == matchCount - 1) ? "" : ", ");
+        LOG_DEBUG_RAW("%d%s", matchList[i], (i == matchCount - 1) ? "" : ", ");
         if (matchList[i] == 0x23) {
           hasEp23 = true;
         }
       }
-      LOG_RAW("]\n");
+      LOG_DEBUG_RAW("]\n");
       for (int i = 0; i < matchCount; i++) {
         ZNP_QuerySimpleDesc(shortAddr, matchList[i]);
       }
@@ -1375,9 +1375,9 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
     } else if (clusterId == 0x8006 && status == 0) {
       LOG_DEBUG("ZDO Match Desc Rsp: short=0x%04X, endpoints=[", shortAddr);
       for (int i = 0; i < matchCount; i++) {
-        LOG_RAW("%d%s", matchList[i], (i == matchCount - 1) ? "" : ", ");
+        LOG_DEBUG_RAW("%d%s", matchList[i], (i == matchCount - 1) ? "" : ", ");
       }
-      LOG_RAW("]\n");
+      LOG_DEBUG_RAW("]\n");
       for (int i = 0; i < matchCount; i++) {
         ZNP_QuerySimpleDesc(shortAddr, matchList[i]);
       }

@@ -353,7 +353,15 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         
         if (t.lastTvocTime > 0) {
             format_time(now - t.lastTvocTime, ts);
-            printf("  \033[1;35mTVOC        :\033[0m %6.2f ppb \033[90m(updated %s)\033[0m\n", t.lastTvoc, ts);
+            const char* quality;
+            const char* color;
+            if (t.lastTvoc <= 65.0f) { quality = "Excellent"; color = "\033[1;32m"; }
+            else if (t.lastTvoc <= 220.0f) { quality = "Good"; color = "\033[1;36m"; }
+            else if (t.lastTvoc <= 660.0f) { quality = "Moderate"; color = "\033[1;33m"; }
+            else if (t.lastTvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; }
+            else { quality = "Unhealthy"; color = "\033[1;31m"; }
+            
+            printf("  \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(updated %s)\033[0m\n", t.lastTvoc, color, quality, ts);
         } else {
             printf("  \033[1;35mTVOC        :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }

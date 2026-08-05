@@ -568,6 +568,10 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   bool alreadyConfigured = (idx != -1 && g_aqaraOccupancies[idx].configured);
   pthread_mutex_unlock(&g_deviceMutex);
 
+  if (changed) {
+    Device_Save();
+  }
+
   // For an already-configured sensor with the SAME short address (not a rejoin)
   // still call PostAssign so AqaraOccupancy_Setup can skip setup (it returns
   // early if configured==true) but remain silent about it — no log spam.

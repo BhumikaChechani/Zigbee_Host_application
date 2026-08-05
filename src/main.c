@@ -1539,10 +1539,6 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
 #if ENABLE_SIREN
         Siren_Discover(af.srcAddr, af.srcEp);
 #endif
-      } else if (af.srcEp == 1) {
-#if ENABLE_OKOS_SIREN
-        OkosSiren_Discover(af.srcAddr, af.srcEp);
-#endif
       } else {
         LOG_DEBUG("❓ Unknown device 0x%04X sent AF message on cluster 0x%04X. "
                   "Requesting Active EPs...\n",
@@ -1551,18 +1547,8 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
       }
     }
 
-#if ENABLE_OKOS_SIREN
-    if (OkosSiren_IsKnown(af.srcAddr)) {
-      OkosSiren_PostAf(af.srcAddr, &af);
-    }
-#endif
-#if ENABLE_SIREN
-    else if (Siren_IsKnown(af.srcAddr)) {
-      Siren_PostAf(af.srcAddr, &af);
-    }
-#endif
 #if ENABLE_AQARA_BUTTON
-    else if (AqaraButton_IsKnown(af.srcAddr)) {
+    if (AqaraButton_IsKnown(af.srcAddr)) {
       AqaraButton_PostAf(af.srcAddr, &af);
     }
 #endif
@@ -1584,6 +1570,16 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
 #if ENABLE_AQARA_OCCUPANCY
     else if (AqaraOccupancy_IsKnown(af.srcAddr)) {
       AqaraOccupancy_PostAf(af.srcAddr, &af);
+    }
+#endif
+#if ENABLE_OKOS_SIREN
+    else if (OkosSiren_IsKnown(af.srcAddr)) {
+      OkosSiren_PostAf(af.srcAddr, &af);
+    }
+#endif
+#if ENABLE_SIREN
+    else if (Siren_IsKnown(af.srcAddr)) {
+      Siren_PostAf(af.srcAddr, &af);
     }
 #endif
 #if ENABLE_AQARA_TVOC

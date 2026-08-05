@@ -355,9 +355,9 @@ static void *AqaraOccupancy_PollThread(void *arg_) {
     usleep(300000); // Check presence/light every 300ms for fast response
     AqaraOccupancy_PollAll();
 
-    // Every ~30s, retry setup for sensors whose bind/config never succeeded
+    // Every ~90s, retry setup for sensors whose bind/config never succeeded
     // (device was asleep or the network was congested during setup).
-    if (++retryTick >= 100) {
+    if (++retryTick >= 300) {
       retryTick = 0;
       uint16_t retryAddrs[MAX_AQARA_OCCUPANCY];
       int numRetry = 0;

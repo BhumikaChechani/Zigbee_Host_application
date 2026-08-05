@@ -28,7 +28,7 @@ static pthread_t s_aqaraThread;
 ///
 static void AqaraButton_HandleAf( const AF_MSG_T *af_ )
 {
-    if ( af_->clusterId != 0x0006 || af_->dataLen < 3 )
+    if ( af_->dataLen < 3 )
     {
         return;
     }
@@ -39,6 +39,34 @@ static void AqaraButton_HandleAf( const AF_MSG_T *af_ )
         return;
     }
     uint8_t cmdId = af_->data[hdrLen - 1];
+    
+    if (af_->clusterId == 0x0012) {
+        LOG_DEBUG("[AQARA BUTTON] Msg on Multistate Input (0x0012), cmd=0x%02X\n", cmdId);
+        if (cmdId == 0x0A && af_->dataLen >= hdrLen + 4) {
+            uint16_t attr = af_->data[hdrLen] | (af_->data[hdrLen+1] << 8);
+            uint8_t type = af_->data[hdrLen+2];
+            LOG_DEBUG("  -> Report Attr: 0x%04X, type: 0x%02X\n", attr, type);
+        }
+    }
+    
+    if ( af_->clusterId != 0x0006 )
+    {
+        return;
+    }
+
+    if (cmdId == 0x0A && af_->dataLen >= hdrLen + 4) {
+        // Report Attributes
+        uint16_t attr = af_->data[hdrLen] | (af_->data[hdrLen+1] << 8);
+        uint8_t type = af_->data[hdrLen+2];
+        uint8_t val = af_->data[hdrLen+3];
+        LOG_DEBUG("[AQARA BUTTON] Report Attr: cluster=0x0006, attr=0x%04X, val=0x%02X\n", attr, val);
+        // Treat OnOff boolean report as button presses if needed
+        if (attr == 0x0000 && type == 0x10) {
+            AqaraButton_HandleCommand( af_->srcAddr, val == 1 ? 0x01 : 0x00 );
+            return;
+        }
+    }
+
     AqaraButton_HandleCommand( af_->srcAddr, cmdId );
 }
 
@@ -295,6 +323,10 @@ void AqaraButton_HandleCommand( uint16_t shortAddr_, uint8_t cmdId_ )
     else if ( cmdId_ == 0x02 ) // Toggle
     {
         UseCase_Post( UC_BUTTON_TOGGLE, shortAddr_, cmdId_, 0 );
+    }
+    else
+    {
+        LOG_DEBUG("[AQARA BUTTON] Unhandled command ID 0x%02X from 0x%04X\n", cmdId_, shortAddr_);
     }
 }
 

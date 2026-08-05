@@ -671,15 +671,16 @@ int main(int argc, char *argv[]) {
   // cluster the coordinator doesn't advertise). 0xFCC0 = Aqara manufacturer
   // cluster (occupancy/presence attr 0x0142), 0x0012 = Multistate Input.
   LOG_INFO("[5.5] Registering Application Endpoint and ZDO Callbacks...\n");
-  // inClusters: clusters we RECEIVE from sensors.
-  // 0x0500 = IAS Zone (contact sensor zone status/enroll)
-  // 0x0006 = On/Off (Aqara button)
+  // inClusters: clusters we RECEIVE from sensors where the sensor is Client (Out).
+  // 0x0006 = On/Off (Aqara button is Client)
   // 0x0406 = Occupancy, 0xFCC0 = Aqara MFR (FP300 presence)
-  uint16_t inClusters[9] = {0x0000, 0x0003, 0x0004, 0x0005,
-                             0x0006, 0x0406, 0xFCC0, 0x0012, 0x0500};
-  uint16_t outClusters[6] = {0x0502, 0x0406, 0xFCC0,
+  uint16_t inClusters[8] = {0x0000, 0x0003, 0x0004, 0x0005,
+                             0x0006, 0x0406, 0xFCC0, 0x0012};
+  // outClusters: clusters we RECEIVE from sensors where the sensor is Server (In).
+  // 0x0500 = IAS Zone (contact sensor is Server)
+  uint16_t outClusters[7] = {0x0500, 0x0502, 0x0406, 0xFCC0,
                               0x0402, 0x0405, 0x0400};
-  ZNP_AfRegister(8, 0x0104, 0x0007, 1, 0, 9, inClusters, 6, outClusters);
+  ZNP_AfRegister(8, 0x0104, 0x0007, 1, 0, 8, inClusters, 7, outClusters);
 
   ZNP_ZdoMsgCbRegister(0x8001); // IEEE_addr_rsp
   ZNP_ZdoMsgCbRegister(0x8004); // Simple_desc_rsp

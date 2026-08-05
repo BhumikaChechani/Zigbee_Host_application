@@ -1426,4 +1426,34 @@ void AqaraOccupancy_SetLightThreshold(uint16_t shortAddr_, uint16_t threshold_) 
     printf("ERROR: Aqara Occupancy 0x%04X not found.\n", shortAddr_);
   }
 }
+
+void AqaraOccupancy_TriggerIfOccupied(void) {
+    pthread_mutex_lock(&g_deviceMutex);
+    int num = g_numAqaraOccupancies;
+    uint16_t addrs[MAX_AQARA_OCCUPANCY];
+    for (int i = 0; i < num; i++) {
+        addrs[i] = g_aqaraOccupancies[i].shortAddr;
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+
+    for (int i = 0; i < num; i++) {
+        pthread_mutex_lock(&g_deviceMutex);
+        int idx = -1;
+        for (int j = 0; j < g_numAqaraOccupancies; j++) {
+            if (g_aqaraOccupancies[j].shortAddr == addrs[i]) {
+                idx = j;
+                break;
+            }
+        }
+        if (idx != -1 && g_aqaraOccupancies[idx].rawOccupied) {
+            uint32_t dist = g_aqaraOccupancies[idx].currentDistanceCm;
+            for (int z = 0; z < MAX_OCCUPANCY_ZONES; z++) {
+                if (g_aqaraOccupancies[idx].zones[z].isActive && g_aqaraOccupancies[idx].zones[z].occupied) {
+                     UseCase_Post(UC_OCCUPANCY_DETECTED, addrs[i], z, dist);
+                }
+            }
+        }
+        pthread_mutex_unlock(&g_deviceMutex);
+    }
+}
 #endif

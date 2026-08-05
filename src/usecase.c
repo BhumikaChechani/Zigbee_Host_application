@@ -323,12 +323,18 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
 #if ENABLE_SIREN
     Siren_PostBeep(2);
 #endif
+#if ENABLE_AQARA_OCCUPANCY
+    AqaraOccupancy_TriggerIfOccupied();
+#endif
     break;
   }
   case UC_CONTACT_CLOSED: {
     LOG_EVENT("CONTACT", event_->srcAddr, "\033[1;36mDoor CLOSED\033[0m\n");
 #if ENABLE_SIREN
     Siren_PostBeep(1);
+#endif
+#if ENABLE_AQARA_OCCUPANCY
+    AqaraOccupancy_TriggerIfOccupied();
 #endif
     break;
   }

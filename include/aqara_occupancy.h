@@ -156,4 +156,7 @@ void AqaraOccupancy_DiscoverAllActiveEp(void);
 ///
 void AqaraOccupancy_PollAll(void);
 
+/// @brief Re-trigger detection events for all occupied zones (used when door opens).
+void AqaraOccupancy_TriggerIfOccupied(void);
+
 #endif // AQARA_OCCUPANCY_H

@@ -290,6 +290,18 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
     if (changed) {
         Device_Save();
     }
+    
+    // Automatically fetch latest data when device joins or rejoins
+    // The device is guaranteed to be awake and polling for a few seconds right now.
+    static uint8_t joinSeq = 0xD0;
+    uint8_t reqTemp[5] = { 0x00, ++joinSeq, 0x00, 0x00, 0x00 };
+    ZNP_AfDataRequestExt(2, addr, ep, 0, 8, AQARA_TVOC_TEMP_CLUSTER, joinSeq, 0, 30, reqTemp, 5);
+    
+    uint8_t reqHum[5] = { 0x00, ++joinSeq, 0x00, 0x00, 0x00 };
+    ZNP_AfDataRequestExt(2, addr, ep, 0, 8, AQARA_TVOC_HUM_CLUSTER, joinSeq, 0, 30, reqHum, 5);
+    
+    uint8_t reqTvoc[5] = { 0x00, ++joinSeq, 0x00, 0x55, 0x00 };
+    ZNP_AfDataRequestExt(2, addr, ep, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, joinSeq, 0, 30, reqTvoc, 5);
 }
 
 bool AqaraTvoc_IsKnown(uint16_t addr)

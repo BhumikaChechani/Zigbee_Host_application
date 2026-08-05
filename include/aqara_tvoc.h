@@ -38,6 +38,9 @@ typedef struct {
     double   lastTvocTime;
     uint8_t  lastBatt;
     double   lastBattTime;
+    bool     configured;
+    uint8_t  setupRetries;
+    double   lastSetupAttempt;
 } AQARA_TVOC_T;
 
 extern AQARA_TVOC_T g_aqaraTvocs[MAX_AQARA_TVOC];
@@ -56,6 +59,8 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr);
 void AqaraTvoc_PrintStatus(void);
 
 // Processing incoming messages
+void AqaraTvoc_PostAssign(uint16_t shortAddr_);
+void AqaraTvoc_Setup(uint16_t shortAddr_);
 void AqaraTvoc_PostAf(uint16_t addr, const AF_MSG_T *af);
 
 #endif // AQARA_TVOC_H

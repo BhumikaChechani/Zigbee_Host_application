@@ -149,7 +149,11 @@ static void *AqaraTvoc_Thread(void *arg)
     while (1) {
         SENSOR_MSG_T *msg = (SENSOR_MSG_T *)MsgQueue_Pop(&s_inbox);
         if (!msg) continue;
-        if (msg->kind == SENSOR_MSG_AF) HandleAf(&msg->af);
+        if (msg->kind == SENSOR_MSG_ASSIGN) {
+            AqaraTvoc_Setup(msg->shortAddr);
+        } else if (msg->kind == SENSOR_MSG_AF) {
+            HandleAf(&msg->af);
+        }
         free(msg);
     }
     return NULL;
@@ -207,6 +211,16 @@ void AqaraTvoc_Start(void)
     pthread_detach(pollThread);
 }
 
+void AqaraTvoc_PostAssign(uint16_t shortAddr_)
+{
+    SENSOR_MSG_T *m = calloc(1, sizeof(SENSOR_MSG_T));
+    if (m) {
+        m->kind = SENSOR_MSG_ASSIGN;
+        m->shortAddr = shortAddr_;
+        MsgQueue_Push(&s_inbox, m);
+    }
+}
+
 void AqaraTvoc_PostAf(uint16_t addr, const AF_MSG_T *af)
 {
     SENSOR_MSG_T *m = calloc(1, sizeof(SENSOR_MSG_T));
@@ -233,6 +247,7 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
                 if (g_aqaraTvocs[i].shortAddr != addr) {
                     LOG_EVENT("AQARA_TVOC", addr, "Network Rejoin (Short address changed from 0x%04X)\n", g_aqaraTvocs[i].shortAddr);
                     g_aqaraTvocs[i].shortAddr = addr;
+                    g_aqaraTvocs[i].configured = false;
                     changed = true;
                 }
                 break;
@@ -255,6 +270,9 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
             g_aqaraTvocs[g_numAqaraTvocs].hasIeee = true;
             memcpy(g_aqaraTvocs[g_numAqaraTvocs].ieee, ieee, 8);
         }
+        g_aqaraTvocs[g_numAqaraTvocs].configured = false;
+        g_aqaraTvocs[g_numAqaraTvocs].setupRetries = 0;
+        g_aqaraTvocs[g_numAqaraTvocs].lastSetupAttempt = 0.0;
         g_numAqaraTvocs++;
         changed = true;
     } else if (idx != -1) {
@@ -275,17 +293,60 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
         Device_Save();
     }
     
-    // Automatically fetch latest data when device joins or rejoins
-    // The device is guaranteed to be awake and polling for a few seconds right now.
-    static uint8_t joinSeq = 0xD0;
-    uint8_t reqTemp[5] = { 0x00, ++joinSeq, 0x00, 0x00, 0x00 };
-    ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_TEMP_CLUSTER, joinSeq, 0, 30, reqTemp, 5 );
+    AqaraTvoc_PostAssign(addr);
+}
+
+void AqaraTvoc_Setup(uint16_t shortAddr_)
+{
+    pthread_mutex_lock(&g_deviceMutex);
+    int idx = -1;
+    for (int i = 0; i < g_numAqaraTvocs; i++) {
+        if (g_aqaraTvocs[i].shortAddr == shortAddr_) {
+            idx = i;
+            break;
+        }
+    }
     
-    uint8_t reqHum[5] = { 0x00, ++joinSeq, 0x00, 0x00, 0x00 };
-    ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_HUM_CLUSTER, joinSeq, 0, 30, reqHum, 5 );
+    if (idx == -1 || g_aqaraTvocs[idx].configured) {
+        pthread_mutex_unlock(&g_deviceMutex);
+        return;
+    }
     
-    uint8_t reqTvoc[5] = { 0x00, ++joinSeq, 0x00, 0x55, 0x00 };
-    ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, joinSeq, 0, 30, reqTvoc, 5 );
+    if (!g_aqaraTvocs[idx].hasIeee) {
+        g_aqaraTvocs[idx].hasIeee = Device_GetDiscoveredIeee(shortAddr_, g_aqaraTvocs[idx].ieee);
+    }
+    if (!g_aqaraTvocs[idx].hasIeee) {
+        pthread_mutex_unlock(&g_deviceMutex);
+        LOG_DEBUG("Aqara TVOC 0x%04X missing IEEE - requesting...\n", shortAddr_);
+        uint8_t reqPay[4] = { shortAddr_ & 0xFF, (shortAddr_ >> 8) & 0xFF, 0x01, 0x00 };
+        ZNP_Sreq(0x25, 0x01, reqPay, 4, NULL, 3000);
+        return;
+    }
+
+    uint8_t sensorIeee[8];
+    uint8_t endpoint = g_aqaraTvocs[idx].endpoint;
+    memcpy(sensorIeee, g_aqaraTvocs[idx].ieee, 8);
+    g_aqaraTvocs[idx].lastSetupAttempt = ZNP_GetCurrentTime();
+    pthread_mutex_unlock(&g_deviceMutex);
+
+    LOG_DEBUG("Configuring Aqara TVOC 0x%04X...\n", shortAddr_);
+
+    // Bind Temp, Humidity, and TVOC Analog clusters
+    ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, AQARA_TVOC_TEMP_CLUSTER, g_coordinatorIeee, 8);
+    usleep(300000);
+    ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, AQARA_TVOC_HUM_CLUSTER, g_coordinatorIeee, 8);
+    usleep(300000);
+    ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, AQARA_TVOC_ANALOG_CLUSTER, g_coordinatorIeee, 8);
+    usleep(300000);
+
+    pthread_mutex_lock(&g_deviceMutex);
+    if (idx < g_numAqaraTvocs && g_aqaraTvocs[idx].shortAddr == shortAddr_) {
+        g_aqaraTvocs[idx].configured = true;
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    
+    LOG_DEBUG("Aqara TVOC 0x%04X configured OK.\n", shortAddr_);
+    Device_Save();
 }
 
 void AqaraTvoc_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
@@ -314,8 +375,10 @@ void AqaraTvoc_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
         }
     }
     pthread_mutex_unlock(&g_deviceMutex);
+    pthread_mutex_unlock(&g_deviceMutex);
     if (found) {
         Device_Save();
+        AqaraTvoc_PostAssign(shortAddr_);
     }
 }
 

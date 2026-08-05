@@ -181,6 +181,10 @@ void VibrationSensor_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
             LOG_DEBUG("Vibration Sensor 0x%04X rejoined as 0x%04X (same IEEE)\n", g_vibrationSensors[idx].shortAddr, shortAddr_);
             LOG_EVENT("VIBRATION", shortAddr_, "Network Rejoin\n");
             g_vibrationSensors[idx].shortAddr = shortAddr_;
+            
+            // CRITICAL: Force re-configuration when device rejoins to restore bindings
+            g_vibrationSensors[idx].configured = false;
+            
             changed = true;
         }
         if ( g_vibrationSensors[idx].endpoint != endpoint_ )

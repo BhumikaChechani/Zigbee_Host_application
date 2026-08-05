@@ -185,6 +185,11 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
             LOG_DEBUG("Aqara Button 0x%04X rejoined as 0x%04X (same IEEE)\n", g_aqaraButtons[idx].shortAddr, shortAddr_);
             LOG_EVENT("AQARA BTN", shortAddr_, "Network Rejoin\n");
             g_aqaraButtons[idx].shortAddr = shortAddr_;
+            
+            // CRITICAL: When the button rejoins, it often clears its internal 
+            // bindings. We MUST force it to re-bind.
+            g_aqaraButtons[idx].configured = false;
+            
             changed = true;
         }
         if ( g_aqaraButtons[idx].endpoint != endpoint_ )

@@ -365,8 +365,6 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         if (t.lastBattTime > 0) {
             format_time(now - t.lastBattTime, ts);
             printf("  \033[1;32mBattery     :\033[0m %6d %%   \033[90m(updated %s)\033[0m\n", t.lastBatt, ts);
-        } else {
-            printf("  \033[1;32mBattery     :\033[0m \033[90m[Waiting for data...]\033[0m\n");
         }
         printf("\033[1;36m---------------------------------------------\033[0m\n");
         printf("\033[90m  [Read requests queued. Press sensor button to refresh.]\033[0m\n\n");

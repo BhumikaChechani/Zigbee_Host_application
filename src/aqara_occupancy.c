@@ -1304,10 +1304,10 @@ int AqaraOccupancy_OccupiedCount(void) {
 
 void AqaraOccupancy_PrintStatus(void) {
   pthread_mutex_lock(&g_deviceMutex);
-  printf("Registered Aqara Occupancies (%d):\n", g_numAqaraOccupancies);
+  printf("\n\033[1;36mRegistered Aqara Occupancies (%d):\033[0m\n", g_numAqaraOccupancies);
   double now = ZNP_GetCurrentTime();
   for (int i = 0; i < g_numAqaraOccupancies; i++) {
-    printf("  - 0x%04X: IEEE=", g_aqaraOccupancies[i].shortAddr);
+    printf("  - \033[1m0x%04X\033[0m: IEEE=", g_aqaraOccupancies[i].shortAddr);
     if (g_aqaraOccupancies[i].hasIeee) {
       for (int j = 7; j >= 0; j--) {
         printf("%02x", g_aqaraOccupancies[i].ieee[j]);
@@ -1315,14 +1315,20 @@ void AqaraOccupancy_PrintStatus(void) {
     } else {
       printf("Unknown");
     }
-    printf(", ep=0x%02X, last_seen=%.1fs ago\n", g_aqaraOccupancies[i].endpoint,
+    printf(", ep=0x%02X, \033[90mlast_seen=%.1fs ago\033[0m\n", g_aqaraOccupancies[i].endpoint,
            now - g_aqaraOccupancies[i].lastSeen);
+           
+    if (!g_aqaraOccupancies[i].configured) {
+        printf("    \033[1;31mState: [NOT CONFIGURED YET]\033[0m\n");
+        continue;
+    }
+
     if (g_aqaraOccupancies[i].hasLightState) {
-      printf("    Light: %s (Raw: %u, Threshold: %u)\n",
-             g_aqaraOccupancies[i].isLightOn ? "ON" : "OFF",
+      printf("    \033[1;37mLight:\033[0m %s \033[90m(Raw: %u, Threshold: %u)\033[0m\n",
+             g_aqaraOccupancies[i].isLightOn ? "\033[1;36m[ON]\033[0m" : "\033[1;33m[OFF]\033[0m",
              g_aqaraOccupancies[i].lastLightLevel, g_aqaraOccupancies[i].lightThreshold);
     } else {
-      printf("    Light: Unknown (Threshold: %u)\n", g_aqaraOccupancies[i].lightThreshold);
+      printf("    \033[1;37mLight:\033[0m \033[90m[Unknown] (Threshold: %u)\033[0m\n", g_aqaraOccupancies[i].lightThreshold);
     }
 
     int activeZones = 0;
@@ -1331,7 +1337,7 @@ void AqaraOccupancy_PrintStatus(void) {
         activeZones++;
     }
 
-    printf("    Active Zones (%d):\n", activeZones);
+    printf("    \033[1;37mActive Zones (%d):\033[0m\n", activeZones);
     for (int z = 0; z < MAX_OCCUPANCY_ZONES; z++) {
       if (g_aqaraOccupancies[i].zones[z].isActive) {
         char distStr[32] = {0};

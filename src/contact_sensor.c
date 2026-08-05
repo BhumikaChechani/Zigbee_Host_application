@@ -442,10 +442,10 @@ void ContactSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_,
 
 void ContactSensor_PrintStatus(void) {
   pthread_mutex_lock(&g_deviceMutex);
-  printf("Registered Contact Sensors (%d):\n", g_numContactSensors);
+  printf("\n\033[1;36mRegistered Contact Sensors (%d):\033[0m\n", g_numContactSensors);
   double now = ZNP_GetCurrentTime();
   for (int i = 0; i < g_numContactSensors; i++) {
-    printf("  - 0x%04X: IEEE=", g_contactSensors[i].shortAddr);
+    printf("  - \033[1m0x%04X\033[0m: IEEE=", g_contactSensors[i].shortAddr);
     if (g_contactSensors[i].hasIeee) {
       for (int j = 7; j >= 0; j--) {
         printf("%02x", g_contactSensors[i].ieee[j]);
@@ -453,10 +453,17 @@ void ContactSensor_PrintStatus(void) {
     } else {
       printf("Unknown");
     }
-    printf(", ep=0x%02X, zone_id=%d, state=%s, last_seen=%.1fs ago\n",
+    printf(", ep=0x%02X, zone_id=%d, \033[90mlast_seen=%.1fs ago\033[0m\n",
            g_contactSensors[i].endpoint, g_contactSensors[i].zoneId,
-           g_contactSensors[i].isOpen ? "OPEN" : "CLOSED",
            now - g_contactSensors[i].lastSeen);
+           
+    if (!g_contactSensors[i].configured) {
+        printf("    \033[1;31mState: [NOT CONFIGURED YET]\033[0m\n");
+    } else if (g_contactSensors[i].isOpen) {
+        printf("    \033[1;37mState:\033[0m \033[1;35m[OPEN]\033[0m\n");
+    } else {
+        printf("    \033[1;37mState:\033[0m \033[1;36m[CLOSED]\033[0m\n");
+    }
   }
   pthread_mutex_unlock(&g_deviceMutex);
 }

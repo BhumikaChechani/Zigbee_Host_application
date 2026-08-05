@@ -103,6 +103,7 @@ static void Cli_HandleCommand( const char *cmd_ )
 #endif
 #if ENABLE_CONTACT_SENSOR
         ContactSensor_PrintStatus();
+        ContactSensor_RefreshIfStale(0.0);
 #endif
 #if ENABLE_VIBRATION_SENSOR
         VibrationSensor_PrintStatus();

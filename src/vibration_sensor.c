@@ -131,49 +131,72 @@ void VibrationSensor_PostAf(uint16_t shortAddr_, const AF_MSG_T *af_) {
   MsgQueue_Push(&s_vibrationInbox, msg);
 }
 
-void VibrationSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
-  pthread_mutex_lock(&g_deviceMutex);
-  int idx = -1;
-  for (int i = 0; i < g_numVibrationSensors; i++) {
-    if (g_vibrationSensors[i].shortAddr == shortAddr_) {
-      idx = i;
-      break;
-    }
-  }
+void VibrationSensor_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
+{
+    pthread_mutex_lock( &g_deviceMutex );
+    uint8_t ieee[8];
+    bool haveIeee = Device_GetDiscoveredIeee( shortAddr_, ieee );
 
-  bool changed = false;
-  if (idx == -1) {
-    if (g_numVibrationSensors < MAX_VIBRATION_SENSORS) {
-      LOG_DEBUG("Vibration Sensor discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_);
-      LOG_EVENT("VIBRATION", shortAddr_, "Network Join\n");
-      g_vibrationSensors[g_numVibrationSensors].shortAddr = shortAddr_;
-      g_vibrationSensors[g_numVibrationSensors].endpoint = endpoint_;
-      g_vibrationSensors[g_numVibrationSensors].lastSeen = ZNP_GetCurrentTime();
-      g_vibrationSensors[g_numVibrationSensors].zoneId = -1;
-      g_vibrationSensors[g_numVibrationSensors].hasIeee = Device_GetDiscoveredIeee(shortAddr_, g_vibrationSensors[g_numVibrationSensors].ieee);
-      g_vibrationSensors[g_numVibrationSensors].configured = false;
-      g_vibrationSensors[g_numVibrationSensors].isVibrating = false;
-      g_vibrationSensors[g_numVibrationSensors].lastVibrationTime = 0.0;
-      g_vibrationSensors[g_numVibrationSensors].isMoving = false;
-      g_vibrationSensors[g_numVibrationSensors].lastMovementTime = 0.0;
-      g_vibrationSensors[g_numVibrationSensors].isTampered = false;
-      g_vibrationSensors[g_numVibrationSensors].sensitivity = 10;
-      g_numVibrationSensors++;
-      changed = true;
+    int idx = -1;
+    for ( int i = 0; i < g_numVibrationSensors; i++ )
+    {
+        if ( g_vibrationSensors[i].shortAddr == shortAddr_ )
+        {
+            idx = i;
+            break;
+        }
+        if ( haveIeee && g_vibrationSensors[i].hasIeee &&
+             memcmp( g_vibrationSensors[i].ieee, ieee, 8 ) == 0 )
+        {
+            idx = i;
+            break;
+        }
     }
-  } else {
-    if (g_vibrationSensors[idx].endpoint != endpoint_) {
-      g_vibrationSensors[idx].endpoint = endpoint_;
-      changed = true;
+
+    bool changed = false;
+    if ( idx == -1 )
+    {
+        if ( g_numVibrationSensors < MAX_VIBRATION_SENSORS )
+        {
+            LOG_DEBUG("Vibration Sensor discovered: short=0x%04X, ep=0x%02X\n", shortAddr_, endpoint_ );
+            LOG_EVENT("VIBRATION", shortAddr_, "Network Join\n");
+            g_vibrationSensors[g_numVibrationSensors].shortAddr = shortAddr_;
+            g_vibrationSensors[g_numVibrationSensors].endpoint = endpoint_;
+            g_vibrationSensors[g_numVibrationSensors].lastSeen = ZNP_GetCurrentTime();
+            g_vibrationSensors[g_numVibrationSensors].hasIeee = haveIeee;
+            if (haveIeee) {
+                memcpy( g_vibrationSensors[g_numVibrationSensors].ieee, ieee, 8 );
+            }
+            g_vibrationSensors[g_numVibrationSensors].zoneId = -1;
+            g_vibrationSensors[g_numVibrationSensors].sensitivity = 21;
+            g_vibrationSensors[g_numVibrationSensors].configured = false;
+            g_numVibrationSensors++;
+            changed = true;
+        }
     }
-    g_vibrationSensors[idx].lastSeen = ZNP_GetCurrentTime();
-    if (!g_vibrationSensors[idx].hasIeee) {
-      g_vibrationSensors[idx].hasIeee = Device_GetDiscoveredIeee(shortAddr_, g_vibrationSensors[idx].ieee);
-      if (g_vibrationSensors[idx].hasIeee)
-        changed = true;
+    else
+    {
+        if ( g_vibrationSensors[idx].shortAddr != shortAddr_ )
+        {
+            LOG_DEBUG("Vibration Sensor 0x%04X rejoined as 0x%04X (same IEEE)\n", g_vibrationSensors[idx].shortAddr, shortAddr_);
+            LOG_EVENT("VIBRATION", shortAddr_, "Network Rejoin\n");
+            g_vibrationSensors[idx].shortAddr = shortAddr_;
+            changed = true;
+        }
+        if ( g_vibrationSensors[idx].endpoint != endpoint_ )
+        {
+            g_vibrationSensors[idx].endpoint = endpoint_;
+            changed = true;
+        }
+        g_vibrationSensors[idx].lastSeen = ZNP_GetCurrentTime();
+        if ( !g_vibrationSensors[idx].hasIeee && haveIeee )
+        {
+            memcpy( g_vibrationSensors[idx].ieee, ieee, 8 );
+            g_vibrationSensors[idx].hasIeee = true;
+            changed = true;
+        }
     }
-  }
-  pthread_mutex_unlock(&g_deviceMutex);
+    pthread_mutex_unlock( &g_deviceMutex );
 
   if (changed)
     Device_Save();

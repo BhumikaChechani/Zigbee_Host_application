@@ -112,10 +112,19 @@ void AqaraButton_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ )
 void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
 {
     pthread_mutex_lock( &g_deviceMutex );
+    uint8_t ieee[8];
+    bool haveIeee = Device_GetDiscoveredIeee( shortAddr_, ieee );
+
     int idx = -1;
     for ( int i = 0; i < g_numAqaraButtons; i++ )
     {
         if ( g_aqaraButtons[i].shortAddr == shortAddr_ )
+        {
+            idx = i;
+            break;
+        }
+        if ( haveIeee && g_aqaraButtons[i].hasIeee &&
+             memcmp( g_aqaraButtons[i].ieee, ieee, 8 ) == 0 )
         {
             idx = i;
             break;
@@ -132,7 +141,10 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
             g_aqaraButtons[g_numAqaraButtons].shortAddr = shortAddr_;
             g_aqaraButtons[g_numAqaraButtons].endpoint = endpoint_;
             g_aqaraButtons[g_numAqaraButtons].lastSeen = ZNP_GetCurrentTime();
-            g_aqaraButtons[g_numAqaraButtons].hasIeee = Device_GetDiscoveredIeee( shortAddr_, g_aqaraButtons[g_numAqaraButtons].ieee );
+            g_aqaraButtons[g_numAqaraButtons].hasIeee = haveIeee;
+            if (haveIeee) {
+                memcpy( g_aqaraButtons[g_numAqaraButtons].ieee, ieee, 8 );
+            }
             g_aqaraButtons[g_numAqaraButtons].configured = false;
             g_numAqaraButtons++;
             changed = true;
@@ -140,19 +152,24 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     }
     else
     {
+        if ( g_aqaraButtons[idx].shortAddr != shortAddr_ )
+        {
+            LOG_DEBUG("Aqara Button 0x%04X rejoined as 0x%04X (same IEEE)\n", g_aqaraButtons[idx].shortAddr, shortAddr_);
+            LOG_EVENT("AQARA BTN", shortAddr_, "Network Rejoin\n");
+            g_aqaraButtons[idx].shortAddr = shortAddr_;
+            changed = true;
+        }
         if ( g_aqaraButtons[idx].endpoint != endpoint_ )
         {
             g_aqaraButtons[idx].endpoint = endpoint_;
             changed = true;
         }
         g_aqaraButtons[idx].lastSeen = ZNP_GetCurrentTime();
-        if ( !g_aqaraButtons[idx].hasIeee )
+        if ( !g_aqaraButtons[idx].hasIeee && haveIeee )
         {
-            g_aqaraButtons[idx].hasIeee = Device_GetDiscoveredIeee( shortAddr_, g_aqaraButtons[idx].ieee );
-            if ( g_aqaraButtons[idx].hasIeee )
-            {
-                changed = true;
-            }
+            memcpy( g_aqaraButtons[idx].ieee, ieee, 8 );
+            g_aqaraButtons[idx].hasIeee = true;
+            changed = true;
         }
     }
     pthread_mutex_unlock( &g_deviceMutex );

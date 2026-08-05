@@ -1304,139 +1304,71 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
         if (profileId == 0x0104) {
           bool isSiren = false;
           bool isOkosTuya = false;
+          bool isContact = false;
+          bool isVibration = false;
+          bool isOnics = false;
+          bool isAqara = false;
+          bool isOccupancy = false;
+          bool isTvoc = false;
+
           for (int i = 0; i < numInCls; i++) {
-            if (inCls[i] == 0x0502) {
-              isSiren = true;
-            }
-            if (inCls[i] == 0xEF00 || deviceId == 0x0051) {
-              isOkosTuya = true;
-            }
+            if (inCls[i] == 0x0502) isSiren = true;
+            if (inCls[i] == 0xEF00 || deviceId == 0x0051) isOkosTuya = true;
+            if (inCls[i] == 0x000F || inCls[i] == 0x0012) isOnics = true;
+            if (inCls[i] == 0x0006 || inCls[i] == 0x0012) isAqara = true;
+            if (inCls[i] == 0x0406) isOccupancy = true;
+            if (inCls[i] == 0x000C) isTvoc = true;
+            if (inCls[i] == 0xFC04 || inCls[i] == 0x0101) isVibration = true;
+          }
+          
+          for (int i = 0; i < numOutCls; i++) {
+            if (outCls[i] == 0x0006) isAqara = true;
           }
 
-          if (isOkosTuya) {
+          if (deviceId == 0x0107) isOccupancy = true;
+          if (deviceId == 0x0228 || deviceId == 0x022D || deviceId == 0x0101) isVibration = true;
+
+          if (deviceId == 0x0402 && !isVibration && !isTvoc) {
+             LOG_DEBUG("Device 0x%04X is DevID 0x0402 (IAS Zone). Querying ModelIdentifier to classify...\n", shortAddr);
+             uint8_t req[5] = {0x00, 0x55, 0x00, 0x05, 0x00};
+             ZNP_AfDataRequestExt(2, shortAddr, ep, 0, 8, 0x0000, 0x55, 0, 30, req, 5);
+          }
+
+          if (isOccupancy) {
+#if ENABLE_AQARA_OCCUPANCY
+            AqaraOccupancy_Discover(shortAddr, ep);
+#endif
+          } else if (isTvoc) {
+#if ENABLE_AQARA_TVOC
+            AqaraTvoc_Discover(shortAddr, ep);
+#endif
+          } else if (isContact) {
+#if ENABLE_CONTACT_SENSOR
+            ContactSensor_Discover(shortAddr, ep);
+#endif
+          } else if (isVibration) {
+#if ENABLE_VIBRATION_SENSOR
+            VibrationSensor_Discover(shortAddr, ep);
+#endif
+          } else if (isOkosTuya) {
 #if ENABLE_OKOS_SIREN
             OkosSiren_Discover(shortAddr, ep);
 #endif
           } else if (isSiren) {
 #if ENABLE_OKOS_SIREN
-            if (ep == 0x01 || !ENABLE_SIREN) {
-              OkosSiren_Discover(shortAddr, ep);
-            }
+            if (ep == 0x01 || !ENABLE_SIREN) OkosSiren_Discover(shortAddr, ep);
 #endif
 #if ENABLE_SIREN
-            if (ep == 0x2B || !ENABLE_OKOS_SIREN) {
-              Siren_Discover(shortAddr, ep);
-            }
+            if (ep == 0x2B || !ENABLE_OKOS_SIREN) Siren_Discover(shortAddr, ep);
 #endif
-          }
-#if ENABLE_SIREN
-          else if (Siren_IsKnown(shortAddr)) {
-            LOG_DEBUG("0x%04X already known as a siren - skipping button "
-                      "classification for ep 0x%02X\n",
-                      shortAddr, ep);
-          }
-#endif
-          else {
-            bool isContact = false;
-            bool isVibration = false;
-
-            // Check if it's explicitly a Vibration/Glass Break Sensor by DevID
-            if (deviceId == 0x0228 || deviceId == 0x022D ||
-                deviceId == 0x0101) {
-              isVibration = true;
-            } else if (deviceId == 0x0402) {
-              for (int i = 0; i < numInCls; i++) {
-                if (inCls[i] == 0xFC04 || inCls[i] == 0x0101) {
-                  isVibration = true;
-                  break;
-                }
-              }
-              if (!isVibration) {
-                // Instead of blindly assuming it's a contact sensor (since TVOC
-                // also uses 0x0402), query the Model Identifier. We will
-                // classify it when the AF response arrives.
-                LOG_DEBUG("Device 0x%04X is DevID 0x0402 (IAS Zone). Querying "
-                          "ModelIdentifier to classify...\n",
-                          shortAddr);
-                uint8_t req[5] = {0x00, 0x55, 0x00, 0x05, 0x00};
-                ZNP_AfDataRequestExt(2, shortAddr, ep, 0, 8, 0x0000, 0x55, 0,
-                                     30, req, 5);
-              }
-            }
-
-            bool isOnics = false;
-            if (!isContact && !isVibration) {
-              for (int i = 0; i < numInCls; i++) {
-                if (inCls[i] == 0x000F || inCls[i] == 0x0012) {
-                  isOnics = true;
-                  break;
-                }
-              }
-            }
-
-            bool isAqara = false;
-            for (int i = 0; i < numOutCls; i++) {
-              if (outCls[i] == 0x0006) {
-                isAqara = true;
-                break;
-              }
-            }
-            for (int i = 0; i < numInCls; i++) {
-              if (inCls[i] == 0x0006 || inCls[i] == 0x0012) {
-                isAqara = true;
-                break;
-              }
-            }
-
-            bool isOccupancy = false;
-            if (deviceId == 0x0107) {
-              isOccupancy = true;
-            }
-            for (int i = 0; i < numInCls; i++) {
-              if (inCls[i] == 0x0406) {
-                isOccupancy = true;
-                break;
-              }
-            }
-
-            bool isTvoc = false;
-            for (int i = 0; i < numInCls; i++) {
-              // genAnalogInput is highly indicative of the Aqara TVOC sensor
-              if (inCls[i] == 0x000C) {
-                isTvoc = true;
-                break;
-              }
-            }
-
-            if (isOccupancy) {
-#if ENABLE_AQARA_OCCUPANCY
-              AqaraOccupancy_Discover(shortAddr, ep);
-#endif
-            } else if (isTvoc) {
-#if ENABLE_AQARA_TVOC
-              AqaraTvoc_Discover(shortAddr, ep);
-#endif
-            } else if (isContact) {
-#if ENABLE_CONTACT_SENSOR
-              ContactSensor_Discover(shortAddr, ep);
-#endif
-            } else if (isVibration) {
-#if ENABLE_VIBRATION_SENSOR
-              VibrationSensor_Discover(shortAddr, ep);
-#endif
-            } else if (isOnics) {
+          } else if (isOnics) {
 #if ENABLE_ONICS_BUTTON
-              OnicsButton_Discover(shortAddr, ep);
+            OnicsButton_Discover(shortAddr, ep);
 #endif
-            } else if (isAqara
-#if ENABLE_ONICS_BUTTON
-                       && !OnicsButton_IsKnown(shortAddr)
-#endif
-            ) {
+          } else if (isAqara) {
 #if ENABLE_AQARA_BUTTON
-              AqaraButton_Discover(shortAddr, ep);
+            AqaraButton_Discover(shortAddr, ep);
 #endif
-            }
           }
         }
       }

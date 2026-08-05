@@ -90,7 +90,9 @@ static void Cli_HandleCommand( const char *cmd_ )
     else if ( strcmp( base, "status" ) == 0 )
     {
         pthread_mutex_lock( &g_deviceMutex );
-        printf( "\n--- System Status ---\n" );
+        printf( "\n\033[1;35m============================================================\033[0m\n" );
+        printf( "\033[1;32m                       SYSTEM STATUS                        \033[0m\n" );
+        printf( "\033[1;35m============================================================\033[0m\n" );
         pthread_mutex_unlock( &g_deviceMutex );
 #if ENABLE_SIREN
         Siren_PrintStatus();
@@ -117,7 +119,7 @@ static void Cli_HandleCommand( const char *cmd_ )
 #if ENABLE_AQARA_TVOC
         AqaraTvoc_PrintStatus();
 #endif
-        printf( "\n" );
+        printf( "\n\033[1;35m============================================================\033[0m\n\n" );
     }
     else if ( strcmp( base, "siren" ) == 0 )
     {

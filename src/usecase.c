@@ -42,7 +42,7 @@ static bool ContactCountsAsOpen(int idx, double now) {
            (now - g_contactSensors[idx].lastOpenedTime) < DOOR_OPEN_GRACE_S;
 }
 
-static bool IsDoorOpenForZone(uint8_t zoneIdx, bool *hasSensors_out) {
+bool UseCase_IsDoorOpenForZone(uint8_t zoneIdx, bool *hasSensors_out) {
     bool open = false;
     bool matchedById = false;
     double now = ZNP_GetCurrentTime();
@@ -244,7 +244,7 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     ContactSensor_RefreshIfStale(30.0);
 #endif
     bool hasDoorSensors = false;
-    bool isDoorOpen = IsDoorOpenForZone(zoneIdx, &hasDoorSensors);
+    bool isDoorOpen = UseCase_IsDoorOpenForZone(zoneIdx, &hasDoorSensors);
     uint32_t minCm = 0;
     uint32_t maxCm = 0;
     pthread_mutex_lock(&g_deviceMutex);

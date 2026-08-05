@@ -1341,17 +1341,27 @@ void AqaraOccupancy_PrintStatus(void) {
       printf("    \033[1;37mActive Zones (%d):\033[0m\n", activeZones);
       for (int z = 0; z < MAX_OCCUPANCY_ZONES; z++) {
         if (g_aqaraOccupancies[i].zones[z].isActive) {
-          char distStr[32] = {0};
+          char distStr[64] = {0};
           if (g_aqaraOccupancies[i].zones[z].occupied && g_aqaraOccupancies[i].currentDistanceCm > 0) {
               snprintf(distStr, sizeof(distStr), " at %u cm", g_aqaraOccupancies[i].currentDistanceCm);
           }
           
-          printf("      - Zone %d: [%u cm - %u cm] -> %s%s%s\033[0m\n", z,
+          const char* presenceStatus = "\033[1;31mPresence CLEARED\033[0m";
+          if (g_aqaraOccupancies[i].zones[z].occupied) {
+              bool hasDoor = false;
+              bool doorOpen = UseCase_IsDoorOpenForZone((uint8_t)z, &hasDoor);
+              if (hasDoor && !doorOpen) {
+                  presenceStatus = "\033[1;33mPresence IGNORED (Door Closed)\033[0m";
+              } else {
+                  presenceStatus = "\033[1;32mPresence DETECTED\033[0m";
+              }
+          }
+          
+          printf("      - \033[1mZone %d\033[0m: [%u cm - %u cm] -> %s%s\n", z,
                  g_aqaraOccupancies[i].zones[z].minCm,
                  g_aqaraOccupancies[i].zones[z].maxCm,
-                 g_aqaraOccupancies[i].zones[z].occupied ? "\033[1;32mPresence DETECTED" : "\033[1;31mPresence CLEARED",
-                 distStr,
-                 "");
+                 presenceStatus,
+                 distStr);
         }
       }
     }

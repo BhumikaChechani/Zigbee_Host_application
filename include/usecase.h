@@ -12,6 +12,7 @@
 #define USECASE_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /// @brief High-level events a sensor can raise for the policy layer to act on.
 typedef enum
@@ -71,5 +72,8 @@ void UseCase_Start( void );
 /// @return None.
 ///
 void UseCase_Post( UC_EVT_TYPE_T type_, uint16_t srcAddr_, uint16_t raw_, uint32_t val2_ );
+
+/// @brief Checks if a door is considered open for a specific zone.
+bool UseCase_IsDoorOpenForZone(uint8_t zoneIdx, bool *hasSensors_out);
 
 #endif // USECASE_H

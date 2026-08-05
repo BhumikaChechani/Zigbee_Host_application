@@ -333,25 +333,25 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     break;
   }
   case UC_VIBRATION_DETECTED:
-    LOG_EVENT("VIBRATION", event_->srcAddr, "Vibration DETECTED\n");
+    LOG_EVENT("VIBRATION", event_->srcAddr, "\033[38;5;214mVibration DETECTED\033[0m\n");
 #if ENABLE_SIREN
     Siren_TriggerAll(4, 240);
 #endif
     break;
   case UC_VIBRATION_CLEARED:
-    LOG_EVENT("VIBRATION", event_->srcAddr, "Vibration CLEARED\n");
+    LOG_EVENT("VIBRATION", event_->srcAddr, "\033[1;33mVibration CLEARED\033[0m\n");
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif
     break;
   case UC_MOVEMENT_DETECTED:
-    LOG_EVENT("VIBRATION", event_->srcAddr, "Movement DETECTED\n");
+    LOG_EVENT("VIBRATION", event_->srcAddr, "\033[38;5;214mMovement DETECTED\033[0m\n");
 #if ENABLE_SIREN
     Siren_TriggerAll(4, 240);
 #endif
     break;
   case UC_MOVEMENT_CLEARED:
-    LOG_EVENT("VIBRATION", event_->srcAddr, "Movement CLEARED\n");
+    LOG_EVENT("VIBRATION", event_->srcAddr, "\033[1;33mMovement CLEARED\033[0m\n");
 #if ENABLE_SIREN
     Siren_ControlAll(0);
 #endif

@@ -280,7 +280,7 @@ static void Cli_HandleCommand( const char *cmd_ )
                 uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
                 OkosSiren_Control( addr, 1 );
             }
-            else { OkosSiren_ControlAll( 1 ); }
+            else { printf( "Usage: okos on <addr>\n" ); }
         }
         else if ( strcmp( sub, "off" ) == 0 )
         {
@@ -289,7 +289,7 @@ static void Cli_HandleCommand( const char *cmd_ )
                 uint16_t addr = (uint16_t)strtoul( parts[2], NULL, 16 );
                 OkosSiren_Control( addr, 0 );
             }
-            else { OkosSiren_ControlAll( 0 ); }
+            else { printf( "Usage: okos off <addr>\n" ); }
         }
         else if ( strcmp( sub, "vol" ) == 0 )
         {

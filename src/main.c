@@ -671,11 +671,15 @@ int main(int argc, char *argv[]) {
   // cluster the coordinator doesn't advertise). 0xFCC0 = Aqara manufacturer
   // cluster (occupancy/presence attr 0x0142), 0x0012 = Multistate Input.
   LOG_INFO("[5.5] Registering Application Endpoint and ZDO Callbacks...\n");
-  uint16_t inClusters[8] = {0x0000, 0x0003, 0x0004, 0x0005,
-                            0x0006, 0x0406, 0xFCC0, 0x0012};
-  uint16_t outClusters[7] = {0x0500, 0x0502, 0x0406, 0xFCC0,
-                             0x0402, 0x0405, 0x0400};
-  ZNP_AfRegister(8, 0x0104, 0x0007, 1, 0, 8, inClusters, 7, outClusters);
+  // inClusters: clusters we RECEIVE from sensors.
+  // 0x0500 = IAS Zone (contact sensor zone status/enroll)
+  // 0x0006 = On/Off (Aqara button)
+  // 0x0406 = Occupancy, 0xFCC0 = Aqara MFR (FP300 presence)
+  uint16_t inClusters[9] = {0x0000, 0x0003, 0x0004, 0x0005,
+                             0x0006, 0x0406, 0xFCC0, 0x0012, 0x0500};
+  uint16_t outClusters[6] = {0x0502, 0x0406, 0xFCC0,
+                              0x0402, 0x0405, 0x0400};
+  ZNP_AfRegister(8, 0x0104, 0x0007, 1, 0, 9, inClusters, 6, outClusters);
 
   ZNP_ZdoMsgCbRegister(0x8001); // IEEE_addr_rsp
   ZNP_ZdoMsgCbRegister(0x8004); // Simple_desc_rsp
@@ -1319,13 +1323,13 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
             "Device 0x%04X ep 0x%02X Profile=0x%04X DevID=0x%04X InClusters=[",
             shortAddr, ep, profileId, deviceId);
         for (int i = 0; i < numInCls; i++) {
-          LOG_DEBUG("0x%04X%s", inCls[i], (i == numInCls - 1) ? "" : ", ");
+          LOG_DEBUG_RAW("0x%04X%s", inCls[i], (i == numInCls - 1) ? "" : ", ");
         }
-        LOG_DEBUG("] OutClusters=[");
+        LOG_DEBUG_RAW("] OutClusters=[");
         for (int i = 0; i < numOutCls; i++) {
-          LOG_DEBUG("0x%04X%s", outCls[i], (i == numOutCls - 1) ? "" : ", ");
+          LOG_DEBUG_RAW("0x%04X%s", outCls[i], (i == numOutCls - 1) ? "" : ", ");
         }
-        LOG_DEBUG("]\n");
+        LOG_DEBUG_RAW("]\n");
 
         if (profileId == 0x0104) {
           bool isSiren = false;

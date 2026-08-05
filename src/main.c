@@ -1350,9 +1350,10 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
             if (inCls[i] == 0x000C) isTvoc = true;
             // 0xFC04 and 0x0101 are Frient-specific vibration clusters
             if (inCls[i] == 0xFC04 || inCls[i] == 0x0101) isVibration = true;
-            // 0x0500 = IAS Zone (contact sensor), but Frient vibration also uses it.
-            // Only flag as contact if no vibration-specific cluster was seen.
-            if (inCls[i] == 0x0500 && !isVibration) isContact = true;
+            // 0x0500 = IAS Zone. Many Aqara sensors (TVOC, contact) share DevID 0x0402.
+            // For 0x0402 devices, use model identifier query to differentiate.
+            // Only set isContact directly for NON-0x0402 IAS Zone devices.
+            if (inCls[i] == 0x0500 && !isVibration && deviceId != 0x0402) isContact = true;
           }
           
           for (int i = 0; i < numOutCls; i++) {
@@ -1366,8 +1367,12 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
             isContact = false;
           }
 
-          if (deviceId == 0x0402 && !isVibration && !isTvoc && !isContact) {
-             LOG_DEBUG("Device 0x%04X is DevID 0x0402 (IAS Zone). Querying ModelIdentifier to classify...\n", shortAddr);
+          // For ALL DevID 0x0402 non-vibration devices, always query ModelIdentifier.
+          // Both the Aqara contact sensor and TVOC sensor use 0x0402. The model
+          // string ("lumi.sensor_magnet" vs "airmonitor") is the only reliable way
+          // to tell them apart. The response is handled in the AF incoming path.
+          if (deviceId == 0x0402 && !isVibration) {
+             LOG_DEBUG("Device 0x%04X is DevID 0x0402. Querying ModelIdentifier...\n", shortAddr);
              uint8_t req[5] = {0x00, 0x55, 0x00, 0x05, 0x00};
              ZNP_AfDataRequestExt(2, shortAddr, ep, 0, 8, 0x0000, 0x55, 0, 30, req, 5);
           }

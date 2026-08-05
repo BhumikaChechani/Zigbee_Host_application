@@ -389,58 +389,60 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
 void AqaraTvoc_PrintStatus(void)
 {
     pthread_mutex_lock(&g_deviceMutex);
-    printf("\n\033[1;36mRegistered Aqara TVOC Sensors (%d):\033[0m\n", g_numAqaraTvocs);
-    double now = ZNP_GetCurrentTime();
-    for (int i = 0; i < g_numAqaraTvocs; i++) {
-        double diff = now - g_aqaraTvocs[i].lastSeen;
-        printf("  - \033[1m0x%04X\033[0m: IEEE=", g_aqaraTvocs[i].shortAddr);
-        if (g_aqaraTvocs[i].hasIeee) {
-            for (int j = 7; j >= 0; j--) {
-                printf("%02x", g_aqaraTvocs[i].ieee[j]);
+    if (g_numAqaraTvocs > 0) {
+        printf("\n\033[1;37mRegistered Aqara TVOC Sensors (%d):\033[0m\n", g_numAqaraTvocs);
+        double now = ZNP_GetCurrentTime();
+        for (int i = 0; i < g_numAqaraTvocs; i++) {
+            double diff = now - g_aqaraTvocs[i].lastSeen;
+            printf("  - \033[1m0x%04X\033[0m: IEEE=", g_aqaraTvocs[i].shortAddr);
+            if (g_aqaraTvocs[i].hasIeee) {
+                for (int j = 7; j >= 0; j--) {
+                    printf("%02x", g_aqaraTvocs[i].ieee[j]);
+                }
+            } else {
+                printf("Unknown");
             }
-        } else {
-            printf("Unknown");
-        }
-        printf(", ep=0x%02X, \033[90mlast_seen=%.1fs ago\033[0m\n", 
-            g_aqaraTvocs[i].endpoint, diff);
+            printf(", ep=0x%02X, \033[90mlast_seen=%.1fs ago\033[0m\n", 
+                g_aqaraTvocs[i].endpoint, diff);
+                
+            char ts[32];
+            AQARA_TVOC_T t = g_aqaraTvocs[i];
             
-        char ts[32];
-        AQARA_TVOC_T t = g_aqaraTvocs[i];
-        
-        if (t.lastTempTime > 0) {
-            format_time(now - t.lastTempTime, ts);
-            printf("    \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(updated %s)\033[0m\n", t.lastTemp, ts);
+            if (t.lastTempTime > 0) {
+                format_time(now - t.lastTempTime, ts);
+                printf("    \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(updated %s)\033[0m\n", t.lastTemp, ts);
+            }
+            if (t.lastHumTime > 0) {
+                format_time(now - t.lastHumTime, ts);
+                printf("    \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(updated %s)\033[0m\n", t.lastHum, ts);
+            }
+            if (t.lastTvocTime > 0) {
+                format_time(now - t.lastTvocTime, ts);
+                const char* quality;
+                const char* color;
+                if (t.lastTvoc <= 65.0f) { quality = "Excellent"; color = "\033[1;32m"; }
+                else if (t.lastTvoc <= 220.0f) { quality = "Good"; color = "\033[1;36m"; }
+                else if (t.lastTvoc <= 660.0f) { quality = "Moderate"; color = "\033[1;33m"; }
+                else if (t.lastTvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; }
+                else { quality = "Unhealthy"; color = "\033[1;31m"; }
+                printf("    \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(updated %s)\033[0m\n", t.lastTvoc, color, quality, ts);
+            }
+            if (t.lastBattTime > 0) {
+                format_time(now - t.lastBattTime, ts);
+                printf("    \033[1;32mBattery     :\033[0m %6d %%   \033[90m(updated %s)\033[0m\n", t.lastBatt, ts);
+            }
+            
+            // Queue read requests so running status updates the cache for next time
+            static uint8_t statSeq = 0xE0;
+            uint8_t reqTemp[5] = { 0x00, ++statSeq, 0x00, 0x00, 0x00 };
+            ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, statSeq, 0, 30, reqTemp, 5 );
+            
+            uint8_t reqHum[5] = { 0x00, ++statSeq, 0x00, 0x00, 0x00 };
+            ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, statSeq, 0, 30, reqHum, 5 );
+            
+            uint8_t reqTvoc[5] = { 0x00, ++statSeq, 0x00, 0x55, 0x00 };
+            ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, statSeq, 0, 30, reqTvoc, 5 );
         }
-        if (t.lastHumTime > 0) {
-            format_time(now - t.lastHumTime, ts);
-            printf("    \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(updated %s)\033[0m\n", t.lastHum, ts);
-        }
-        if (t.lastTvocTime > 0) {
-            format_time(now - t.lastTvocTime, ts);
-            const char* quality;
-            const char* color;
-            if (t.lastTvoc <= 65.0f) { quality = "Excellent"; color = "\033[1;32m"; }
-            else if (t.lastTvoc <= 220.0f) { quality = "Good"; color = "\033[1;36m"; }
-            else if (t.lastTvoc <= 660.0f) { quality = "Moderate"; color = "\033[1;33m"; }
-            else if (t.lastTvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; }
-            else { quality = "Unhealthy"; color = "\033[1;31m"; }
-            printf("    \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(updated %s)\033[0m\n", t.lastTvoc, color, quality, ts);
-        }
-        if (t.lastBattTime > 0) {
-            format_time(now - t.lastBattTime, ts);
-            printf("    \033[1;32mBattery     :\033[0m %6d %%   \033[90m(updated %s)\033[0m\n", t.lastBatt, ts);
-        }
-        
-        // Queue read requests so running status updates the cache for next time
-        static uint8_t statSeq = 0xE0;
-        uint8_t reqTemp[5] = { 0x00, ++statSeq, 0x00, 0x00, 0x00 };
-        ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, statSeq, 0, 30, reqTemp, 5 );
-        
-        uint8_t reqHum[5] = { 0x00, ++statSeq, 0x00, 0x00, 0x00 };
-        ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, statSeq, 0, 30, reqHum, 5 );
-        
-        uint8_t reqTvoc[5] = { 0x00, ++statSeq, 0x00, 0x55, 0x00 };
-        ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, statSeq, 0, 30, reqTvoc, 5 );
     }
     pthread_mutex_unlock(&g_deviceMutex);
 }

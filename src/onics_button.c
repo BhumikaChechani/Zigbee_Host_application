@@ -563,24 +563,26 @@ void OnicsButton_HandleStatus( uint16_t shortAddr_, uint16_t zoneStatus_, uint8_
 void OnicsButton_PrintStatus( void )
 {
     pthread_mutex_lock( &g_deviceMutex );
-    printf( "Registered Onics Buttons (%d):\n", g_numOnicsButtons );
-    double now = ZNP_GetCurrentTime();
-    for ( int i = 0; i < g_numOnicsButtons; i++ )
-    {
-        printf( "  - 0x%04X: IEEE=", g_onicsButtons[i].shortAddr );
-        if ( g_onicsButtons[i].hasIeee )
+    if (g_numOnicsButtons > 0) {
+        printf( "\n\033[1;37mRegistered Onics Buttons (%d):\033[0m\n", g_numOnicsButtons );
+        double now = ZNP_GetCurrentTime();
+        for ( int i = 0; i < g_numOnicsButtons; i++ )
         {
-            for ( int j = 7; j >= 0; j-- )
+            printf( "  - \033[1m0x%04X\033[0m: IEEE=", g_onicsButtons[i].shortAddr );
+            if ( g_onicsButtons[i].hasIeee )
             {
-                printf( "%02x", g_onicsButtons[i].ieee[j] );
+                for ( int j = 7; j >= 0; j-- )
+                {
+                    printf( "%02x", g_onicsButtons[i].ieee[j] );
+                }
             }
+            else
+            {
+                printf( "Unknown" );
+            }
+            printf( ", ep=0x%02X, zone_id=%d, \033[90mlast_seen=%.1fs ago\033[0m\n",
+                    g_onicsButtons[i].endpoint, g_onicsButtons[i].zoneId, now - g_onicsButtons[i].lastSeen );
         }
-        else
-        {
-            printf( "Unknown" );
-        }
-        printf( ", ep=0x%02X, zone_id=%d, last_seen=%.1fs ago\n",
-                g_onicsButtons[i].endpoint, g_onicsButtons[i].zoneId, now - g_onicsButtons[i].lastSeen );
     }
     pthread_mutex_unlock( &g_deviceMutex );
 }

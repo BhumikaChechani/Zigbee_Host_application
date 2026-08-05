@@ -354,26 +354,28 @@ void VibrationSensor_HandleStatus(uint16_t shortAddr_, uint16_t zoneStatus_, uin
 
 void VibrationSensor_PrintStatus(void) {
   pthread_mutex_lock(&g_deviceMutex);
-  printf("\n\033[1;36mRegistered Vibration Sensors (%d):\033[0m\n", g_numVibrationSensors);
-  double now = ZNP_GetCurrentTime();
-  for (int i = 0; i < g_numVibrationSensors; i++) {
-    printf("  - \033[1m0x%04X\033[0m: IEEE=", g_vibrationSensors[i].shortAddr);
-    if (g_vibrationSensors[i].hasIeee) {
-      for (int j = 7; j >= 0; j--) {
-        printf("%02x", g_vibrationSensors[i].ieee[j]);
+  if (g_numVibrationSensors > 0) {
+    printf("\n\033[1;37mRegistered Vibration Sensors (%d):\033[0m\n", g_numVibrationSensors);
+    double now = ZNP_GetCurrentTime();
+    for (int i = 0; i < g_numVibrationSensors; i++) {
+      printf("  - \033[1m0x%04X\033[0m: IEEE=", g_vibrationSensors[i].shortAddr);
+      if (g_vibrationSensors[i].hasIeee) {
+        for (int j = 7; j >= 0; j--) {
+          printf("%02x", g_vibrationSensors[i].ieee[j]);
+        }
+      } else {
+        printf("Unknown");
       }
-    } else {
-      printf("Unknown");
-    }
-    printf(", ep=0x%02X, zone_id=%d, \033[90mlast_seen=%.1fs ago\033[0m\n", 
-           g_vibrationSensors[i].endpoint, g_vibrationSensors[i].zoneId, 
-           now - g_vibrationSensors[i].lastSeen);
-           
-    if (!g_vibrationSensors[i].configured) {
-        printf("    \033[1;31mState: [NOT CONFIGURED YET]\033[0m\n");
-    } else {
-        printf("    \033[1;37mVibration:\033[0m %s\n", g_vibrationSensors[i].isVibrating ? "\033[38;5;214m[DETECTED]\033[0m" : "\033[1;33m[CLEARED]\033[0m");
-        printf("    \033[1;37mMovement :\033[0m %s\n", g_vibrationSensors[i].isMoving ? "\033[38;5;214m[DETECTED]\033[0m" : "\033[1;33m[CLEARED]\033[0m");
+      printf(", ep=0x%02X, zone_id=%d, \033[90mlast_seen=%.1fs ago\033[0m\n", 
+             g_vibrationSensors[i].endpoint, g_vibrationSensors[i].zoneId, 
+             now - g_vibrationSensors[i].lastSeen);
+             
+      if (!g_vibrationSensors[i].configured) {
+          printf("    \033[1;31mState: [NOT CONFIGURED YET]\033[0m\n");
+      } else {
+          printf("    \033[1;37mVibration:\033[0m %s\n", g_vibrationSensors[i].isVibrating ? "\033[38;5;214m[DETECTED]\033[0m" : "\033[1;33m[CLEARED]\033[0m");
+          printf("    \033[1;37mMovement :\033[0m %s\n", g_vibrationSensors[i].isMoving ? "\033[38;5;214m[DETECTED]\033[0m" : "\033[1;33m[CLEARED]\033[0m");
+      }
     }
   }
   pthread_mutex_unlock(&g_deviceMutex);

@@ -700,25 +700,27 @@ void OkosSiren_UpdateSeen(uint16_t addr)
 void OkosSiren_PrintStatus(void)
 {
     pthread_mutex_lock(&g_deviceMutex);
-    LOG_RAW("Okos Sirens (%d):\n", g_numOkosSirens);
-    double now = ZNP_GetCurrentTime();
-    for (int i = 0; i < g_numOkosSirens; i++) {
-        OKOS_SIREN_T *s = &g_okosSirens[i];
-        LOG_RAW("  - 0x%04X: IEEE=", s->shortAddr);
-        if (s->hasIeee) {
-            for (int j = 7; j >= 0; j--) {
-                LOG_RAW("%02x", s->ieee[j]);
+    if (g_numOkosSirens > 0) {
+        printf("\n\033[1;37mRegistered Okos Sirens (%d):\033[0m\n", g_numOkosSirens);
+        double now = ZNP_GetCurrentTime();
+        for (int i = 0; i < g_numOkosSirens; i++) {
+            OKOS_SIREN_T *s = &g_okosSirens[i];
+            printf("  - \033[1m0x%04X\033[0m: IEEE=", s->shortAddr);
+            if (s->hasIeee) {
+                for (int j = 7; j >= 0; j--) {
+                    printf("%02x", s->ieee[j]);
+                }
+            } else {
+                printf("Unknown");
             }
-        } else {
-            LOG_RAW("Unknown");
+            printf(", ep=0x%02X, tone=%d, vol=%d, tamper=%s, \033[90mlast_seen=%.1fs ago\033[0m",
+                   s->endpoint, s->toneId, s->volume,
+                   s->isTampered ? "YES" : "no", now - s->lastSeen);
+            if (s->temperatureCdeg != 0x7FFF) printf(" temp=%.2fC", s->temperatureCdeg/100.0f);
+            if (s->humidityHpct   != 0xFFFF) printf(" hum=%.2f%%", s->humidityHpct/100.0f);
+            if (s->batteryPct     != 0xFF)   printf(" bat=%u%%", s->batteryPct);
+            printf("\n");
         }
-        LOG_RAW(", ep=0x%02X, tone=%d, vol=%d, tamper=%s, seen=%.1fs ago",
-               s->endpoint, s->toneId, s->volume,
-               s->isTampered ? "YES" : "no", now - s->lastSeen);
-        if (s->temperatureCdeg != 0x7FFF) LOG_RAW(" temp=%.2fC", s->temperatureCdeg/100.0f);
-        if (s->humidityHpct   != 0xFFFF) LOG_RAW(" hum=%.2f%%", s->humidityHpct/100.0f);
-        if (s->batteryPct     != 0xFF)   LOG_RAW(" bat=%u%%", s->batteryPct);
-        LOG_RAW("\n");
     }
     pthread_mutex_unlock(&g_deviceMutex);
 }

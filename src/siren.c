@@ -645,24 +645,26 @@ void Siren_Beep( int count_ )
 void Siren_PrintStatus( void )
 {
     pthread_mutex_lock( &g_deviceMutex );
-    printf( "Registered Sirens (%d):\n", g_numSirens );
-    double now = ZNP_GetCurrentTime();
-    for ( int i = 0; i < g_numSirens; i++ )
-    {
-        printf( "  - 0x%04X: IEEE=", g_sirens[i].shortAddr );
-        if ( g_sirens[i].hasIeee )
+    if (g_numSirens > 0) {
+        printf( "\n\033[1;37mRegistered Sirens (%d):\033[0m\n", g_numSirens );
+        double now = ZNP_GetCurrentTime();
+        for ( int i = 0; i < g_numSirens; i++ )
         {
-            for ( int j = 7; j >= 0; j-- )
+            printf( "  - \033[1m0x%04X\033[0m: IEEE=", g_sirens[i].shortAddr );
+            if ( g_sirens[i].hasIeee )
             {
-                printf( "%02x", g_sirens[i].ieee[j] );
+                for ( int j = 7; j >= 0; j-- )
+                {
+                    printf( "%02x", g_sirens[i].ieee[j] );
+                }
             }
+            else
+            {
+                printf( "Unknown" );
+            }
+            printf( ", ep=0x%02X, \033[90mlast_seen=%.1fs ago\033[0m\n",
+                    g_sirens[i].endpoint, now - g_sirens[i].lastSeen );
         }
-        else
-        {
-            printf( "Unknown" );
-        }
-        printf( ", ep=0x%02X, last_seen=%.1fs ago\n",
-                g_sirens[i].endpoint, now - g_sirens[i].lastSeen );
     }
     pthread_mutex_unlock( &g_deviceMutex );
 }

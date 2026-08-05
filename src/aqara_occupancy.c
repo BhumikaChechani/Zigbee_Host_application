@@ -1334,11 +1334,17 @@ void AqaraOccupancy_PrintStatus(void) {
     printf("    Active Zones (%d):\n", activeZones);
     for (int z = 0; z < MAX_OCCUPANCY_ZONES; z++) {
       if (g_aqaraOccupancies[i].zones[z].isActive) {
-        printf("      - Zone %d: slice %u to %u (%u cm - %u cm)\n", z,
-               g_aqaraOccupancies[i].zones[z].minCm / 25,
-               g_aqaraOccupancies[i].zones[z].maxCm / 25,
+        char distStr[32] = {0};
+        if (g_aqaraOccupancies[i].zones[z].occupied && g_aqaraOccupancies[i].currentDistanceCm > 0) {
+            snprintf(distStr, sizeof(distStr), " at %u cm", g_aqaraOccupancies[i].currentDistanceCm);
+        }
+        
+        printf("      - Zone %d: [%u cm - %u cm] -> %s%s%s\033[0m\n", z,
                g_aqaraOccupancies[i].zones[z].minCm,
-               g_aqaraOccupancies[i].zones[z].maxCm);
+               g_aqaraOccupancies[i].zones[z].maxCm,
+               g_aqaraOccupancies[i].zones[z].occupied ? "\033[1;32mPresence DETECTED" : "\033[1;31mPresence CLEARED",
+               distStr,
+               "");
       }
     }
   }

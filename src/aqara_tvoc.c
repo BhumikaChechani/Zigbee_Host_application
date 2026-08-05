@@ -159,42 +159,6 @@ static void *AqaraTvoc_Thread(void *arg)
     return NULL;
 }
 
-// Poll thread: every 5 minutes, queue read requests for all registered TVOC
-// sensors into the ZNP indirect queue. When the sensor's radio wakes for any
-// reason (heartbeat, button press, threshold push), it finds these requests
-// and answers them automatically, keeping the cache fresh.
-static void *AqaraTvoc_PollThread(void *arg)
-{
-    (void)arg;
-    sleep(10); // Small startup delay
-    while (1) {
-        sleep(300); // 5 minutes between poll cycles
-
-        pthread_mutex_lock(&g_deviceMutex);
-        int num = g_numAqaraTvocs;
-        uint16_t addrs[MAX_AQARA_TVOC];
-        uint8_t  eps[MAX_AQARA_TVOC];
-        for (int i = 0; i < num; i++) {
-            addrs[i] = g_aqaraTvocs[i].shortAddr;
-            eps[i]   = g_aqaraTvocs[i].endpoint;
-        }
-        pthread_mutex_unlock(&g_deviceMutex);
-
-        for (int i = 0; i < num; i++) {
-            static uint8_t pollSeq = 0xC0;
-            LOG_DEBUG("[TVOC] Background poll: queueing read requests for 0x%04X\n", addrs[i]);
-
-            uint8_t reqTemp[5] = { 0x00, ++pollSeq, 0x00, 0x00, 0x00 };
-            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_TEMP_CLUSTER,    pollSeq, 0, 30, reqTemp, 5);
-            uint8_t reqHum[5]  = { 0x00, ++pollSeq, 0x00, 0x00, 0x00 };
-            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_HUM_CLUSTER,     pollSeq, 0, 30, reqHum,  5);
-            uint8_t reqTvoc[5] = { 0x00, ++pollSeq, 0x00, 0x55, 0x00 };
-            ZNP_AfDataRequestExt(2, addrs[i], eps[i], 0, 8, AQARA_TVOC_ANALOG_CLUSTER,  pollSeq, 0, 30, reqTvoc, 5);
-        }
-    }
-    return NULL;
-}
-
 void AqaraTvoc_Init(void)
 {
     memset(g_aqaraTvocs, 0, sizeof(g_aqaraTvocs));
@@ -205,10 +169,6 @@ void AqaraTvoc_Init(void)
 void AqaraTvoc_Start(void)
 {
     pthread_create(&s_thread, NULL, AqaraTvoc_Thread, NULL);
-
-    pthread_t pollThread;
-    pthread_create(&pollThread, NULL, AqaraTvoc_PollThread, NULL);
-    pthread_detach(pollThread);
 }
 
 void AqaraTvoc_PostAssign(uint16_t shortAddr_)
@@ -425,20 +385,20 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
         double now = ZNP_GetCurrentTime();
         char ts[32];
         
-        printf("\n\033[1;36m--- Aqara TVOC Environment Cache (0x%04X) ---\033[0m\n", addr);
+        printf("\n\033[1;36m--- Aqara TVOC Environment Status (0x%04X) ---\033[0m\n", addr);
         
         if (t.lastTempTime > 0) {
             format_time(now - t.lastTempTime, ts);
-            printf("  \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(updated %s)\033[0m\n", t.lastTemp, ts);
+            printf("  \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(live %s)\033[0m\n", t.lastTemp, ts);
         } else {
-            printf("  \033[1;31mTemperature :\033[0m \033[90m[Waiting for data...]\033[0m\n");
+            printf("  \033[1;31mTemperature :\033[0m \033[90m[Waiting for sensor push...]\033[0m\n");
         }
         
         if (t.lastHumTime > 0) {
             format_time(now - t.lastHumTime, ts);
-            printf("  \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(updated %s)\033[0m\n", t.lastHum, ts);
+            printf("  \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(live %s)\033[0m\n", t.lastHum, ts);
         } else {
-            printf("  \033[1;34mHumidity    :\033[0m \033[90m[Waiting for data...]\033[0m\n");
+            printf("  \033[1;34mHumidity    :\033[0m \033[90m[Waiting for sensor push...]\033[0m\n");
         }
         
         if (t.lastTvocTime > 0) {
@@ -451,28 +411,16 @@ void AqaraTvoc_ReadEnvironment(uint16_t addr)
             else if (t.lastTvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; }
             else { quality = "Unhealthy"; color = "\033[1;31m"; }
             
-            printf("  \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(updated %s)\033[0m\n", t.lastTvoc, color, quality, ts);
+            printf("  \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(live %s)\033[0m\n", t.lastTvoc, color, quality, ts);
         } else {
-            printf("  \033[1;35mTVOC        :\033[0m \033[90m[Waiting for data...]\033[0m\n");
+            printf("  \033[1;35mTVOC        :\033[0m \033[90m[Waiting for sensor push...]\033[0m\n");
         }
         
         if (t.lastBattTime > 0) {
             format_time(now - t.lastBattTime, ts);
-            printf("  \033[1;32mBattery     :\033[0m %6d %%   \033[90m(updated %s)\033[0m\n", t.lastBatt, ts);
+            printf("  \033[1;32mBattery     :\033[0m %6d %%   \033[90m(live %s)\033[0m\n", t.lastBatt, ts);
         }
-        printf("\033[1;36m---------------------------------------------\033[0m\n");
-        printf("\033[90m  [Read requests queued. Press sensor button to refresh.]\033[0m\n\n");
-        
-        // Always queue read requests so the sensor can answer whenever it wakes
-        static uint8_t seq = 0;
-        uint8_t reqTemp[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, seq, 0, 30, reqTemp, 5 );
-        
-        uint8_t reqHum[5] = { 0x00, ++seq, 0x00, 0x00, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, seq, 0, 30, reqHum, 5 );
-        
-        uint8_t reqTvoc[5] = { 0x00, ++seq, 0x00, 0x55, 0x00 };
-        ZNP_AfDataRequestExt( 2, addr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, seq, 0, 30, reqTvoc, 5 );
+        printf("\033[1;36m----------------------------------------------\033[0m\n");
     } else {
         pthread_mutex_unlock(&g_deviceMutex);
     }
@@ -502,11 +450,11 @@ void AqaraTvoc_PrintStatus(void)
             
             if (t.lastTempTime > 0) {
                 format_time(now - t.lastTempTime, ts);
-                printf("    \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(updated %s)\033[0m\n", t.lastTemp, ts);
+                printf("    \033[1;31mTemperature :\033[0m %6.2f C    \033[90m(live %s)\033[0m\n", t.lastTemp, ts);
             }
             if (t.lastHumTime > 0) {
                 format_time(now - t.lastHumTime, ts);
-                printf("    \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(updated %s)\033[0m\n", t.lastHum, ts);
+                printf("    \033[1;34mHumidity    :\033[0m %6.2f %%   \033[90m(live %s)\033[0m\n", t.lastHum, ts);
             }
             if (t.lastTvocTime > 0) {
                 format_time(now - t.lastTvocTime, ts);
@@ -517,24 +465,15 @@ void AqaraTvoc_PrintStatus(void)
                 else if (t.lastTvoc <= 660.0f) { quality = "Moderate"; color = "\033[1;33m"; }
                 else if (t.lastTvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; }
                 else { quality = "Unhealthy"; color = "\033[1;31m"; }
-                printf("    \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(updated %s)\033[0m\n", t.lastTvoc, color, quality, ts);
+                printf("    \033[1;35mTVOC        :\033[0m %6.2f ppb %s[%s]\033[0m \033[90m(live %s)\033[0m\n", t.lastTvoc, color, quality, ts);
             }
             if (t.lastBattTime > 0) {
                 format_time(now - t.lastBattTime, ts);
-                printf("    \033[1;32mBattery     :\033[0m %6d %%   \033[90m(updated %s)\033[0m\n", t.lastBatt, ts);
+                printf("    \033[1;32mBattery     :\033[0m %6d %%   \033[90m(live %s)\033[0m\n", t.lastBatt, ts);
             }
-            
-            // Queue read requests so running status updates the cache for next time
-            static uint8_t statSeq = 0xE0;
-            uint8_t reqTemp[5] = { 0x00, ++statSeq, 0x00, 0x00, 0x00 };
-            ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_TEMP_CLUSTER, statSeq, 0, 30, reqTemp, 5 );
-            
-            uint8_t reqHum[5] = { 0x00, ++statSeq, 0x00, 0x00, 0x00 };
-            ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_HUM_CLUSTER, statSeq, 0, 30, reqHum, 5 );
-            
-            uint8_t reqTvoc[5] = { 0x00, ++statSeq, 0x00, 0x55, 0x00 };
-            ZNP_AfDataRequestExt( 2, t.shortAddr, t.endpoint, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, statSeq, 0, 30, reqTvoc, 5 );
         }
+    } else {
+        printf("\n\033[1;37mNo Aqara TVOC Sensors registered.\033[0m\n");
     }
     pthread_mutex_unlock(&g_deviceMutex);
 }

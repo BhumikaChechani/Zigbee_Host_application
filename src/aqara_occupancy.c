@@ -75,7 +75,7 @@ static int AqaraOccupancy_ZclTypeLen(uint8_t type_) {
 static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
   if ((af_->clusterId != 0x0406 && af_->clusterId != 0xFCC0 &&
        af_->clusterId != 0x0402 && af_->clusterId != 0x0405 &&
-       af_->clusterId != 0x0400) ||
+       af_->clusterId != 0x0400 && af_->clusterId != 0x0012) ||
       af_->dataLen < 5) {
     return;
   }
@@ -667,7 +667,7 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   // hit, this also prevents the "setup flood -> crash -> rejoin" loop.
   double now = ZNP_GetCurrentTime();
   double lastAttempt = g_aqaraOccupancies[idx].lastSetupAttempt;
-  if ( lastAttempt > 0 && (now - lastAttempt) < 60.0 ) {
+  if ( lastAttempt > 0 && (now - lastAttempt) < 90.0 ) {
     pthread_mutex_unlock( &g_deviceMutex );
     LOG_DEBUG("[OCC] 0x%04X setup cooldown active (%.1fs since last attempt) - skipping\n",
            shortAddr_, now - lastAttempt);

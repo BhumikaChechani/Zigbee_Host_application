@@ -58,8 +58,6 @@ static void HandleAf(const AF_MSG_T *af)
             if (af->clusterId == AQARA_TVOC_TEMP_CLUSTER && attr == 0x0000 && dataType == 0x29 && zclLen >= dataOffset + 2) {
                 int16_t tempRaw = data[0] | (data[1] << 8);
                 float tempC = tempRaw / 100.0f;
-                if (cmdId == 0x0A)
-                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mTemperature: %.2f°C\033[0m\n", tempC);
                 
                 pthread_mutex_lock(&g_deviceMutex);
                 for (int i = 0; i < g_numAqaraTvocs; i++) {
@@ -75,8 +73,6 @@ static void HandleAf(const AF_MSG_T *af)
             else if (af->clusterId == AQARA_TVOC_HUM_CLUSTER && attr == 0x0000 && dataType == 0x21 && zclLen >= dataOffset + 2) {
                 uint16_t humRaw = data[0] | (data[1] << 8);
                 float humPercent = humRaw / 100.0f;
-                if (cmdId == 0x0A)
-                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;36mHumidity: %.2f%%\033[0m\n", humPercent);
                 
                 pthread_mutex_lock(&g_deviceMutex);
                 for (int i = 0; i < g_numAqaraTvocs; i++) {
@@ -93,25 +89,17 @@ static void HandleAf(const AF_MSG_T *af)
                 float tvoc = 0.0f;
                 memcpy(&tvoc, &data[0], 4);
                 
-                const char* quality;
-                const char* color;
                 TVOC_AQ_STATE_T newState;
                 
-                if (tvoc <= 65.0f) { quality = "Excellent"; color = "\033[1;32m"; newState = TVOC_AQ_EXCELLENT; }
-                else if (tvoc <= 220.0f) { quality = "Good"; color = "\033[1;36m"; newState = TVOC_AQ_GOOD; }
-                else if (tvoc <= 660.0f) { quality = "Moderate"; color = "\033[1;33m"; newState = TVOC_AQ_MODERATE; }
-                else if (tvoc <= 2200.0f) { quality = "Poor"; color = "\033[1;35m"; newState = TVOC_AQ_POOR; }
-                else { quality = "Unhealthy"; color = "\033[1;31m"; newState = TVOC_AQ_UNHEALTHY; }
-                
-                if (cmdId == 0x0A)
-                    LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;35mTVOC: %.2f ppb\033[0m (Air Quality: %s%s\033[0m)\n", tvoc, color, quality);
+                if (tvoc <= 65.0f) { newState = TVOC_AQ_EXCELLENT; }
+                else if (tvoc <= 220.0f) { newState = TVOC_AQ_GOOD; }
+                else if (tvoc <= 660.0f) { newState = TVOC_AQ_MODERATE; }
+                else if (tvoc <= 2200.0f) { newState = TVOC_AQ_POOR; }
+                else { newState = TVOC_AQ_UNHEALTHY; }
                 
                 pthread_mutex_lock(&g_deviceMutex);
                 for (int i = 0; i < g_numAqaraTvocs; i++) {
                     if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
-                        if (g_aqaraTvocs[i].lastAirQuality != TVOC_AQ_UNKNOWN && g_aqaraTvocs[i].lastAirQuality != newState) {
-                            LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;33m[AIR QUALITY ALERT] Changed to %s%s\033[0m (Reading: %.2f ppb)\n", color, quality, tvoc);
-                        }
                         g_aqaraTvocs[i].lastAirQuality = newState;
                         g_aqaraTvocs[i].lastTvoc = tvoc;
                         g_aqaraTvocs[i].lastTvocTime = ZNP_GetCurrentTime();
@@ -125,8 +113,6 @@ static void HandleAf(const AF_MSG_T *af)
                 uint8_t battRaw = data[0];
                 
                 if (attr == 0x0021) {
-                    if (cmdId == 0x0A)
-                        LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %d%%\033[0m\n", battRaw / 2);
                     pthread_mutex_lock(&g_deviceMutex);
                     for (int i = 0; i < g_numAqaraTvocs; i++) {
                         if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {
@@ -142,8 +128,6 @@ static void HandleAf(const AF_MSG_T *af)
                     if (pct > 100) pct = 100;
                     if (pct < 0) pct = 0;
                     
-                    if (cmdId == 0x0A)
-                        LOG_EVENT("AQARA_TVOC", af->srcAddr, "\033[1;32mBattery: %.1fV (~%d%%)\033[0m\n", voltage, pct);
                     pthread_mutex_lock(&g_deviceMutex);
                     for (int i = 0; i < g_numAqaraTvocs; i++) {
                         if (g_aqaraTvocs[i].shortAddr == af->srcAddr) {

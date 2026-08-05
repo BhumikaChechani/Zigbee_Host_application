@@ -153,101 +153,116 @@ void Device_Save(void) {
 
 #if ENABLE_SIREN
   for (int i = 0; i < g_numSirens; i++) {
-    fprintf(file, "siren %04X %02X ", g_sirens[i].shortAddr,
-            g_sirens[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_sirens[i].ieee[j]);
+    if (g_sirens[i].hasIeee) {
+      fprintf(file, "siren %04X %02X ", g_sirens[i].shortAddr,
+              g_sirens[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_sirens[i].ieee[j]);
+      }
+      fprintf(file, " %d %d %u %u\n", g_sirens[i].hasIeee ? 1 : 0,
+              g_sirens[i].zoneId, g_sirens[i].volume, g_sirens[i].mode);
     }
-    fprintf(file, " %d %d %u %u\n", g_sirens[i].hasIeee ? 1 : 0,
-            g_sirens[i].zoneId, g_sirens[i].volume, g_sirens[i].mode);
   }
 #endif
 #if ENABLE_OKOS_SIREN
   for (int i = 0; i < g_numOkosSirens; i++) {
-    fprintf(file, "okos_siren %04X %02X ", g_okosSirens[i].shortAddr,
-            g_okosSirens[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_okosSirens[i].ieee[j]);
+    if (g_okosSirens[i].hasIeee) {
+      fprintf(file, "okos_siren %04X %02X ", g_okosSirens[i].shortAddr,
+              g_okosSirens[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_okosSirens[i].ieee[j]);
+      }
+      fprintf(file, " %d %d %u %u %u\n", g_okosSirens[i].hasIeee ? 1 : 0,
+              g_okosSirens[i].zoneId, g_okosSirens[i].volume,
+              g_okosSirens[i].toneId, g_okosSirens[i].strobeMode);
     }
-    fprintf(file, " %d %d %u %u %u\n", g_okosSirens[i].hasIeee ? 1 : 0,
-            g_okosSirens[i].zoneId, g_okosSirens[i].volume,
-            g_okosSirens[i].toneId, g_okosSirens[i].strobeMode);
   }
 #endif
 
 #if ENABLE_AQARA_BUTTON
   for (int i = 0; i < g_numAqaraButtons; i++) {
-    fprintf(file, "aqara %04X %02X ", g_aqaraButtons[i].shortAddr,
-            g_aqaraButtons[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_aqaraButtons[i].ieee[j]);
+    if (g_aqaraButtons[i].hasIeee) {
+      fprintf(file, "aqara %04X %02X ", g_aqaraButtons[i].shortAddr,
+              g_aqaraButtons[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_aqaraButtons[i].ieee[j]);
+      }
+      fprintf(file, " %d\n", g_aqaraButtons[i].hasIeee ? 1 : 0);
     }
-    fprintf(file, " %d\n", g_aqaraButtons[i].hasIeee ? 1 : 0);
   }
 #endif
 
 #if ENABLE_ONICS_BUTTON
   for (int i = 0; i < g_numOnicsButtons; i++) {
-    fprintf(file, "onics %04X %02X ", g_onicsButtons[i].shortAddr,
-            g_onicsButtons[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_onicsButtons[i].ieee[j]);
+    if (g_onicsButtons[i].hasIeee) {
+      fprintf(file, "onics %04X %02X ", g_onicsButtons[i].shortAddr,
+              g_onicsButtons[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_onicsButtons[i].ieee[j]);
+      }
+      fprintf(file, " %d %d\n", g_onicsButtons[i].hasIeee ? 1 : 0,
+              g_onicsButtons[i].zoneId);
     }
-    fprintf(file, " %d %d\n", g_onicsButtons[i].hasIeee ? 1 : 0,
-            g_onicsButtons[i].zoneId);
   }
 #endif
 
 #if ENABLE_AQARA_OCCUPANCY
   for (int i = 0; i < g_numAqaraOccupancies; i++) {
-    fprintf(file, "occupancy %04X %02X ", g_aqaraOccupancies[i].shortAddr,
-            g_aqaraOccupancies[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_aqaraOccupancies[i].ieee[j]);
+    if (g_aqaraOccupancies[i].hasIeee) {
+      fprintf(file, "occupancy %04X %02X ", g_aqaraOccupancies[i].shortAddr,
+              g_aqaraOccupancies[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_aqaraOccupancies[i].ieee[j]);
+      }
+      fprintf(file, " %d", g_aqaraOccupancies[i].hasIeee ? 1 : 0);
+      for (int z = 0; z < MAX_OCCUPANCY_ZONES; z++) {
+        fprintf(file, " %d %u %u",
+                g_aqaraOccupancies[i].zones[z].isActive ? 1 : 0,
+                g_aqaraOccupancies[i].zones[z].minCm,
+                g_aqaraOccupancies[i].zones[z].maxCm);
+      }
+      fprintf(file, " %u\n", g_aqaraOccupancies[i].lightThreshold);
     }
-    fprintf(file, " %d", g_aqaraOccupancies[i].hasIeee ? 1 : 0);
-    for (int z = 0; z < MAX_OCCUPANCY_ZONES; z++) {
-      fprintf(file, " %d %u %u",
-              g_aqaraOccupancies[i].zones[z].isActive ? 1 : 0,
-              g_aqaraOccupancies[i].zones[z].minCm,
-              g_aqaraOccupancies[i].zones[z].maxCm);
-    }
-    fprintf(file, " %u", g_aqaraOccupancies[i].lightThreshold);
-    fprintf(file, "\n");
   }
 #endif
 
 #if ENABLE_CONTACT_SENSOR
   for (int i = 0; i < g_numContactSensors; i++) {
-    fprintf(file, "contact %04X %02X ", g_contactSensors[i].shortAddr,
-            g_contactSensors[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_contactSensors[i].ieee[j]);
+    if (g_contactSensors[i].hasIeee) {
+      fprintf(file, "contact %04X %02X ", g_contactSensors[i].shortAddr,
+              g_contactSensors[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_contactSensors[i].ieee[j]);
+      }
+      fprintf(file, " %d %d\n", g_contactSensors[i].hasIeee ? 1 : 0,
+              g_contactSensors[i].zoneId);
     }
-    fprintf(file, " %d %d\n", g_contactSensors[i].hasIeee ? 1 : 0,
-            g_contactSensors[i].zoneId);
   }
 #endif
 
 #if ENABLE_VIBRATION_SENSOR
   for (int i = 0; i < g_numVibrationSensors; i++) {
-    fprintf(file, "vibration %04X %02X ", g_vibrationSensors[i].shortAddr,
-            g_vibrationSensors[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_vibrationSensors[i].ieee[j]);
+    if (g_vibrationSensors[i].hasIeee) {
+      fprintf(file, "vibration %04X %02X ", g_vibrationSensors[i].shortAddr,
+              g_vibrationSensors[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_vibrationSensors[i].ieee[j]);
+      }
+      fprintf(file, " %d %d %d\n", g_vibrationSensors[i].hasIeee ? 1 : 0,
+              g_vibrationSensors[i].zoneId, g_vibrationSensors[i].sensitivity);
     }
-    fprintf(file, " %d %d %d\n", g_vibrationSensors[i].hasIeee ? 1 : 0,
-            g_vibrationSensors[i].zoneId, g_vibrationSensors[i].sensitivity);
   }
 #endif
 #if ENABLE_AQARA_TVOC
   for (int i = 0; i < g_numAqaraTvocs; i++) {
-    fprintf(file, "tvoc %04X %02X ", g_aqaraTvocs[i].shortAddr,
-            g_aqaraTvocs[i].endpoint);
-    for (int j = 0; j < 8; j++) {
-      fprintf(file, "%02X", g_aqaraTvocs[i].ieee[j]);
+    if (g_aqaraTvocs[i].hasIeee) {
+      fprintf(file, "tvoc %04X %02X ", g_aqaraTvocs[i].shortAddr,
+              g_aqaraTvocs[i].endpoint);
+      for (int j = 0; j < 8; j++) {
+        fprintf(file, "%02X", g_aqaraTvocs[i].ieee[j]);
+      }
+      fprintf(file, " %d\n", g_aqaraTvocs[i].hasIeee ? 1 : 0);
     }
-    fprintf(file, " %d\n", g_aqaraTvocs[i].hasIeee ? 1 : 0);
   }
 #endif
 

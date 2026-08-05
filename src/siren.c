@@ -488,7 +488,7 @@ void Siren_ControlAllDuration( uint8_t warnMode_, uint16_t durationSeconds_ )
     if ( g_numSirens == 0 )
     {
         if (warnMode_ != 0) {
-            printf("ERROR: Failed to trigger siren. No sirens registered in the network.\n");
+            LOG_DEBUG("[SIREN] No sirens registered - trigger skipped.\n");
         }
         pthread_mutex_unlock( &g_deviceMutex );
         return;
@@ -527,7 +527,7 @@ void Siren_TriggerAll( uint8_t mode_, uint16_t durationSeconds_ )
     if ( g_numSirens == 0 )
     {
         if (mode_ != 0) {
-            printf("ERROR: Failed to trigger siren. No sirens registered in the network.\n");
+            LOG_DEBUG("[SIREN] No sirens registered - trigger skipped.\n");
         }
         pthread_mutex_unlock( &g_deviceMutex );
         return;
@@ -593,7 +593,7 @@ void Siren_Beep( int count_ )
     pthread_mutex_lock( &g_deviceMutex );
     if ( g_numSirens == 0 )
     {
-        printf("ERROR: Failed to trigger siren beep. No sirens registered in the network.\n");
+        LOG_DEBUG("[SIREN] No sirens registered - beep skipped.\n");
         pthread_mutex_unlock( &g_deviceMutex );
         return;
     }

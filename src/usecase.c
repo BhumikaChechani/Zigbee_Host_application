@@ -38,8 +38,16 @@
 static bool ContactCountsAsOpen(int idx, double now) {
     if (g_contactSensors[idx].isOpen)
         return true;
-    return g_contactSensors[idx].lastOpenedTime > 0.0 &&
-           (now - g_contactSensors[idx].lastOpenedTime) < DOOR_OPEN_GRACE_S;
+    // Grace period: only applies if door has NOT been explicitly closed after
+    // opening. Once a CLOSE event arrives, lastStatusTime is updated to the
+    // close moment, so we compare the open time against the status time.
+    // If closed time > open time, the door has since been explicitly closed.
+    double lastOpened = g_contactSensors[idx].lastOpenedTime;
+    double lastStatus = g_contactSensors[idx].lastStatusTime;
+    if (lastOpened > 0.0 && (lastStatus <= 0.0 || lastOpened > lastStatus)) {
+        return (now - lastOpened) < DOOR_OPEN_GRACE_S;
+    }
+    return false;
 }
 
 bool UseCase_IsDoorOpenForZone(uint8_t zoneIdx, bool *hasSensors_out) {

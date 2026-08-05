@@ -1344,8 +1344,11 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
             if (inCls[i] == 0x0006 || inCls[i] == 0x0012) isAqara = true;
             if (inCls[i] == 0x0406) isOccupancy = true;
             if (inCls[i] == 0x000C) isTvoc = true;
+            // 0xFC04 and 0x0101 are Frient-specific vibration clusters
             if (inCls[i] == 0xFC04 || inCls[i] == 0x0101) isVibration = true;
-            if (inCls[i] == 0x0500) isContact = true;  // IAS Zone cluster
+            // 0x0500 = IAS Zone (contact sensor), but Frient vibration also uses it.
+            // Only flag as contact if no vibration-specific cluster was seen.
+            if (inCls[i] == 0x0500 && !isVibration) isContact = true;
           }
           
           for (int i = 0; i < numOutCls; i++) {
@@ -1353,7 +1356,11 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
           }
 
           if (deviceId == 0x0107) isOccupancy = true;
-          if (deviceId == 0x0228 || deviceId == 0x022D || deviceId == 0x0101) isVibration = true;
+          // Frient vibration DeviceIDs — override isContact if it was set by 0x0500
+          if (deviceId == 0x0228 || deviceId == 0x022D || deviceId == 0x0101) {
+            isVibration = true;
+            isContact = false;
+          }
 
           if (deviceId == 0x0402 && !isVibration && !isTvoc && !isContact) {
              LOG_DEBUG("Device 0x%04X is DevID 0x0402 (IAS Zone). Querying ModelIdentifier to classify...\n", shortAddr);
@@ -1369,13 +1376,13 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
 #if ENABLE_AQARA_TVOC
             AqaraTvoc_Discover(shortAddr, ep);
 #endif
-          } else if (isContact) {
-#if ENABLE_CONTACT_SENSOR
-            ContactSensor_Discover(shortAddr, ep);
-#endif
           } else if (isVibration) {
 #if ENABLE_VIBRATION_SENSOR
             VibrationSensor_Discover(shortAddr, ep);
+#endif
+          } else if (isContact) {
+#if ENABLE_CONTACT_SENSOR
+            ContactSensor_Discover(shortAddr, ep);
 #endif
           } else if (isOkosTuya) {
 #if ENABLE_OKOS_SIREN

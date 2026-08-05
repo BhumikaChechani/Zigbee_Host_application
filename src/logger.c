@@ -1,6 +1,6 @@
 #include "logger.h"
 
-LogLevel g_logLevel = LOG_LEVEL_DEBUG;
+LogLevel g_logLevel = LOG_LEVEL_INFO;
 
 void Logger_PrintTimestamp(void) {
   time_t now;

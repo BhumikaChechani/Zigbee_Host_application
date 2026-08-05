@@ -5,7 +5,7 @@
 // Feature Toggles: Enable or disable specific sensor modules at compile-time.
 // Set to 1 to compile and run the module, set to 0 to completely remove it.
 // ============================================================================
-#define APP_VERSION "1.1.0"
+#define APP_VERSION "2.2.1"
 
 // ============================================================================
 

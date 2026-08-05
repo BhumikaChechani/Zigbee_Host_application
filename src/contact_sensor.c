@@ -463,7 +463,7 @@ void ContactSensor_PrintStatus(void) {
       } else if (g_contactSensors[i].isOpen) {
           printf("    \033[1;37mState:\033[0m \033[1;35m[DOOR OPEN]\033[0m\n");
       } else {
-          printf("    \033[1;37mState:\033[0m \033[1;36m[DOOR CLOSED]\033[0m\n");
+          printf("    \033[1;37mState:\033[0m \033[1;33m[DOOR CLOSED]\033[0m\n");
       }
     }
   }

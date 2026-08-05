@@ -1006,9 +1006,14 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
       // arrive asynchronously as events; we only need the SRSP ack here.
       uint8_t reqPay[4] = {nwkAddr & 0xFF, (nwkAddr >> 8) & 0xFF, 0x01, 0x00};
       ZNP_Sreq(0x25, 0x01, reqPay, 4, NULL, 3000); // IEEE_addr_req
+      usleep(250000);
+      
       ZNP_ZdoActiveEpReq(nwkAddr);
-      ZNP_QuerySimpleDesc(nwkAddr,
-                          1); // Standard ep-1 (Okos, Aqara, Tuya, etc.)
+      usleep(250000);
+      
+      ZNP_QuerySimpleDesc(nwkAddr, 1); // Standard ep-1 (Okos, Aqara, Tuya, etc.)
+      usleep(250000);
+      
       ZNP_QuerySimpleDesc(nwkAddr, 43); // Develco/Frient siren ep-43 fallback
     }
   }

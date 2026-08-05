@@ -279,13 +279,44 @@ void AqaraTvoc_Discover(uint16_t addr, uint8_t ep)
     // The device is guaranteed to be awake and polling for a few seconds right now.
     static uint8_t joinSeq = 0xD0;
     uint8_t reqTemp[5] = { 0x00, ++joinSeq, 0x00, 0x00, 0x00 };
-    ZNP_AfDataRequestExt(2, addr, ep, 0, 8, AQARA_TVOC_TEMP_CLUSTER, joinSeq, 0, 30, reqTemp, 5);
+    ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_TEMP_CLUSTER, joinSeq, 0, 30, reqTemp, 5 );
     
     uint8_t reqHum[5] = { 0x00, ++joinSeq, 0x00, 0x00, 0x00 };
-    ZNP_AfDataRequestExt(2, addr, ep, 0, 8, AQARA_TVOC_HUM_CLUSTER, joinSeq, 0, 30, reqHum, 5);
+    ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_HUM_CLUSTER, joinSeq, 0, 30, reqHum, 5 );
     
     uint8_t reqTvoc[5] = { 0x00, ++joinSeq, 0x00, 0x55, 0x00 };
-    ZNP_AfDataRequestExt(2, addr, ep, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, joinSeq, 0, 30, reqTvoc, 5);
+    ZNP_AfDataRequestExt( 2, addr, ep, 0, 8, AQARA_TVOC_ANALOG_CLUSTER, joinSeq, 0, 30, reqTvoc, 5 );
+}
+
+void AqaraTvoc_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
+    bool found = false;
+    pthread_mutex_lock(&g_deviceMutex);
+    int targetIdx = -1;
+    for (int i = 0; i < g_numAqaraTvocs; i++) {
+        if (g_aqaraTvocs[i].shortAddr == shortAddr_) {
+            memcpy(g_aqaraTvocs[i].ieee, ieee_, 8);
+            g_aqaraTvocs[i].hasIeee = true;
+            targetIdx = i;
+            found = true;
+            break;
+        }
+    }
+    if (found) {
+        for (int i = g_numAqaraTvocs - 1; i >= 0; i--) {
+            if (g_aqaraTvocs[i].shortAddr != shortAddr_ && g_aqaraTvocs[i].hasIeee && memcmp(g_aqaraTvocs[i].ieee, ieee_, 8) == 0) {
+                // Duplicate resolution
+                for (int j = i; j < g_numAqaraTvocs - 1; j++) {
+                    g_aqaraTvocs[j] = g_aqaraTvocs[j + 1];
+                }
+                g_numAqaraTvocs--;
+                if (targetIdx > i) targetIdx--;
+            }
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (found) {
+        Device_Save();
+    }
 }
 
 bool AqaraTvoc_IsKnown(uint16_t addr)

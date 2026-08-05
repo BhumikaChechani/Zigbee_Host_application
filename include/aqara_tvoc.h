@@ -49,6 +49,7 @@ void AqaraTvoc_Start(void);
 
 // Management
 void AqaraTvoc_Discover(uint16_t addr, uint8_t ep);
+void AqaraTvoc_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_);
 bool AqaraTvoc_IsKnown(uint16_t addr);
 void AqaraTvoc_UpdateSeen(uint16_t addr);
 void AqaraTvoc_ReadEnvironment(uint16_t addr);

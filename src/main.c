@@ -1230,6 +1230,12 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
 #if ENABLE_OKOS_SIREN
         OkosSiren_UpdateIeee(shortAddr, ieee);
 #endif
+#if ENABLE_VIBRATION_SENSOR
+        VibrationSensor_UpdateIeee(shortAddr, ieee);
+#endif
+#if ENABLE_AQARA_TVOC
+        AqaraTvoc_UpdateIeee(shortAddr, ieee);
+#endif
       }
     } else if (clusterId == 0x8005 && status == 0) {
       LOG_DEBUG("ZDO Active EPs Rsp: short=0x%04X, EPs=[", shortAddr);

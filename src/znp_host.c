@@ -1313,8 +1313,8 @@ bool ZNP_SendSirenSquawk( uint16_t sirenShortAddr_, uint8_t sirenEndpoint_, uint
 bool ZNP_SendDefaultResponse(uint16_t shortAddr_, uint8_t endpoint_, uint16_t clusterId_,
                              uint8_t transId_, uint8_t cmdId_, uint8_t status_)
 {
-    LOG_DEBUG("Sending Default Response to 0x%04X ep=0x%02X cluster=0x%04X cmd=0x%02X status=0x%02X...\n",
-           shortAddr_, endpoint_, clusterId_, cmdId_, status_);
+    // LOG_DEBUG("Sending Default Response to 0x%04X ep=0x%02X cluster=0x%04X cmd=0x%02X status=0x%02X...\n",
+    //        shortAddr_, endpoint_, clusterId_, cmdId_, status_);
 
     uint8_t zclFrame[5];
     zclFrame[0] = 0x10;

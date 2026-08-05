@@ -201,7 +201,6 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   }
 
   bool changed = false;
-  bool isRejoin = false;
   if (idx == -1) {
     if (g_numContactSensors < MAX_CONTACT_SENSORS) {
       LOG_DEBUG("Contact Sensor discovered: short=0x%04X, ep=0x%02X\n",
@@ -229,7 +228,11 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
              g_contactSensors[idx].shortAddr, shortAddr_);
       LOG_EVENT("CONTACT", shortAddr_, "Network Rejoin\n");
       g_contactSensors[idx].shortAddr = shortAddr_;
-      isRejoin = true;
+      
+      // CRITICAL: When an IAS Zone device rejoins, it often clears its internal 
+      // bindings and IAS_CIE_Address. We MUST force it to reconfigure.
+      g_contactSensors[idx].configured = false;
+      
       changed = true;
     }
     if (g_contactSensors[idx].endpoint != endpoint_) {
@@ -244,16 +247,14 @@ void ContactSensor_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     }
   }
 
-  // Device-side bindings target the coordinator's (stable) IEEE, so they
-  // survive a rejoin; skip the setup flood for a pure rejoin of an
-  // already-configured sensor.
-  bool alreadyConfigured = (idx != -1 && g_contactSensors[idx].configured);
   pthread_mutex_unlock(&g_deviceMutex);
 
   if (changed)
     Device_Save();
-  if (!(isRejoin && alreadyConfigured))
-    ContactSensor_PostAssign(shortAddr_);
+    
+  // Always trigger the setup thread; if the device is already configured,
+  // ContactSensor_Setup will gracefully abort early.
+  ContactSensor_PostAssign(shortAddr_);
 }
 
 void ContactSensor_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {

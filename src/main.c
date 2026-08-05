@@ -1345,6 +1345,7 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
             if (inCls[i] == 0x0406) isOccupancy = true;
             if (inCls[i] == 0x000C) isTvoc = true;
             if (inCls[i] == 0xFC04 || inCls[i] == 0x0101) isVibration = true;
+            if (inCls[i] == 0x0500) isContact = true;  // IAS Zone cluster
           }
           
           for (int i = 0; i < numOutCls; i++) {
@@ -1354,7 +1355,7 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
           if (deviceId == 0x0107) isOccupancy = true;
           if (deviceId == 0x0228 || deviceId == 0x022D || deviceId == 0x0101) isVibration = true;
 
-          if (deviceId == 0x0402 && !isVibration && !isTvoc) {
+          if (deviceId == 0x0402 && !isVibration && !isTvoc && !isContact) {
              LOG_DEBUG("Device 0x%04X is DevID 0x0402 (IAS Zone). Querying ModelIdentifier to classify...\n", shortAddr);
              uint8_t req[5] = {0x00, 0x55, 0x00, 0x05, 0x00};
              ZNP_AfDataRequestExt(2, shortAddr, ep, 0, 8, 0x0000, 0x55, 0, 30, req, 5);

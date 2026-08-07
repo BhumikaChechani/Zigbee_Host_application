@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 
 AQARA_BUTTON_T g_aqaraButtons[MAX_AQARA_BUTTONS];
 int g_numAqaraButtons = 0;
@@ -28,6 +29,20 @@ static pthread_t s_aqaraThread;
 ///
 static void AqaraButton_HandleAf( const AF_MSG_T *af_ )
 {
+    // If we receive a message from an unconfigured button (e.g. heartbeat), schedule setup immediately while it's awake
+    bool conf = false;
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numAqaraButtons; i++) {
+        if (g_aqaraButtons[i].shortAddr == af_->srcAddr) {
+            conf = g_aqaraButtons[i].configured;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    if (!conf) {
+        AqaraButton_PostAssign(af_->srcAddr);
+    }
+
     if ( af_->dataLen < 3 )
     {
         return;
@@ -45,7 +60,12 @@ static void AqaraButton_HandleAf( const AF_MSG_T *af_ )
         if (cmdId == 0x0A && af_->dataLen >= hdrLen + 4) {
             uint16_t attr = af_->data[hdrLen] | (af_->data[hdrLen+1] << 8);
             uint8_t type = af_->data[hdrLen+2];
-            LOG_DEBUG("  -> Report Attr: 0x%04X, type: 0x%02X\n", attr, type);
+            uint8_t val = af_->data[hdrLen+3]; // low byte is sufficient for single/double clicks
+            LOG_DEBUG("  -> Report Attr: 0x%04X, type: 0x%02X, val: 0x%02X\n", attr, type, val);
+            if (attr == 0x0055) { // Present Value
+                AqaraButton_HandleCommand( af_->srcAddr, 0x02 ); // Map to TOGGLE
+                return;
+            }
         }
     }
     
@@ -135,6 +155,13 @@ void AqaraButton_PostAf( uint16_t shortAddr_, const AF_MSG_T *af_ )
     MsgQueue_Push( &s_aqaraInbox, msg );
 }
 
+static void* DelayedAqaraSetupThread(void* arg) {
+    uint16_t shortAddr = (uint16_t)(uintptr_t)arg;
+    sleep(10); // Allow TCLK exchange to complete without overwhelming the device
+    AqaraButton_PostAssign(shortAddr);
+    return NULL;
+}
+
 // Register (or refresh) an Aqara button. Runs in the dispatcher; only touches
 // shared state. Device setup I/O is handed to the aqara worker thread.
 void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
@@ -211,7 +238,20 @@ void AqaraButton_Discover( uint16_t shortAddr_, uint8_t endpoint_ )
     {
         Device_Save();
     }
-    AqaraButton_PostAssign( shortAddr_ );
+    
+    bool alreadyConfigured = false;
+    if (idx != -1) {
+        alreadyConfigured = g_aqaraButtons[idx].configured;
+    }
+    
+    if (!alreadyConfigured) {
+        LOG_DEBUG("[AQARA BTN] 0x%04X delaying setup for 10s to allow secure join.\n", shortAddr_);
+        pthread_t t;
+        pthread_create(&t, NULL, DelayedAqaraSetupThread, (void*)(uintptr_t)shortAddr_);
+        pthread_detach(t);
+    } else {
+        AqaraButton_PostAssign( shortAddr_ );
+    }
 }
 
 void AqaraButton_UpdateIeee( uint16_t shortAddr_, const uint8_t *ieee_ )
@@ -309,6 +349,9 @@ void AqaraButton_Setup( uint16_t shortAddr_ )
 
     // Bind On/Off cluster output (0x0006) to coordinator endpoint 8.
     ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0006, g_coordinatorIeee, 8 );
+    usleep(300000);
+    // Bind Multistate Input cluster (0x0012) for newer revisions (e.g. WXKG12LM).
+    ZNP_ZdoBindReq( shortAddr_, buttonIeee, endpoint, 0x0012, g_coordinatorIeee, 8 );
     LOG_DEBUG( "Configuration sent to Aqara button 0x%04X!\n", shortAddr_ );
 }
 

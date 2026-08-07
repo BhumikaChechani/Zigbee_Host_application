@@ -268,13 +268,10 @@ static void UseCase_Handle(const UC_EVT_T *event_) {
     LOG_DEBUG("[USECASE] Person detected in FP300 0x%04X Zone %u (Door open: %s, Sensors: %d)\n",
            event_->srcAddr, zoneIdx, isDoorOpen ? "YES" : "NO", hasDoorSensors);
     if (!hasDoorSensors) {
-        // No contact sensor registered at all - trigger alarm unconditionally
+        // No contact sensor registered - ignore presence
         LOG_EVENT("OCCUPANCY", event_->srcAddr,
-            "\033[1;32mPresence DETECTED | Zone %-2u [%u-%u cm] | %4u cm\033[0m\n",
+            "\033[1;33mPresence IGNORED  | Zone %-2u [%u-%u cm] | %4u cm | Reason: Door Sensor NOT REGISTERED\033[0m\n",
             zoneIdx, minCm, maxCm, event_->val2);
-#if ENABLE_SIREN
-        Siren_TriggerAll(5, 5);
-#endif
     } else if (isDoorOpen) {
         LOG_EVENT("OCCUPANCY", event_->srcAddr,
             "\033[1;32mPresence DETECTED | Zone %-2u [%u-%u cm] | %4u cm\033[0m\n",

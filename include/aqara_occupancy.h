@@ -35,11 +35,12 @@ typedef struct {
   bool isLightOn;     ///< Last known state of the light.
   uint16_t lastLightLevel; ///< Last reported raw light intensity level.
   uint16_t lightThreshold; ///< Per-device threshold for Day/Night detection.
-  double lastPolled;  ///< Timestamp of the last outgoing poll (Read Attributes) sent to this device.
+
   double lastSetupAttempt; ///< Timestamp of the last setup attempt (rate-limiter).
   OccupancyZone zones[MAX_OCCUPANCY_ZONES]; ///< Configured distance ranges.
   uint8_t motionStatus;      ///< Last radar motion classification (attr 0x0143).
   uint8_t approachDirection; ///< Last approach direction (attr 0x0144). 0=Left, 1=Right, 0xFF=Unknown.
+  double setupScheduledTime; ///< Timestamp when initial setup should run (delays setup to allow secure join).
 } AQARA_OCCUPANCY_T;
 
 #define MAX_AQARA_OCCUPANCY 32 ///< Maximum occupancy sensors tracked.
@@ -145,16 +146,7 @@ void AqaraOccupancy_UpdateSeen(uint16_t shortAddr_);
 /// @return None.
 void AqaraOccupancy_DiscoverAllActiveEp(void);
 
-///
-/// @brief  Actively read the presence attribute from every occupancy sensor.
-///
-/// Sends a ZCL Read Attributes for 0xFCC0/0x0142 to each registered sensor. A
-/// Read Attributes Response proves the device is reachable/awake; silence means
-/// it is asleep or has left the network. Used by the CLI 'poll' command.
-///
-/// @return None.
-///
-void AqaraOccupancy_PollAll(void);
+
 
 /// @brief Re-trigger detection events for all occupied zones (used when door opens).
 void AqaraOccupancy_TriggerIfOccupied(void);

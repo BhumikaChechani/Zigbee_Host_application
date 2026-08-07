@@ -898,28 +898,7 @@ static void Main_SetOnline(uint16_t addr_) {
 /// @return None.
 ///
 static void Main_CheckDeviceOfflineStatus(double now_) {
-#if ENABLE_AQARA_OCCUPANCY
-  // Occupancy: compare lastPolled vs lastSeen.
-  // If we polled it (lastPolled > 0) and the last reply is older than the
-  // poll timestamp by more than OCC_POLL_NO_REPLY_THRESHOLD, the sensor
-  // was asked to respond but stayed silent.
-  pthread_mutex_lock(&g_deviceMutex);
-  for (int i = 0; i < g_numAqaraOccupancies; i++) {
-    double lastPolled = g_aqaraOccupancies[i].lastPolled;
-    double lastSeen = g_aqaraOccupancies[i].lastSeen;
-    if (lastPolled > 0 && lastPolled > lastSeen &&
-        (now_ - lastPolled) > OCC_POLL_NO_REPLY_THRESHOLD) {
-      LOG_DEBUG(
-          "\U000026a0\ufe0f  [NOT RESPONDING] Occupancy Sensor 0x%04X: "
-          "polled %.0fs ago but NO reply received! "
-          "(last seen %.0fs ago) — radar may be frozen, check power/range.\n",
-          g_aqaraOccupancies[i].shortAddr, now_ - lastPolled, now_ - lastSeen);
-    }
-  }
-  pthread_mutex_unlock(&g_deviceMutex);
-#else
-  (void)now_;
-#endif
+
   // Check sleepy end devices (Buttons, Contact, Vibration) for a 2-hour timeout
   // Check mains-powered routers (Sirens, Occupancy) for a 5-minute timeout
   pthread_mutex_lock(&g_deviceMutex);

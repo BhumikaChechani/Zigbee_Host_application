@@ -263,68 +263,7 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
   }
 }
 
-void AqaraOccupancy_PollAll(void) {
-  pthread_mutex_lock(&g_deviceMutex);
-  int num = g_numAqaraOccupancies;
-  int validNum = 0;
-  uint16_t addrs[MAX_AQARA_OCCUPANCY];
-  uint8_t eps[MAX_AQARA_OCCUPANCY];
-  for (int i = 0; i < num; i++) {
-    if (!g_aqaraOccupancies[i].configured)
-      continue;
-    addrs[validNum] = g_aqaraOccupancies[i].shortAddr;
-    eps[validNum] = g_aqaraOccupancies[i].endpoint;
-    validNum++;
-  }
-  pthread_mutex_unlock(&g_deviceMutex);
 
-  if (validNum == 0)
-    return;
-  num = validNum;
-
-  // Atomic: PollAll runs on the poll thread AND from the CLI 'poll' command.
-  static uint8_t zclSeq = 100; // distinct sequence range
-  static int pollCounter = 0;
-  int tick = __atomic_add_fetch(&pollCounter, 1, __ATOMIC_RELAXED);
-
-  // Poll presence & distance only once every 10 cycles (~3 seconds) to avoid
-  // network congestion
-  bool pollPresence = (tick % 10 == 0);
-
-  for (int i = 0; i < num; i++) {
-    uint8_t seq;
-    if (pollPresence) {
-      // NOTE: do NOT write 0x0198 (start distance tracking) here. Re-arming
-      // the radar every poll cycle while occupied resets its absence
-      // detection, so presence stays latched at 1 and never clears. The
-      // arm is edge-triggered in AqaraOccupancy_HandleState instead.
-      seq = __atomic_add_fetch(&zclSeq, 1, __ATOMIC_RELAXED);
-      uint8_t readZcl[9] = {0x04, 0x5F, 0x11, seq, 0x00,
-                            0x42, 0x01, 0x5F, 0x01};
-      // Poll Presence & Distance
-      ZNP_AfDataRequestExt(0x02, addrs[i], eps[i], 0x0000, 8, 0xFCC0, seq, 0x00,
-                           0x1E, readZcl, 9);
-      // Stamp the poll time so the watchdog can detect if no reply comes back
-      pthread_mutex_lock( &g_deviceMutex );
-      for ( int j = 0; j < g_numAqaraOccupancies; j++ )
-      {
-          if ( g_aqaraOccupancies[j].shortAddr == addrs[i] )
-          {
-              g_aqaraOccupancies[j].lastPolled = ZNP_GetCurrentTime();
-              break;
-          }
-      }
-      pthread_mutex_unlock( &g_deviceMutex );
-      usleep(50000);
-      seq = __atomic_add_fetch(&zclSeq, 1, __ATOMIC_RELAXED);
-      uint8_t readLhtZcl[5] = {0x00, seq, 0x00, 0x00, 0x00};
-      // Poll Light
-      ZNP_AfDataRequestExt(0x02, addrs[i], eps[i], 0x0000, 8, 0x0400, seq, 0x00,
-                           0x1E, readLhtZcl, 5);
-      usleep(50000);
-    }
-  }
-}
 
 static void *AqaraOccupancy_PollThread(void *arg_) {
   (void)arg_;
@@ -353,7 +292,30 @@ static void *AqaraOccupancy_PollThread(void *arg_) {
   int keepaliveTick = 0; // separate counter for periodic radar keepalive
   while (1) {
     usleep(300000); // Check presence/light every 300ms for fast response
-    AqaraOccupancy_PollAll();
+    // AqaraOccupancy_PollAll(); // Removed polling to prevent sensor crash and rejoin loop
+
+    // Delayed Setup Execution: Check for sensors scheduled for setup (e.g. 10s after joining)
+    double now = ZNP_GetCurrentTime();
+    uint16_t delayedSetupAddrs[MAX_AQARA_OCCUPANCY];
+    int numDelayedSetup = 0;
+    
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int i = 0; i < g_numAqaraOccupancies; i++) {
+      if (!g_aqaraOccupancies[i].configured && 
+          g_aqaraOccupancies[i].setupScheduledTime > 0.0 &&
+          now >= g_aqaraOccupancies[i].setupScheduledTime &&
+          g_aqaraOccupancies[i].setupRetries < 5) {
+          
+          delayedSetupAddrs[numDelayedSetup++] = g_aqaraOccupancies[i].shortAddr;
+          g_aqaraOccupancies[i].setupScheduledTime = 0.0; // Don't trigger again
+      }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
+    for (int i = 0; i < numDelayedSetup; i++) {
+      LOG_DEBUG("[OCC] Executing delayed setup for sensor 0x%04X (TCLK exchange window closed)\n",
+             delayedSetupAddrs[i]);
+      AqaraOccupancy_PostAssign(delayedSetupAddrs[i]);
+    }
 
     // Every ~90s, retry setup for sensors whose bind/config never succeeded
     // (device was asleep or the network was congested during setup).
@@ -364,6 +326,7 @@ static void *AqaraOccupancy_PollThread(void *arg_) {
       pthread_mutex_lock(&g_deviceMutex);
       for (int i = 0; i < g_numAqaraOccupancies; i++) {
         if (!g_aqaraOccupancies[i].configured &&
+            g_aqaraOccupancies[i].setupScheduledTime == 0.0 && // Ignore ones waiting for initial delay
             g_aqaraOccupancies[i].setupRetries < 5) {
           retryAddrs[numRetry++] = g_aqaraOccupancies[i].shortAddr;
         }
@@ -566,6 +529,16 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   }
 
   bool alreadyConfigured = (idx != -1 && g_aqaraOccupancies[idx].configured);
+
+  if (!alreadyConfigured) {
+    // Schedule setup 10 seconds into the future.
+    // This allows Zigbee 3.0 devices to complete their TCLK exchange natively. 
+    // Flooding the device with ZDO bind requests right after joining interrupts 
+    // the security handshake and causes an infinite rejoin loop.
+    int tIdx = (idx != -1) ? idx : g_numAqaraOccupancies - 1;
+    g_aqaraOccupancies[tIdx].setupScheduledTime = ZNP_GetCurrentTime() + 10.0;
+  }
+
   pthread_mutex_unlock(&g_deviceMutex);
 
   if (changed) {
@@ -578,8 +551,10 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
   if (!(isRejoin && alreadyConfigured)) {
     if (!isRejoin && alreadyConfigured) {
       LOG_DEBUG("[OCC] 0x%04X already configured, re-discover skipped full setup.\n", shortAddr_);
+      AqaraOccupancy_PostAssign(shortAddr_);
+    } else {
+      LOG_DEBUG("[OCC] 0x%04X unconfigured device joined - scheduling setup in 10s to allow TCLK exchange.\n", shortAddr_);
     }
-    AqaraOccupancy_PostAssign(shortAddr_);
   } else {
     LOG_DEBUG("[OCC] 0x%04X rejoin of already-configured device - skipping setup flood.\n", shortAddr_);
   }
@@ -624,10 +599,18 @@ void AqaraOccupancy_UpdateIeee(uint16_t shortAddr_, const uint8_t *ieee_) {
       }
     }
   }
+  bool isConfigured = false;
+  if (found && targetIdx != -1) {
+    isConfigured = g_aqaraOccupancies[targetIdx].configured;
+  }
   pthread_mutex_unlock(&g_deviceMutex);
   if (found) {
     Device_Save();
-    AqaraOccupancy_PostAssign(shortAddr_);
+    // Only PostAssign immediately if already configured (it exits early).
+    // If unconfigured, we rely on the 10-second setupScheduledTime to run Setup.
+    if (isConfigured) {
+      AqaraOccupancy_PostAssign(shortAddr_);
+    }
   }
 }
 

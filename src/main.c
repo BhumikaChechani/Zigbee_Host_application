@@ -671,16 +671,25 @@ int main(int argc, char *argv[]) {
   // cluster the coordinator doesn't advertise). 0xFCC0 = Aqara manufacturer
   // cluster (occupancy/presence attr 0x0142), 0x0012 = Multistate Input.
   LOG_INFO("[5.5] Registering Application Endpoint and ZDO Callbacks...\n");
-  // inClusters: clusters we RECEIVE from sensors where the sensor is Client (Out).
-  // 0x0006 = On/Off (Aqara button is Client)
-  // 0x0406 = Occupancy, 0xFCC0 = Aqara MFR (FP300 presence)
-  uint16_t inClusters[8] = {0x0000, 0x0003, 0x0004, 0x0005,
-                             0x0006, 0x0406, 0xFCC0, 0x0012};
-  // outClusters: clusters we RECEIVE from sensors where the sensor is Server (In).
-  // 0x0500 = IAS Zone (contact sensor is Server)
-  uint16_t outClusters[7] = {0x0500, 0x0502, 0x0406, 0xFCC0,
-                              0x0402, 0x0405, 0x0400};
-  ZNP_AfRegister(8, 0x0104, 0x0007, 1, 0, 8, inClusters, 7, outClusters);
+  // inClusters: ALL clusters we need to RECEIVE reports from sensors.
+  // These MUST include every cluster the sensor sends attribute reports on.
+  // 0x0000 = Basic, 0x0003 = Identify, 0x0006 = On/Off (button)
+  // 0x0012 = Multistate Input, 0x0406 = Occupancy
+  // 0xFCC0 = Aqara MFR (FP300 presence/distance/light config)
+  // 0x0400 = Illuminance Measurement (FP300 light reports)
+  // 0x0402 = Temperature, 0x0405 = Humidity (FP300 env reports)
+  // 0x0500 = IAS Zone (contact/vibration sensors)
+  uint16_t inClusters[11] = {0x0000, 0x0003, 0x0006, 0x0012,
+                              0x0406, 0xFCC0, 0x0400, 0x0402,
+                              0x0405, 0x0500, 0x0502};
+  uint16_t outClusters[1] = {0x0019}; // OTA upgrade cluster
+  bool epOk = ZNP_AfRegister(8, 0x0104, 0x0007, 1, 0, 11, inClusters, 1, outClusters);
+  if (!epOk) {
+    // Status 184 = already registered from a previous run. The ZNP routes
+    // ALL incoming AF messages regardless of cluster list, so this is non-fatal.
+    // The updated cluster list will take effect on the next cold start.
+    LOG_WARNING("[5.5] Endpoint 8 already registered (stale from prev run). Continuing - all AF messages still routed.\n");
+  }
 
   ZNP_ZdoMsgCbRegister(0x8001); // IEEE_addr_rsp
   ZNP_ZdoMsgCbRegister(0x8004); // Simple_desc_rsp
@@ -1538,8 +1547,11 @@ static void Main_HandleIncomingFrame(const MT_FRAME_T *frame_) {
 #endif
       } else {
         LOG_DEBUG("❓ Unknown device 0x%04X sent AF message on cluster 0x%04X. "
-                  "Requesting Active EPs...\n",
+                  "Requesting IEEE and Active EPs...\n",
                   af.srcAddr, af.clusterId);
+        uint8_t reqPay[4] = {af.srcAddr & 0xFF, (af.srcAddr >> 8) & 0xFF, 0x01, 0x00};
+        ZNP_Sreq(0x25, 0x01, reqPay, 4, NULL, 3000); // IEEE_addr_req
+        usleep(50000);
         ZNP_ZdoActiveEpReq(af.srcAddr);
       }
     }

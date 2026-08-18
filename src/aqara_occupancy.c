@@ -76,7 +76,7 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
   if ((af_->clusterId != 0x0406 && af_->clusterId != 0xFCC0 &&
        af_->clusterId != 0x0402 && af_->clusterId != 0x0405 &&
        af_->clusterId != 0x0400 && af_->clusterId != 0x0012) ||
-      af_->dataLen < 5) {
+      af_->dataLen < 3) {  // 3 = minimum ZCL frame (FC + Seq + Cmd)
     return;
   }
   uint8_t fc = af_->data[0];
@@ -203,7 +203,6 @@ static void AqaraOccupancy_HandleAf(const AF_MSG_T *af_) {
                         (af_->data[offset + 2] << 16) |
                         ((uint32_t)af_->data[offset + 3] << 24);
           AqaraOccupancy_HandleDistance(af_->srcAddr, cm);
-
         } else if (af_->clusterId == 0xFCC0 && attrId == 0x0143 && width == 1) {
           // Motion Status: 0=None, 1=Stationary, 2=Moving, 3=Approaching, 4=Walking Away, 5=Passed By
           uint8_t newMotion = af_->data[offset];
@@ -282,17 +281,70 @@ static void *AqaraOccupancy_PollThread(void *arg_) {
 
   for (int i = 0; i < num; i++) {
     LOG_DEBUG("[OCC] Auto-configuring pre-registered sensor 0x%04X\n", addrs[i]);
-    // Post instead of calling Setup directly: setup then only ever runs on
-    // the occupancy worker thread, so two threads never configure at once.
-    AqaraOccupancy_PostAssign(addrs[i]);
+
+    // Always reset configured=false on startup. The FP300 may have lost its
+    // bindings and ZCL configure-reporting state due to a power cycle or
+    // firmware reset between app runs. Re-running setup restores them.
+    pthread_mutex_lock(&g_deviceMutex);
+    for (int j = 0; j < g_numAqaraOccupancies; j++) {
+      if (g_aqaraOccupancies[j].shortAddr == addrs[i]) {
+        g_aqaraOccupancies[j].configured = false;
+        g_aqaraOccupancies[j].lastSetupAttempt = 0.0;
+        g_aqaraOccupancies[j].setupRetries = 0;
+        g_aqaraOccupancies[j].setupScheduledTime = ZNP_GetCurrentTime() + 5.0;
+        LOG_DEBUG("[OCC] Startup: forcing re-setup of 0x%04X in 5s\n", addrs[i]);
+        break;
+      }
+    }
+    pthread_mutex_unlock(&g_deviceMutex);
     sleep(1);
   }
 
   int retryTick = 0;
   int keepaliveTick = 0; // separate counter for periodic radar keepalive
+  static uint8_t s_pollSeq = 200; // distinct range from setup sequences
+  int pollTick = 0;
   while (1) {
-    usleep(300000); // Check presence/light every 300ms for fast response
-    // AqaraOccupancy_PollAll(); // Removed polling to prevent sensor crash and rejoin loop
+    usleep(300000); // 300ms per tick
+    pollTick++;
+
+    // --- Poll Presence, Distance, and Light (every 10 ticks = ~3s) ---
+    // The FP300 does not reliably push presence/distance/light over ZCL 
+    // configure-reporting. It expects to be polled. This mirrors the exact 
+    // behavior from the working commit.
+    if (pollTick % 10 == 0) {
+      pthread_mutex_lock(&g_deviceMutex);
+      int pNum = 0;
+      uint16_t pAddrs[MAX_AQARA_OCCUPANCY];
+      uint8_t  pEps[MAX_AQARA_OCCUPANCY];
+      for (int i = 0; i < g_numAqaraOccupancies; i++) {
+        if (g_aqaraOccupancies[i].configured) {
+          pAddrs[pNum] = g_aqaraOccupancies[i].shortAddr;
+          pEps[pNum]   = g_aqaraOccupancies[i].endpoint;
+          pNum++;
+        }
+      }
+      pthread_mutex_unlock(&g_deviceMutex);
+      
+      for (int i = 0; i < pNum; i++) {
+        uint8_t seq1 = __atomic_add_fetch(&s_pollSeq, 1, __ATOMIC_RELAXED);
+        // ZCL Read Attribute: cluster 0xFCC0, attrs 0x0142 (Presence), 0x015F (Distance)
+        uint8_t readOcc[9] = {0x04, 0x5F, 0x11, seq1, 0x00, 0x42, 0x01, 0x5F, 0x01};
+        ZNP_AfDataRequestExt(0x02, pAddrs[i], pEps[i], 0x0000, 8, 0xFCC0,
+                             seq1, 0x00, 0x1E, readOcc, 9);
+        
+        usleep(50000);
+
+        uint8_t seq2 = __atomic_add_fetch(&s_pollSeq, 1, __ATOMIC_RELAXED);
+        // ZCL Read Attribute: cluster 0x0400, attr 0x0000 (MeasuredValue)
+        uint8_t readLht[5] = {0x00, seq2, 0x00, 0x00, 0x00};
+        ZNP_AfDataRequestExt(0x02, pAddrs[i], pEps[i], 0x0000, 8, 0x0400,
+                             seq2, 0x00, 0x1E, readLht, 5);
+        
+        usleep(50000);
+      }
+    }
+
 
     // Delayed Setup Execution: Check for sensors scheduled for setup (e.g. 10s after joining)
     double now = ZNP_GetCurrentTime();
@@ -508,11 +560,14 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
              g_aqaraOccupancies[idx].shortAddr, shortAddr_);
       LOG_EVENT("OCCUPANCY", shortAddr_, "Network Rejoin\n");
       g_aqaraOccupancies[idx].shortAddr = shortAddr_;
-      // DO NOT reset configured or absenceDelayApplied here. The device
-      // retains its configuration (bindings, absence delay) across a simple
-      // network rejoin. Flooding it with ZCL configuration commands right
-      // after it announces itself overwhelms the FP300 and causes it to
-      // immediately leave again, creating an infinite rejoin loop.
+      
+      // The device often loses its bindings on reboot/rejoin. We must re-configure it.
+      // However, sending ZCL commands immediately overwhelms the FP300 and causes
+      // an infinite rejoin loop. Schedule the setup to run 30 seconds from now.
+      g_aqaraOccupancies[idx].configured = false;
+      g_aqaraOccupancies[idx].setupScheduledTime = ZNP_GetCurrentTime() + 30.0;
+      g_aqaraOccupancies[idx].lastSetupAttempt = 0.0;
+      
       isRejoin = true;
       changed = true;
     }
@@ -528,15 +583,26 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     }
   }
 
-  bool alreadyConfigured = (idx != -1 && g_aqaraOccupancies[idx].configured);
+  // Capture configured state AFTER all modifications above (including the rejoin
+  // path which clears configured=false).
+  bool isNowConfigured = (idx != -1) ? g_aqaraOccupancies[idx].configured
+                         : ((g_numAqaraOccupancies > 0) ? g_aqaraOccupancies[g_numAqaraOccupancies-1].configured : false);
 
-  if (!alreadyConfigured) {
-    // Schedule setup 10 seconds into the future.
-    // This allows Zigbee 3.0 devices to complete their TCLK exchange natively. 
-    // Flooding the device with ZDO bind requests right after joining interrupts 
-    // the security handshake and causes an infinite rejoin loop.
+  if (!isNowConfigured) {
+    // If rejoin already scheduled a 30s setup time, don't overwrite it with 10s.
     int tIdx = (idx != -1) ? idx : g_numAqaraOccupancies - 1;
-    g_aqaraOccupancies[tIdx].setupScheduledTime = ZNP_GetCurrentTime() + 10.0;
+    if (g_aqaraOccupancies[tIdx].setupScheduledTime == 0.0) {
+      // Fresh join: allow 10 seconds for TCLK exchange before configuring.
+      g_aqaraOccupancies[tIdx].setupScheduledTime = ZNP_GetCurrentTime() + 10.0;
+      LOG_DEBUG("[OCC] 0x%04X new device - scheduling setup in 10s (TCLK window).\n", shortAddr_);
+    } else {
+      LOG_DEBUG("[OCC] 0x%04X rejoin - setup already scheduled at T+%.0fs.\n",
+             shortAddr_, g_aqaraOccupancies[tIdx].setupScheduledTime - ZNP_GetCurrentTime());
+    }
+  } else {
+    // Already configured and same short address: silently re-check via PostAssign
+    // (it returns immediately if configured==true, so no ZCL flood).
+    LOG_DEBUG("[OCC] 0x%04X already configured, re-discover skipped full setup.\n", shortAddr_);
   }
 
   pthread_mutex_unlock(&g_deviceMutex);
@@ -545,18 +611,8 @@ void AqaraOccupancy_Discover(uint16_t shortAddr_, uint8_t endpoint_) {
     Device_Save();
   }
 
-  // For an already-configured sensor with the SAME short address (not a rejoin)
-  // still call PostAssign so AqaraOccupancy_Setup can skip setup (it returns
-  // early if configured==true) but remain silent about it — no log spam.
-  if (!(isRejoin && alreadyConfigured)) {
-    if (!isRejoin && alreadyConfigured) {
-      LOG_DEBUG("[OCC] 0x%04X already configured, re-discover skipped full setup.\n", shortAddr_);
-      AqaraOccupancy_PostAssign(shortAddr_);
-    } else {
-      LOG_DEBUG("[OCC] 0x%04X unconfigured device joined - scheduling setup in 10s to allow TCLK exchange.\n", shortAddr_);
-    }
-  } else {
-    LOG_DEBUG("[OCC] 0x%04X rejoin of already-configured device - skipping setup flood.\n", shortAddr_);
+  if (isNowConfigured && !isRejoin) {
+    AqaraOccupancy_PostAssign(shortAddr_);
   }
 }
 
@@ -674,25 +730,26 @@ void AqaraOccupancy_Setup(uint16_t shortAddr_) {
   bool bMfr = ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0xFCC0,
                              g_coordinatorIeee, 8);
   usleep(300000);
-  bool bMs = ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0012,
-                            g_coordinatorIeee, 8);
+  (void)ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0012,
+                       g_coordinatorIeee, 8); // result not used
   usleep(300000);
   bool bLht = ZNP_ZdoBindReq(shortAddr_, sensorIeee, endpoint, 0x0400,
                              g_coordinatorIeee, 8);
   usleep(300000);
-  LOG_DEBUG("[OCC] bind: 0x0406=%s 0xFCC0=%s 0x0012=%s 0x0400=%s\n",
-         bStd ? "OK" : "FAIL", bMfr ? "OK" : "FAIL", bMs ? "OK" : "FAIL",
-         bLht ? "OK" : "FAIL");
+  // Elevate bind results to EVENT level so user can see them without debug mode
+  LOG_EVENT("OCCUPANCY", shortAddr_, "Setup binds: 0x0406=%s 0xFCC0=%s 0x0400=%s\n",
+         bStd ? "OK" : "FAIL", bMfr ? "OK" : "FAIL", bLht ? "OK" : "FAIL");
 
-  // Presence (0xFCC0 + 0x0406) and light (0x0400) binds are what event flow
-  // depends on; if any failed (device asleep / congestion), leave the entry
-  // unconfigured so the poll thread retries instead of silently giving up.
-  if (!(bStd && bMfr && bLht)) {
+  // The FP300 often does NOT support ZDO bind on its manufacturer cluster 0xFCC0.
+  // Reports from 0xFCC0 are configured via ZCL Configure Reporting (steps below),
+  // so a 0xFCC0 bind failure is NOT fatal. Only abort if the standard occupancy
+  // cluster (0x0406) AND the light cluster (0x0400) both fail.
+  if (!bStd && !bLht) {
     pthread_mutex_lock(&g_deviceMutex);
     for (int i = 0; i < g_numAqaraOccupancies; i++) {
       if (g_aqaraOccupancies[i].shortAddr == shortAddr_) {
         g_aqaraOccupancies[i].setupRetries++;
-        LOG_ERROR("[OCC] setup of 0x%04X FAILED (attempt %u) - will retry\n",
+        LOG_ERROR("[OCC] setup of 0x%04X FAILED - both 0x0406 and 0x0400 binds failed (attempt %u) - will retry\n",
                shortAddr_, g_aqaraOccupancies[i].setupRetries);
         break;
       }
@@ -1330,7 +1387,9 @@ void AqaraOccupancy_PrintStatus(void) {
           if (g_aqaraOccupancies[i].zones[z].occupied) {
               bool hasDoor = false;
               bool doorOpen = UseCase_IsDoorOpenForZone((uint8_t)z, &hasDoor);
-              if (hasDoor && !doorOpen) {
+              if (!hasDoor) {
+                  presenceStatus = "\033[1;33mPresence IGNORED (Door Sensor NOT REGISTERED)\033[0m";
+              } else if (!doorOpen) {
                   presenceStatus = "\033[1;33mPresence IGNORED (Door Closed)\033[0m";
               } else {
                   presenceStatus = "\033[1;32mPresence DETECTED\033[0m";
